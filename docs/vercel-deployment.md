@@ -17,7 +17,7 @@ The first deployment was explicitly requested from the application branch above,
 
 ## Remaining configuration
 
-No live database credentials or Resend configuration were supplied to the new project. The UI can be deployed without them, but real account registration requires:
+The dedicated Supabase schema and restricted backend role have been provisioned; see [Supabase setup](supabase-setup.md) for applied migrations and the pending pooler activation. No live database credentials or Resend configuration have been installed in Vercel. Production `WEBAUTHN_ORIGIN` is set to `https://sirocash.vercel.app` on SiroCash only. The UI can be deployed without them, but real account registration requires:
 
 - `DATABASE_URL` for a separate appropriate PostgreSQL database, with migrations applied.
 - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` for a verified sending domain.

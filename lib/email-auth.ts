@@ -1,17 +1,14 @@
 import 'server-only';
-import {Pool, type PoolClient} from 'pg';
 import {createHash,randomBytes,randomInt,createHmac,timingSafeEqual} from 'node:crypto';
 import {Resend} from 'resend';
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
 import {sameOrigin,apiError} from './api';
+import {database as pool,databaseTransaction as transaction} from './database';
 import {passwordSchema,hashPassword,verifyPassword} from './password';
-const globals=globalThis as unknown as {authPool?:Pool};
 const COOKIE='siro-auth';
-function pool(){if(!process.env.DATABASE_URL)throw Error('خدمة الحسابات غير متاحة حالياً. يرجى المحاولة لاحقاً.');return globals.authPool??=new Pool({connectionString:process.env.DATABASE_URL,max:5})}
 const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
 function otpHash(id:string,code:string){const secret=process.env.AUTH_SECRET;if(!secret||secret.length<32)throw Error('خدمة الحسابات غير متاحة حالياً. يرجى المحاولة لاحقاً.');return createHmac('sha256',secret).update(id+':'+code).digest('hex')}
-async function transaction<T>(run:(c:PoolClient)=>Promise<T>){const c=await pool().connect();try{await c.query('BEGIN');const result=await run(c);await c.query('COMMIT');return result}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}
 function cookieToken(request:Request){return request.headers.get('cookie')?.split(';').map(c=>c.trim()).find(c=>c.startsWith(COOKIE+'='))?.slice(COOKIE.length+1)}
 export async function currentUser(request:Request){const token=cookieToken(request);if(!token)return null;const {rows}=await pool().query('SELECT u.id,u.email,u."emailVerifiedAt" FROM "AuthSession" s JOIN "User" u ON u.id=s."userId" WHERE s."tokenHash"=$1 AND s."expiresAt">NOW()',[hash(token)]);return rows[0] as {id:string;email:string;emailVerifiedAt:string}|undefined??null}
 export async function requireUser(request:Request){let user;try{user=await currentUser(request)}catch{throw Error('خدمة الحسابات غير متاحة مؤقتاً.')}if(!user)throw Error('يتطلّب هذا الإجراء تسجيل الدخول والتحقق من البريد الإلكتروني.');return user}

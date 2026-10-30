@@ -184,3 +184,7 @@ The same allowlist in `lib/crypto-assets.ts` drives the client and validation. U
 - Apply migrations `20261030050000_crypto_types` then `20261030060000_crypto_assets`: they add the asset/network metadata, per-user asset-aware address uniqueness, compatibility constraints and immutable transaction asset/network fields. Legacy transaction metadata remains null rather than inferring an unknown chain. Existing balanced-journal and USD balance invariants are preserved.
 
 `npm run test:crypto` covers the allowlist, destination formats, approval binding, migrations, invalid metadata rejection and immutability. `npm run test:api` covers generated demo payloads for all four allowed pairs and denial of unverified withdrawals. No real deposit/withdrawal was performed or tested.
+
+### Hosted database status
+
+The dedicated Supabase schema, RLS isolation, and restricted backend role are provisioned. Server connection credentials and email delivery are **not yet activated**. See [Supabase setup and verification](docs/supabase-setup.md) and [isolated Vercel deployment](docs/vercel-deployment.md). `/api/health/database` returns 503 until runtime connectivity and auth-schema permissions succeed.
