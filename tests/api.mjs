@@ -51,3 +51,13 @@ assert.ok([200,503].includes(unknownSession.status));
 if(unknownSession.status===503){assert.equal(unknownBody.balance,null);assert.equal(unknownBody.demo,false);assert.deepEqual(unknownBody.transactions,[])}
 else{assert.equal(unknownBody.demo,true);assert.equal(unknownBody.user,null)}
 console.log('Account API: explicit guest demo and no account-error fallback to shared balances passed.');
+for(const path of ['/dashboard','/deposit','/withdraw','/sham-cash','/mobile-topup']){
+ const response=await fetch(base+path,{redirect:'manual'});
+ assert.equal(response.status,307,`${path} must require a server-verified session`);
+ assert.equal(new URL(response.headers.get('location'),base).pathname,'/auth');
+ const forged=await fetch(base+path,{redirect:'manual',headers:{Cookie:'siro-auth='+'b'.repeat(64)}});
+ // Invalid sessions redirect; a database outage fails closed instead of exposing the account page.
+ assert.ok([307,500].includes(forged.status));
+ if(forged.status===307)assert.equal(new URL(forged.headers.get('location'),base).pathname,'/auth');
+}
+console.log('Private page routing: anonymous redirect and invalid-session fail-closed behavior passed.');

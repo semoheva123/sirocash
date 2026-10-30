@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const root=await readFile('app/page.tsx','utf8');
+const auth=await readFile('app/auth/page.tsx','utf8');
+const layout=await readFile('app/(account)/layout.tsx','utf8');
+for(const source of [root,auth])assert.ok(source.includes("if(await serverUser())redirect('/dashboard')"));
+assert.ok(layout.includes("if(!await serverUser())redirect('/auth')"));
+const session=await readFile('lib/server-user.ts','utf8');
+assert.ok(session.includes('currentUser('));assert.ok(session.includes("cookies()).get('siro-auth')"));
+const client=await readFile('components/email-auth.tsx','utf8');
+assert.ok(client.includes("window.location.replace('/dashboard')"));
+const app=await readFile('components/siro-app.tsx','utf8');
+assert.ok(app.includes('(accountPage?accountNav:visitorNav)'));
+assert.ok(app.includes("href={accountPage?'/dashboard':'/'}"));
+assert.ok(app.includes("page!=='home'&&!data.user"));
+assert.ok(app.includes("window.location.replace('/auth')"));
+for(const route of ['dashboard','deposit','withdraw','sham-cash','mobile-topup'])await readFile(`app/(account)/${route}/page.tsx`);
+console.log('Account routing structure: verified server-session guards, member navigation, and post-verification/expired-session replacements passed.');

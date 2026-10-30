@@ -10,7 +10,7 @@
     "db:generate": "prisma generate",
     "test:api": "node tests/api.mjs",
     "test:ledger": "node tests/ledger.mjs",
-    "test": "npm run lint && npm run test:ledger && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:email-template && npm run test:account",
+    "test": "npm run lint && npm run test:ledger && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:email-template && npm run test:account && npm run test:routing",
     "test:email": "node tests/email-schema.mjs",
     "test:password": "node --experimental-strip-types tests/password.mjs",
     "test:copy": "node tests/arabic-copy.mjs",
@@ -20,7 +20,8 @@
     "test:database-options": "tsx tests/database-options.ts",
     "test:email-template": "tsx tests/verification-email.ts",
     "email:preview": "tsx scripts/preview-verification-email.ts",
-    "test:account": "tsx tests/account-overview.ts"
+    "test:account": "tsx tests/account-overview.ts",
+    "test:routing": "node tests/account-routing.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
