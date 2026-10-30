@@ -1,13 +1,27 @@
-import {ArrowLeftRight,ArrowUpRight,Fingerprint,Layers,ShieldCheck} from 'lucide-react';
+'use client';
+import {useState} from 'react';
+import {ArrowLeftRight,ArrowUpRight,ArrowDownLeft,Plus,ShieldCheck,Layers,Wifi,EyeOff,Check,LockKeyhole,Mail} from 'lucide-react';
 
-/** Brand illustration, not an account, payment card, live balance or wallet address. */
+/** Interactive interface illustration. Never an issued card or a live account. */
 export function SignatureVisual({ar,compact=false}:{ar:boolean;compact?:boolean}){
- return <div className={'signature-scene'+(compact?' signature-scene-compact':'')} aria-label={ar?'تصميم توضيحي لهوية سيرو كاش، لا يمثّل بطاقة دفع فعلية':'SiroCash brand illustration, not an issued payment card'}>
-  <div className="signature-orb" aria-hidden="true"/><div className="signature-orbit orbit-a" aria-hidden="true"/><div className="signature-orbit orbit-b" aria-hidden="true"/>
-  <span className="signature-coordinate" aria-hidden="true">SIROCASH / DIGITAL EXPERIENCE</span>
-  <div className="signature-metal-card" aria-hidden="true"><div className="signature-card-brand"><ArrowLeftRight size={22}/><strong>SiroCash<span>.</span></strong><span>DIGITAL WALLET</span></div><svg className="signature-engraving" viewBox="0 0 420 270" fill="none"><path d="M170-50C450 30 10 180 430 290M195-60C470 40 30 185 455 300M220-70C490 50 50 190 480 310M245-80C510 60 70 195 505 320M270-90C530 70 90 200 530 330M295-100C550 80 110 205 555 340" stroke="currentColor"/><circle cx="300" cy="130" r="95" stroke="currentColor"/><circle cx="300" cy="130" r="113" stroke="currentColor"/></svg><div className="signature-chip"><i/><i/><i/></div><span className="signature-card-caption">CLARITY. BY DESIGN.</span><div className="signature-card-bottom"><span>YOUR PERSONAL SPACE</span><Fingerprint size={30} strokeWidth={1}/></div></div>
-  <div className="signature-asset-panel"><div className="signature-panel-heading"><span>{ar?'العملات الرقمية':'DIGITAL ASSETS'}</span><Layers size={15}/></div><div><span className="signature-token token-usdt">₮</span><span><strong>USDT</strong><small>Tether</small></span><ArrowUpRight size={16}/></div><div><span className="signature-token token-usdc">$</span><span><strong>USDC</strong><small>USD Coin</small></span><ArrowUpRight size={16}/></div><small className="signature-panel-note">{ar?'خيارات توضيحية · دون تسوية فعلية':'Preview selections · No live settlement'}</small></div>
-  <div className="signature-seal"><span><ShieldCheck size={20}/></span><div><strong>{ar?'تأكيد التغييرات الحسّاسة':'Considered account security'}</strong><small>{ar?'كلمة مرور وتحقق عبر البريد':'Password & email approval'}</small></div></div>
-  <div className="signature-caption"><span>01 / SIROCASH</span><span>{ar?'تصميم توضيحي · ليست بطاقة دفع':'Brand illustration · Not a payment card'}</span></div>
+ const [security,setSecurity]=useState(false);
+ const t=(en:string,arabic:string)=>ar?arabic:en;
+ return <div className={'fintech-scene'+(compact?' fintech-scene-compact':'')} aria-label={t('Illustrative app preview, not an issued payment card','معاينة توضيحية للتطبيق، لا تمثّل بطاقة دفع فعلية')}>
+  <div className="fintech-scene-disc" aria-hidden="true"/><div className="fintech-scene-grid" aria-hidden="true"/>
+  <span className="fintech-scene-word" aria-hidden="true">S.</span>
+  <div className="fintech-phone" dir={ar?'rtl':'ltr'}><div className="fintech-phone-status" aria-hidden="true"><span>9:41</span><span><Wifi size={12}/><i/></span></div>
+   <div className="fintech-phone-brand"><span><ArrowLeftRight size={19}/>SiroCash<span>.</span></span><span className="fintech-phone-avatar">S</span></div>
+   <div className="fintech-phone-greeting"><span>{t('A new perspective','تجربة مالية أوضح')}</span><strong>{t('Your personal space','أهلًا بمساحتك الجديدة')}<span>✦</span></strong></div>
+   <div className="fintech-phone-tabs" role="group" aria-label={t('Explore app screens','استكشاف واجهات التطبيق')}><button type="button" aria-pressed={!security} onClick={()=>setSecurity(false)}>{t('Wallet','المحفظة')}</button><button type="button" aria-pressed={security} onClick={()=>setSecurity(true)}>{t('Security','الحماية')}</button></div>
+   <div className="fintech-phone-screen" aria-live="polite" aria-atomic="true">{!security?<>
+    <div className="fintech-phone-balance"><div><span>{t('Private balance preview','معاينة الرصيد المخفي')}</span><EyeOff size={15}/></div><strong dir="ltr">•••••• <small>USD</small></strong><span className="fintech-balance-decoration" aria-hidden="true">↗</span><div className="fintech-phone-actions">{[{icon:ArrowUpRight,en:'Send',ar:'إرسال'},{icon:ArrowDownLeft,en:'Receive',ar:'استلام'},{icon:Plus,en:'Deposit',ar:'إيداع'}].map(a=><span key={a.en}><a.icon size={15}/>{ar?a.ar:a.en}</span>)}</div></div>
+    <div className="fintech-phone-section"><strong>{t('Digital assets','العملات الرقمية')}</strong><span>{t('Preview','معاينة')}</span></div>
+    <div className="fintech-phone-assets">{[{symbol:'₮',name:'USDT',label:'Tether',className:'usdt'},{symbol:'$',name:'USDC',label:'USD Coin',className:'usdc'}].map(asset=><div key={asset.name}><span className={'fintech-coin '+asset.className}>{asset.symbol}</span><span><strong>{asset.name}</strong><small>{asset.label}</small></span><span>{t('Not activated','غير مفعّلة')}</span></div>)}</div>
+   </>:<div className="fintech-phone-security"><span className="fintech-security-orb"><ShieldCheck size={31}/></span><h3>{t('Control your access','تحكّم في الوصول لحسابك')}</h3>{[{icon:Mail,en:'Email approval',ar:'تأكيد عبر البريد'},{icon:LockKeyhole,en:'Session controls',ar:'إدارة الجلسات'},{icon:ShieldCheck,en:'Security history',ar:'سجل النشاط الأمني'}].map(a=><div key={a.en}><a.icon size={16}/><span>{ar?a.ar:a.en}</span><Check size={14}/></div>)}</div>}</div>
+   <div className="fintech-phone-bottom"><span className="fintech-phone-home"/><span>{t('Visual preview · No live settlement','معاينة توضيحية · دون تسوية فعلية')}</span></div>
+  </div>
+  <div className="fintech-float fintech-float-assets"><span className="fintech-float-icon"><Layers size={22}/></span><div><small>{t('Two assets. One space.','عملتان. مساحة واحدة.')}</small><strong>USDT <span>+</span> USDC</strong></div><ArrowUpRight size={20}/></div>
+  <div className="fintech-float fintech-float-security"><span><ShieldCheck size={23}/></span><div><strong>{t('Your account. Your control.','حسابك. تحت إدارتك.')}</strong><small>{t('Password & email approval','كلمة مرور وتأكيد عبر البريد')}</small></div></div>
+  <div className="fintech-scene-caption"><span className="fintech-caption-dot"/>{t('Brand illustration · Not a payment card','تصميم توضيحي · ليست بطاقة دفع')}</div>
  </div>;
 }
