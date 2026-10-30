@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {databaseOptions,databaseFailureCategory} from '../lib/database-options';
+const options=databaseOptions('postgresql://user:fixture@db.example.test:5432/postgres?sslmode=disable&sslrootcert=bad&sslcert=bad&sslkey=bad&uselibpqcompat=true',true,'TRUSTED\\nCA');
+assert.deepEqual(options.ssl,{rejectUnauthorized:true,ca:'TRUSTED\nCA'});
+const url=new URL(options.connectionString!);
+for(const flag of ['sslmode','sslrootcert','sslcert','sslkey','uselibpqcompat'])assert.equal(url.searchParams.has(flag),false);
+assert.equal(options.max,1);assert.equal(options.connectionTimeoutMillis,8000);assert.equal(options.query_timeout,10000);
+assert.equal(databaseOptions('postgresql://localhost/test',false).ssl,undefined);
+assert.deepEqual(databaseOptions('postgresql://db.example.test/test',true).ssl,{rejectUnauthorized:true});
+assert.equal(databaseFailureCategory({code:'SELF_SIGNED_CERT_IN_CHAIN',message:'secret'}),'TLS_CERTIFICATE');
+assert.equal(databaseFailureCategory({code:'28P01'}),'AUTHENTICATION');
+assert.equal(databaseFailureCategory({code:'42501'}),'PERMISSIONS');
+assert.equal(databaseFailureCategory({code:'42P01'}),'SCHEMA');
+assert.equal(databaseFailureCategory({code:'ENOTFOUND'}),'NETWORK');
+assert.equal(databaseFailureCategory({code:'secret-code',message:'secret'}),'CONNECTION_FAILED');
+console.log('Database options: verified TLS, URL flag isolation, bounded pooling/timeouts, and redacted diagnostics passed.');

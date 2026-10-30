@@ -8,7 +8,7 @@ The eight application tables are installed: `User`, `LedgerAccount`, `Transactio
 
 All eight tables (and the Prisma migration registry) have RLS enabled. PUBLIC, `anon`, and `authenticated` cannot read the application tables. Authentication is implemented by the server, not by direct browser access to Supabase/PostgREST. Do not give browsers a service-role key or add permissive public policies.
 
-A dedicated `sirocash_app` role is provisioned **NOLOGIN** until credentials are installed securely. It cannot bypass RLS, create databases/roles, or post to the financial journal. Explicit backend-only policies and column/table grants permit the existing email/password/session queries, not direct balance updates, user deletion, or PIN-hash reads. Never use the administrator connection as the application's runtime credential.
+A dedicated `sirocash_app` role was initially provisioned **NOLOGIN**. After the user supplied the actual Session Pooler endpoint, LOGIN was enabled with a fresh random password and a 12-connection role limit. The credential is installed as a sensitive, production-only Vercel variable. It cannot bypass RLS, create databases/roles, or post to the financial journal. Explicit backend-only policies and column/table grants permit the existing email/password/session queries, not direct balance updates, user deletion, or PIN-hash reads. Never use the administrator connection as the application's runtime credential.
 
 ### Migration bookkeeping
 
@@ -31,7 +31,7 @@ The enum additions were committed before constraints referenced the new values. 
 - Hosted catalog: all nine public tables have RLS; `anon` and `authenticated` have no SELECT access.
 - Local PostgreSQL-compatible tests: every migration, actual restricted-role auth SQL, rejected financial access, public-role isolation, and role attributes.
 
-## Connection activation — still pending
+## Connection activation
 
 The direct database hostname returned only an IPv6 address during inspection. Do not guess a pooler hostname, assume Vercel IPv6 egress, or deploy an untested direct connection.
 
@@ -42,4 +42,4 @@ The direct database hostname returned only an IPv6 address during inspection. Do
 5. Explicitly redeploy **SiroCash**, then check `/api/health/database`: 200 `ready` means the actual server connection can resolve the auth schema with its runtime privileges. 503 `not_configured` or `unavailable` is a failure, not a successful integration. This endpoint never returns records, credentials, connection URLs, or raw database errors.
 6. Complete a real signup → email OTP → login → logout test. Database readiness alone does not verify email delivery or WebAuthn hardware behavior.
 
-No database credential, auth signing secret, or email-provider key has been installed yet. Financial operations remain simulated and passkey state remains process-local; database provisioning does not change those limitations.
+The actual user-supplied Session Pooler is `aws-0-eu-west-1.pooler.supabase.com:5432`, database `postgres`. Runtime uses the custom-role username `sirocash_app.pqzvkhwxarwwcsquhrea`, **not** the administrator username. Production-only `DATABASE_URL` and a freshly generated `AUTH_SECRET` are installed as sensitive variables on SiroCash only. The connection deployment has been requested; successful runtime readiness still requires verification. No email-provider key has been installed yet. Financial operations remain simulated and passkey state remains process-local; database provisioning does not change those limitations.

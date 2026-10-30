@@ -33,3 +33,11 @@ for(const [asset,chain] of [['USDT','TRC20'],['USDT','BEP20'],['USDC','ETHEREUM'
 for(const chain of ['TRC20','BEP20'])assert.equal((await post('/api/deposit/generate-address',{asset:'USDC',chain})).status,400);
 assert.equal((await post('/api/wallet/withdraw',{asset:'USDC',chain:'ETHEREUM',recipient:'0x'+'a'.repeat(40),amount:1,pin:'123456'})).status,400);
 console.log('USDC API tests passed: supported demo pairs, rejected incompatible networks, and withdrawal blocked without device approval.');
+
+const readiness=await fetch(base+'/api/health/database');
+assert.ok([200,503].includes(readiness.status));
+assert.equal(readiness.headers.get('cache-control'),'no-store');
+const readinessBody=await readiness.json();
+assert.deepEqual(Object.keys(readinessBody),['database']);
+assert.ok((readiness.status===200?['ready']:['not_configured','unavailable']).includes(readinessBody.database));
+console.log('Database readiness API passed: bounded response, no-store, and no database details exposed.');
