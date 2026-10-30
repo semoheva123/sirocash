@@ -11,6 +11,7 @@ const COOKIE='siro-auth';
 const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
 function otpHash(id:string,code:string){const secret=process.env.AUTH_SECRET;if(!secret||secret.length<32)throw Error('خدمة الحسابات غير متاحة حالياً. يرجى المحاولة لاحقاً.');return createHmac('sha256',secret).update(id+':'+code).digest('hex')}
 function cookieToken(request:Request){return request.headers.get('cookie')?.split(';').map(c=>c.trim()).find(c=>c.startsWith(COOKIE+'='))?.slice(COOKIE.length+1)}
+export function sessionTokenHash(request:Request){const token=cookieToken(request);return token?hash(token):null}
 export async function currentUser(request:Request){const token=cookieToken(request);if(!token)return null;const {rows}=await pool().query('SELECT u.id,u.email,u."emailVerifiedAt" FROM "AuthSession" s JOIN "User" u ON u.id=s."userId" WHERE s."tokenHash"=$1 AND s."expiresAt">NOW()',[hash(token)]);return rows[0] as {id:string;email:string;emailVerifiedAt:string}|undefined??null}
 export async function requireUser(request:Request){let user;try{user=await currentUser(request)}catch{throw Error('خدمة الحسابات غير متاحة مؤقتاً.')}if(!user)throw Error('يتطلّب هذا الإجراء تسجيل الدخول والتحقق من البريد الإلكتروني.');return user}
 export async function requestCode(request:Request){

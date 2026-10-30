@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import {readFile,readdir} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+import {changePassword,passwordChangeSchema,type PasswordTransaction} from '../lib/change-password';
+import {hashPassword,verifyPassword} from '../lib/password';
+async function main(){
+ const db=new PGlite();
+ for(const dir of (await readdir('prisma/migrations')).sort())if(!dir.endsWith('.toml'))await db.exec(await readFile(`prisma/migrations/${dir}/migration.sql`,'utf8'));
+ const old='Existing-password-123',fresh='New-unique-password-456';
+ const oldHash=await hashPassword(old);
+ const {rows:[alice]}=await db.query<{id:string}>('INSERT INTO "User"(id,email,"passwordHash","emailVerifiedAt") VALUES(gen_random_uuid(),$1,$2,NOW()) RETURNING id',['password-test@example.test',oldHash]);
+ const {rows:[bob]}=await db.query<{id:string}>('INSERT INTO "User"(id,email,"passwordHash","emailVerifiedAt") VALUES(gen_random_uuid(),$1,$2,NOW()) RETURNING id',['other-password-test@example.test',oldHash]);
+ for(const [token,uid] of [['alice-one',alice.id],['alice-two',alice.id],['bob-one',bob.id]])await db.query('INSERT INTO "AuthSession"("tokenHash","userId","expiresAt") VALUES($1,$2,NOW()+INTERVAL \'1 day\')',[token,uid]);
+ for(const [id,email] of [['alice-code','password-test@example.test'],['bob-code','other-password-test@example.test']])await db.query('INSERT INTO "EmailChallenge"(id,email,"codeHash","passwordHash",purpose,"expiresAt") VALUES($1,$2,$3,$4,$5,NOW()+INTERVAL \'10 minutes\')',[id,email,'hashed-code',oldHash,'login']);
+ await db.exec('SET ROLE sirocash_app');
+ const transaction:PasswordTransaction=run=>db.transaction(tx=>run({query:(sql,params)=>tx.query(sql,params)}));
+ const input=passwordChangeSchema.parse({currentPassword:old,newPassword:fresh,confirmation:fresh});
+ for(const invalid of [{...input,confirmation:'different-password'}, {...input,newPassword:old,confirmation:old},{...input,newPassword:'short',confirmation:'short'},{...input,userId:bob.id}])assert.equal(passwordChangeSchema.safeParse(invalid).success,false);
+ assert.equal(await changePassword(alice.id,'bob-one',input,transaction),'unauthorized');
+ assert.equal(await changePassword(alice.id,'alice-one',{...input,currentPassword:'wrong-current-password'},transaction),'wrong_password');
+ assert.equal((await db.query<{passwordHash:string}>('SELECT "passwordHash" FROM "User" WHERE id=$1',[alice.id])).rows[0].passwordHash,oldHash);
+ // Failure after updating credentials must roll back the password and every deletion.
+ const faulty:PasswordTransaction=run=>transaction(c=>run({query:(sql,params)=>{if(sql.startsWith('DELETE FROM "EmailChallenge"'))throw Error('injected failure');return c.query(sql,params)}}));
+ await assert.rejects(()=>changePassword(alice.id,'alice-one',input,faulty));
+ assert.equal((await db.query<{passwordHash:string}>('SELECT "passwordHash" FROM "User" WHERE id=$1',[alice.id])).rows[0].passwordHash,oldHash);
+ assert.equal((await db.query('SELECT * FROM "AuthSession" WHERE "userId"=$1',[alice.id])).rows.length,2);
+ assert.equal(await changePassword(alice.id,'alice-one',input,transaction),'changed');
+ const newHash=(await db.query<{passwordHash:string}>('SELECT "passwordHash" FROM "User" WHERE id=$1',[alice.id])).rows[0].passwordHash;
+ assert.notEqual(newHash,oldHash);assert.equal(await verifyPassword(fresh,newHash),true);assert.equal(await verifyPassword(old,newHash),false);
+ assert.equal((await db.query('SELECT * FROM "AuthSession" WHERE "userId"=$1',[alice.id])).rows.length,0);
+ assert.equal((await db.query('SELECT * FROM "EmailChallenge" WHERE email=$1',['password-test@example.test'])).rows.length,0);
+ assert.equal((await db.query('SELECT * FROM "AuthSession" WHERE "userId"=$1',[bob.id])).rows.length,1);
+ assert.equal((await db.query('SELECT * FROM "EmailChallenge" WHERE email=$1',['other-password-test@example.test'])).rows.length,1);
+ assert.equal((await db.query<{passwordHash:string}>('SELECT "passwordHash" FROM "User" WHERE id=$1',[bob.id])).rows[0].passwordHash,oldHash);
+ for(let i=0;i<5;i++)assert.equal(await changePassword(bob.id,'bob-one',{...input,currentPassword:'wrong-current-password'},transaction),'wrong_password');
+ assert.equal(await changePassword(bob.id,'bob-one',input,transaction),'rate_limited');
+ await db.query('UPDATE "EmailRateLimit" SET "windowStart"=NOW()-INTERVAL \'2 hours\' WHERE id=$1',['password-change:'+bob.id]);
+ assert.equal(await changePassword(bob.id,'bob-one',input,transaction),'changed');
+ await assert.rejects(()=>db.exec('UPDATE "User" SET balance=100'),/permission denied/);
+ await assert.rejects(()=>db.exec('UPDATE "User" SET email=\'changed@example.test\''),/permission denied/);
+ await db.close();
+ console.log('Password change: restricted DB role, current-password and session binding, validation, durable rate limit/reset, atomic rollback, isolated credential update and all-session/code revocation passed.');
+}
+main();

@@ -61,3 +61,13 @@ for(const path of ['/dashboard','/deposit','/withdraw','/sham-cash','/mobile-top
  if(forged.status===307)assert.equal(new URL(forged.headers.get('location'),base).pathname,'/auth');
 }
 console.log('Private page routing: anonymous redirect and invalid-session fail-closed behavior passed.');
+const passwordPath='/api/auth/password';
+const passwordInput={currentPassword:'existing-password-123',newPassword:'new-unique-password-456',confirmation:'new-unique-password-456'};
+assert.equal((await post(passwordPath,passwordInput)).status,401);
+assert.equal((await post(passwordPath,{...passwordInput,confirmation:'mismatched-confirmation'})).status,400);
+assert.equal((await post(passwordPath,{...passwordInput,newPassword:'short',confirmation:'short'})).status,400);
+assert.equal((await post(passwordPath,{...passwordInput,userId:'forged-user'})).status,400);
+assert.equal((await post(passwordPath,passwordInput,{Origin:'https://evil.example'})).status,403);
+const passwordResponse=await fetch(base+passwordPath,{method:'POST',headers:{'Content-Type':'application/json',Origin:base},body:JSON.stringify(passwordInput)});
+assert.equal(passwordResponse.headers.get('cache-control'),'no-store');
+console.log('Password-change API: unauthenticated, mismatched, weak, forged-target and cross-origin requests rejected.');
