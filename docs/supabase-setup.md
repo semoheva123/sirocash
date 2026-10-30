@@ -33,19 +33,21 @@ The enum additions were committed before constraints referenced the new values. 
 
 ## Connection activation
 
-The direct database hostname returned only an IPv6 address during inspection. Do not guess a pooler hostname, assume Vercel IPv6 egress, or deploy an untested direct connection.
+- The user confirmed Session Pooler host `aws-0-eu-west-1.pooler.supabase.com`, port `5432`, database `postgres` on 2026-10-30. The direct database hostname resolves to IPv6 only; no pooler hostname was guessed.
+- Runtime username: `sirocash_app.pqzvkhwxarwwcsquhrea`, **not** `postgres.pqzvkhwxarwwcsquhrea`.
+- The restricted role has LOGIN enabled with a fresh random password and a 12-connection role limit. Administrator credentials were neither requested nor copied.
+- `DATABASE_URL` and random `AUTH_SECRET` are sensitive **production-only** Vercel variables. `DATABASE_SSL_CA` supplies the authentic public Supabase certificate. `WEBAUTHN_ORIGIN` is the fixed production HTTPS origin. No secrets are in Git.
+- The credentialed Vercel build preflight passed at 2026-10-30 17:47:50 UTC for deployment `dpl_EPUtkXqnFBbNWZBvv6rZRajZCcWK`, source `e85fd0b872cc0f688dcd7c50e1717bc26dc0436f`: verified TLS, correct restricted runtime role, and auth-schema permissions. After promotion, the live `https://sirocash.vercel.app/api/health/database` endpoint returned `{"database":"ready"}` (cache-busted request on 2026-10-30 at approximately 17:49 UTC), verifying connectivity and auth-schema permissions in the running serverless function as well as the build.
+- Session mode is used as supplied. Any later switch to transaction mode requires a separate compatibility check.
 
-1. Open the **new** Supabase project's **Connect → Session pooler**. Supply the **host, port, and username pattern only**, or a screenshot with the password hidden. These are configuration metadata, not passwords. Confirm the actual endpoint assigned by Supabase; do not substitute an endpoint inferred from region names.
-2. Enable LOGIN for the existing least-privilege role and issue a cryptographically random password through the approved administration/secret-manager flow. Keep the resulting server connection string in SiroCash's Vercel `DATABASE_URL` only. The pooler username must follow Supabase's displayed convention for a custom role.
-3. Use certificate-verified TLS. If the authentic provider CA is needed, install its PEM as `DATABASE_SSL_CA`. In production the shared pool enforces certificate verification; URL SSL flags cannot disable it. Session pooling is the initial choice; switching to transaction pooling needs its own compatibility check.
-4. Install random `AUTH_SECRET`, `RESEND_API_KEY`, and a verified-domain `RESEND_FROM_EMAIL` through Vercel settings or an approved secret-management flow, never chat/Git. The fixed production `WEBAUTHN_ORIGIN` has been set on SiroCash only.
-5. Explicitly redeploy **SiroCash**, then check `/api/health/database`: 200 `ready` means the actual server connection can resolve the auth schema with its runtime privileges. 503 `not_configured` or `unavailable` is a failure, not a successful integration. This endpoint never returns records, credentials, connection URLs, or raw database errors.
-6. Complete a real signup → email OTP → login → logout test. Database readiness alone does not verify email delivery or WebAuthn hardware behavior.
+### Still required for actual signup
 
-The actual user-supplied Session Pooler is `aws-0-eu-west-1.pooler.supabase.com:5432`, database `postgres`. Runtime uses the custom-role username `sirocash_app.pqzvkhwxarwwcsquhrea`, **not** the administrator username. Production-only `DATABASE_URL` and a freshly generated `AUTH_SECRET` are installed as sensitive variables on SiroCash only. The connection deployment has been requested; successful runtime readiness still requires verification. No email-provider key has been installed yet. Financial operations remain simulated and passkey state remains process-local; database provisioning does not change those limitations.
+Install `RESEND_API_KEY` and a verified-domain `RESEND_FROM_EMAIL` through SiroCash's Vercel settings or an approved secret-management flow, never chat/Git. Redeploy and complete signup → email OTP → login → logout testing. Database readiness does not verify email delivery or WebAuthn hardware behavior.
+
+Financial operations remain simulated and passkey state remains process-local. Provisioning and connecting the database does not make the financial prototype production-ready.
 
 ### TLS activation diagnostics
 
-The first credentialed production connection failed certificate verification. The deployment preflight correctly blocked promotion with `TLS_CERTIFICATE` and did not print raw errors or credentials. The public Supabase Root 2021 CA was retrieved from the HTTPS URL used by the official Supabase dashboard, its X.509 fingerprint and self-signature checked, and installed as production `DATABASE_SSL_CA`. See [certificate provenance](../certificates/README.md). Verification remains enabled. Subsequent deployment readiness must be checked before claiming the database is connected.
+The first credentialed production connection failed certificate verification. The deployment preflight correctly blocked promotion with `TLS_CERTIFICATE` and did not print raw errors or credentials. The public Supabase Root 2021 CA was retrieved from the HTTPS URL used by the official Supabase dashboard, its X.509 fingerprint and self-signature checked, and installed as production `DATABASE_SSL_CA`. See [certificate provenance](../certificates/README.md). Verification remains enabled. After installing the CA, the subsequent Vercel build preflight and the live production readiness endpoint both passed.
 
 `npm run db:verify` performs a zero-record auth-schema query with the same connection options as runtime and rejects a superuser, RLS-bypassing role, or a role other than `sirocash_app`. Builds run this preflight when `DATABASE_URL` exists; unconfigured previews skip it. The per-instance pool is capped at one connection with finite connection/query timeouts.
