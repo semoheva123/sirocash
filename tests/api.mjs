@@ -51,7 +51,7 @@ assert.ok([200,503].includes(unknownSession.status));
 if(unknownSession.status===503){assert.equal(unknownBody.balance,null);assert.equal(unknownBody.demo,false);assert.deepEqual(unknownBody.transactions,[])}
 else{assert.equal(unknownBody.demo,true);assert.equal(unknownBody.user,null)}
 console.log('Account API: explicit guest demo and no account-error fallback to shared balances passed.');
-for(const path of ['/dashboard','/deposit','/withdraw','/sham-cash','/mobile-topup']){
+for(const path of ['/dashboard','/deposit','/withdraw','/sham-cash','/mobile-topup','/settings']){
  const response=await fetch(base+path,{redirect:'manual'});
  assert.equal(response.status,307,`${path} must require a server-verified session`);
  assert.equal(new URL(response.headers.get('location'),base).pathname,'/auth');

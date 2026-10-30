@@ -17,3 +17,9 @@ Account routes `/dashboard`, `/deposit`, `/withdraw`, `/sham-cash` and `/mobile-
 After OTP verification, the browser replaces the auth-page history entry with `/dashboard` using a full navigation so stale public Router Cache content is not reused. Client-side account refresh also returns an expired session to `/auth` and sends an authenticated visitor-page instance to `/dashboard`. Private navigation, header/footer branding links and footer account access stay within account routes; public marketing navigation is shown only on the visitor page. Account layout/session reads use dynamic server rendering, not shared static HTML.
 
 `test:routing` checks the structural wiring. Running API tests assert actual anonymous HTTP 307 redirects on every protected route and invalid-session fail-closed behavior; successful authenticated browser navigation requires a real sign-in and is not claimed as an automated test.
+
+## Account settings
+
+`/settings` is inside the same verified-session route group. It displays only the signed-in account's email, account ID and actual email-verification status. Account ID copying, browser-local Arabic/English preference, private navigation back to the wallet, and server-revoking current-session logout are functional. Dashboard account identity, navigation and tabs link to settings.
+
+Profile identifiers are read-only. Email changes, password changes, device/passkey management and logout-all-devices are not implemented and are not presented as working actions. Language is explicitly saved only on the current browser/device, not persisted to the database. No secrets are read or shown. Static-render tests cover identity/status rendering and absence of secret fields; API tests include authentication guarding of `/settings`. Hosted authenticated browser interaction must still be confirmed by the account owner.

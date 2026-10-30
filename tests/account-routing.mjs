@@ -14,5 +14,5 @@ assert.ok(app.includes('(accountPage?accountNav:visitorNav)'));
 assert.ok(app.includes("href={accountPage?'/dashboard':'/'}"));
 assert.ok(app.includes("page!=='home'&&!data.user"));
 assert.ok(app.includes("window.location.replace('/auth')"));
-for(const route of ['dashboard','deposit','withdraw','sham-cash','mobile-topup'])await readFile(`app/(account)/${route}/page.tsx`);
+for(const route of ['dashboard','deposit','withdraw','sham-cash','mobile-topup','settings'])await readFile(`app/(account)/${route}/page.tsx`);
 console.log('Account routing structure: verified server-session guards, member navigation, and post-verification/expired-session replacements passed.');
