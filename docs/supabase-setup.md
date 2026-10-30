@@ -40,9 +40,13 @@ The enum additions were committed before constraints referenced the new values. 
 - The credentialed Vercel build preflight passed at 2026-10-30 17:47:50 UTC for deployment `dpl_EPUtkXqnFBbNWZBvv6rZRajZCcWK`, source `e85fd0b872cc0f688dcd7c50e1717bc26dc0436f`: verified TLS, correct restricted runtime role, and auth-schema permissions. After promotion, the live `https://sirocash.vercel.app/api/health/database` endpoint returned `{"database":"ready"}` (cache-busted request on 2026-10-30 at approximately 17:49 UTC), verifying connectivity and auth-schema permissions in the running serverless function as well as the build.
 - Session mode is used as supplied. Any later switch to transaction mode requires a separate compatibility check.
 
-### Still required for actual signup
+### Trial email setup
 
-Install `RESEND_API_KEY` and a verified-domain `RESEND_FROM_EMAIL` through SiroCash's Vercel settings or an approved secret-management flow, never chat/Git. Redeploy and complete signup → email OTP → login → logout testing. Database readiness does not verify email delivery or WebAuthn hardware behavior.
+On 2026-10-30 the user chose Resend's trial sender. A production-only sensitive `RESEND_API_KEY` was already present in SiroCash's Vercel settings; its value was not retrieved or copied. `RESEND_FROM_EMAIL` is now `SiroCash <onboarding@resend.dev>`. Redeployment is required for settings changes to reach the running application.
+
+This sender is for testing with the email address belonging to the Resend account, not unrestricted customer signup. The account owner must complete signup → email OTP → login → logout and confirm actual receipt. No delivery or end-to-end auth success is claimed solely from environment configuration. If a key was disclosed in chat, revoke it and replace it directly in Vercel; do not send its replacement in chat.
+
+General registration still requires a verified sending domain and an appropriate sender address. Database readiness does not verify email delivery or WebAuthn hardware behavior.
 
 Financial operations remain simulated and passkey state remains process-local. Provisioning and connecting the database does not make the financial prototype production-ready.
 
