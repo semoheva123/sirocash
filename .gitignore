@@ -6,3 +6,6 @@ node_modules/
 
 # Local visual review bundles, screenshots and browser fixtures
 .cache/
+
+# Authorized operational exports must never enter Git
+operations-data/

@@ -77,3 +77,15 @@ assert.equal((await post(passwordPath,{challengeId:'a'.repeat(48),code:'123'})).
 assert.equal((await post(passwordPath,{challengeId:'a'.repeat(48),code:'123456',newPassword:'forged-password-123'})).status,400);
 assert.equal((await post(passwordPath,{challengeId:'a'.repeat(48),code:'123456'},{Origin:'https://evil.example'})).status,403);
 console.log('Password OTP API: unauthenticated, malformed, payload substitution and cross-origin confirmations rejected.');
+
+for(const path of ['/api/auth/sessions','/api/auth/security-events']){const r=await fetch(base+path);assert.equal(r.status,401);assert.equal(r.headers.get('cache-control'),'no-store')}
+for(const path of ['/api/auth/email','/api/auth/recovery'])assert.equal((await post(path,{email:'invalid',userId:'forged'})).status,400);
+assert.equal((await post('/api/auth/email',{newEmail:'new@example.test',currentPassword:'current-password-123'})).status,401);
+assert.equal((await post('/api/auth/email',{challengeId:'a'.repeat(48),oldCode:'123456',newCode:'654321'})).status,401);
+for(const path of ['/api/auth/email','/api/auth/recovery'])assert.equal((await post(path,{}, {Origin:'https://evil.example'})).status,403);
+const revoked=await fetch(base+'/api/auth/sessions',{method:'DELETE',headers:{'Content-Type':'application/json',Origin:base},body:JSON.stringify({action:'revoke_all'})});assert.equal(revoked.status,401);
+const forgedRevoke=await fetch(base+'/api/auth/sessions',{method:'DELETE',headers:{'Content-Type':'application/json',Origin:'https://evil.example'},body:JSON.stringify({action:'revoke_all'})});assert.equal(forgedRevoke.status,403);
+assert.equal((await fetch(base+'/operations',{redirect:'manual'})).status,307);
+assert.ok([401,503].includes((await fetch(base+'/api/internal/security-notifications')).status));
+for(const path of ['/auth/recovery','/trust','/privacy','/terms','/support'])assert.equal((await fetch(base+path)).status,200);
+console.log('Lifecycle API: session/event privacy, email/recovery validation, cross-origin and guest revocation rejection, operations guard, job authentication and public information pages passed.');

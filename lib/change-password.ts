@@ -1,4 +1,5 @@
 import {createHmac,randomBytes,randomInt,timingSafeEqual} from 'node:crypto';
+import {recordSecurityEvent} from './security-events';
 import {z} from 'zod';
 import {passwordSchema,hashPassword,verifyPassword} from './password';
 export const passwordChangeSchema=z.object({currentPassword:z.string().min(1,'أدخل كلمة المرور الحالية.').max(128,'كلمة المرور الحالية أطول من الحد المسموح.'),newPassword:passwordSchema,confirmation:passwordSchema}).strict().refine(data=>data.newPassword===data.confirmation,{message:'كلمتا المرور الجديدتان غير متطابقتين.',path:['confirmation']}).refine(data=>data.currentPassword!==data.newPassword,{message:'يجب أن تختلف كلمة المرور الجديدة عن الحالية.',path:['newPassword']});
@@ -50,6 +51,8 @@ export async function confirmPasswordChange(userId:string,tokenHash:string,input
   await c.query('DELETE FROM "AuthSession" WHERE "userId"=$1',[userId]);
   await c.query('DELETE FROM "EmailChallenge" WHERE email=$1',[user.email]);
   await c.query('DELETE FROM "PasswordChangeChallenge" WHERE "userId"=$1',[userId]);
+  await c.query('DELETE FROM "AccountSecurityChallenge" WHERE "userId"=$1',[userId]);
+  await recordSecurityEvent(c,userId,'password_changed',String(user.email));
   return 'changed' as const;
  });
 }

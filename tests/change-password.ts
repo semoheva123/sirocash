@@ -57,7 +57,7 @@ async function main(){
  await db.query('UPDATE "EmailRateLimit" SET "windowStart"=NOW()-INTERVAL \'2 hours\' WHERE id=$1',['password-change:'+bob]);
  assert.ok(typeof await request(bob,'bob-one')==='object');
  await assert.rejects(()=>db.exec('UPDATE "User" SET balance=100'),/permission denied/);
- await assert.rejects(()=>db.exec('UPDATE "User" SET email=\'changed@example.test\''),/permission denied/);
+ await assert.rejects(()=>db.exec('UPDATE "User" SET phone=\'+12345678901\''),/permission denied/);
  await db.exec('RESET ROLE; SET ROLE anon');
  await assert.rejects(()=>db.exec('SELECT * FROM "PasswordChangeChallenge"'),/permission denied/);
  const message=verificationEmail('123456','password_change');assert.ok(message.text.includes('تغيير كلمة المرور'));assert.ok(message.text.includes('Confirm your password change'));

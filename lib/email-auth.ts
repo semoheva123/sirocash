@@ -1,4 +1,7 @@
 import 'server-only';
+import {recordSecurityEvent} from './security-events';
+import {deviceLabel} from './account-security';
+import {flushSecurityMail} from './security-mail';
 import {createHash,randomBytes,randomInt,createHmac,timingSafeEqual} from 'node:crypto';
 import {Resend} from 'resend';
 import {verificationEmail} from './verification-email';
@@ -74,9 +77,11 @@ export async function verifyCode(request:Request){
   }
   if(!u)return null;
   await c.query('DELETE FROM "AuthSession" WHERE "expiresAt"<NOW()');
-  await c.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt") VALUES ($1,$2,NOW()+INTERVAL \'1 day\')',[hash(token),u.id]);return u;
+  await c.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt","createdAt","deviceLabel") VALUES ($1,$2,NOW()+INTERVAL \'1 day\',NOW(),$3)',[hash(token),u.id,deviceLabel(request.headers.get('user-agent'))]);
+  await recordSecurityEvent(c,u.id,'sign_in',u.email);return u;
  });
  if(!user)return NextResponse.json({error:'تعذّر اعتماد رمز التحقق. قد يكون الرمز غير صحيح أو منتهي الصلاحية، أو تم بلوغ الحد الأقصى للمحاولات. يُرجى طلب رمز جديد عند الحاجة.'},{status:400});
+ await flushSecurityMail().catch(()=>{});
  const response=NextResponse.json({user},{headers:{'Cache-Control':'no-store'}});
  response.cookies.set(COOKIE,token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',maxAge:86400});
  // Drop demo passkey state when changing email account.

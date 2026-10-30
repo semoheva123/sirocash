@@ -12,7 +12,7 @@ export function databaseOptions(connectionString:string,production:boolean,ca?:s
   ...(tls?{ssl:{rejectUnauthorized:true,...(ca?{ca:ca.replace(/\\n/g,'\n')}: {})}}:{}),
  };
 }
-export const databaseReadinessQuery='SELECT u.id,u.email,u."passwordHash",s."tokenHash",c.id,r.id FROM "User" u,"AuthSession" s,"EmailChallenge" c,"EmailRateLimit" r WHERE FALSE';
+export const databaseReadinessQuery='SELECT u.id,u.email,u."passwordHash",s."tokenHash",c.id,r.id,a.id,e.id,n.id FROM "User" u,"AuthSession" s,"EmailChallenge" c,"EmailRateLimit" r,"AccountSecurityChallenge" a,"SecurityEvent" e,"SecurityNotification" n WHERE FALSE';
 export function databaseFailureCategory(error:unknown){
  const code=typeof error==='object'&&error!==null&&'code' in error?String(error.code):'';
  if(['SELF_SIGNED_CERT_IN_CHAIN','DEPTH_ZERO_SELF_SIGNED_CERT','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY','CERT_HAS_EXPIRED','ERR_TLS_CERT_ALTNAME_INVALID'].includes(code))return 'TLS_CERTIFICATE';

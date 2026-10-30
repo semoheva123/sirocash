@@ -5,6 +5,7 @@ import {databaseTransaction} from '@/lib/database';
 import {requestPasswordChange,confirmPasswordChange,passwordChangeSchema,passwordOtpSchema} from '@/lib/change-password';
 import {Resend} from 'resend';
 import {verificationEmail} from '@/lib/verification-email';
+import {flushSecurityMail} from '@/lib/security-mail';
 import {ZodError} from 'zod';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -37,6 +38,7 @@ export async function POST(request:Request){
   if(result==='unauthorized')return failure('انتهت الجلسة. يُرجى تسجيل الدخول مجدداً.',401);
   if(result==='invalid_code')return failure('رمز التحقق غير صحيح أو منتهي الصلاحية، أو تم استنفاد المحاولات. يُرجى طلب رمز جديد.',400);
   if(result==='wrong_password')return failure('كلمة المرور الحالية غير صحيحة.',400);
+  await flushSecurityMail().catch(()=>{});
   const response=NextResponse.json({ok:true,reauthenticate:true},{headers});
   for(const name of ['siro-auth','siro-passkey-session'])response.cookies.set(name,'',{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',maxAge:0});
   return response;

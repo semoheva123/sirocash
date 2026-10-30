@@ -160,7 +160,7 @@ This supersedes the passwordless flow above. `/auth` now has separate **Create a
 
 `POST /api/auth/request` now requires `{email, password, mode: "signup" | "login"}`. Both modes require a 12–128 character password and proceed through email OTP before a session is issued. Signup stores a salted scrypt hash on the pending challenge; the verified account receives that hash only if its email does not already exist. Login verifies the existing hash before sending OTP, then checks it is still current when the OTP is redeemed. Raw passwords never go to the email provider, database or browser storage; they remain in component memory until verification or switching modes (including resending). Use HTTPS. Existing sessions remain valid until expiry/logout.
 
-Migration `20261030040000_password_auth` adds `User.passwordHash`, purpose-bound pending credentials and invalidates old passwordless challenges. Existing passwordless accounts are **not** silently given a password or allowed through email-only authentication. A separately protected account activation/recovery flow must be added before onboarding those accounts; password reset is not implemented. No non-working password reset link is displayed.
+Migration `20261030040000_password_auth` adds `User.passwordHash`, purpose-bound pending credentials and invalidates old passwordless challenges. Existing passwordless accounts are **not** silently given a password or allowed through email-only authentication. Recovery now exists for verified accounts with an existing password hash; legacy passwordless activation is still a separate release gate and is not silently enabled. The sign-in screen links to `/auth/recovery`. Recovery needs email approval, expires after ten minutes, limits guesses and revokes all sessions. See `docs/production-readiness.md`.
 
 Passwords use Node's salted scrypt (64-byte derived key with Node default N/r/p). Tune and benchmark work factors for production, add breached-password screening and additional trusted-IP/device abuse controls. The visual strength meter is only a local length/variety aid, not proof that a password is uncompromised. The five-hourly-request quota and 60-second cooldown apply to authentication attempts as well as emails, so incorrect credentials also consume quota.
 
@@ -192,3 +192,15 @@ The dedicated Supabase schema, RLS isolation, and restricted backend role are pr
 ### Signed-in account versus demonstration wallet
 
 The header and wallet overview resolve the actual email session. Signed-in balances come from that user's database row; the shared SC-8901 demonstration balance and activity are never used as an account fallback. New accounts start at their persisted zero balance. Account-specific transaction history, receiving wallets and financial services remain inactive; both UI controls and backend guards prevent registered accounts from posting to the shared demonstration wallet. See [account interface behavior](docs/account-interface.md).
+
+## Account lifecycle and release readiness
+
+- `/auth/recovery`: verified-email password recovery (generic request responses, hashed purpose-specific OTP, bounded attempts, all-session revocation).
+- `/settings`: existing-password + email-code password changes, dual-email address changes, per-session/other/all revocation, recorded security events and notification status. Device labels are self-reported and older metadata may be absent.
+- `/trust`, `/privacy`, `/terms`, `/support`: bilingual honest preview/status/help descriptions, **not final legal policies or a claim of licensing**. Support contact is shown only when explicitly configured.
+- `/operations`: read-only aggregate telemetry, explicitly allowlisted existing admin UUIDs only, denied by default; no financial editing.
+- Security events are append-only for the runtime. An atomic notification outbox retains failed attempts. Mail is attempted after security actions; the authenticated retry endpoint requires a provisioned `CRON_SECRET` and a separately configured scheduler. Neither provider acceptance nor queue status is proof of inbox delivery. Trial sender restrictions remain.
+- `npm run ops:reconcile -- /secure/path/export.json`: offline normalized-export reconciliation; exact integer micros, no automatic financial writes.
+- New tests: `npm run test:account-security`, `npm run test:reconciliation`.
+
+**Real-money services remain disabled.** Domain/sender ownership, approved operator/legal policies/markets, contracted providers/custody, independent security review, actual backup/restore drills, production monitoring/on-call and capacity testing require external decisions and evidence. See [`docs/production-readiness.md`](docs/production-readiness.md) and [`docs/operations-runbook.md`](docs/operations-runbook.md). Do not mistake internal tests, runbooks or offline tools for completed operational certification.

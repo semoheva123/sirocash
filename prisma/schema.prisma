@@ -40,6 +40,8 @@ enum CryptoAsset {
   USDC
 }
 model User {
+  accountSecurityChallenges AccountSecurityChallenge[]
+  securityEvents SecurityEvent[]
   passwordChangeChallenges PasswordChangeChallenge[]
   id String @id @default(uuid()) @db.Uuid
   email String? @unique
@@ -112,6 +114,8 @@ model DepositAddress {
 }
 
 model AuthSession {
+  createdAt DateTime?
+  deviceLabel String?
   tokenHash String @id
   userId String @db.Uuid
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -149,4 +153,39 @@ model PasswordChangeChallenge {
   expiresAt DateTime
   @@index([userId])
   @@index([expiresAt])
+}
+
+model AccountSecurityChallenge {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose String
+  oldEmail String
+  oldPasswordHash String
+  sessionHash String?
+  newEmail String?
+  codeHash String
+  secondCodeHash String?
+  attempts Int @default(0)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+model SecurityEvent {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  kind String
+  createdAt DateTime @default(now())
+  notification SecurityNotification?
+  @@index([userId, createdAt])
+}
+model SecurityNotification {
+  id String @id
+  event SecurityEvent @relation(fields: [id], references: [id], onDelete: Restrict)
+  recipient String
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  deliveredAt DateTime?
+  @@index([nextAttemptAt])
 }
