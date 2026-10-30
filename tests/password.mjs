@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {hashPassword,verifyPassword,passwordSchema} from '../lib/password.ts';
+const secret='A long unique passphrase 2026!';
+const a=await hashPassword(secret),b=await hashPassword(secret);
+assert.notEqual(a,b);assert.equal(a.includes(secret),false);
+assert.equal(await verifyPassword(secret,a),true);
+assert.equal(await verifyPassword('a wrong password',a),false);
+assert.equal(await verifyPassword(secret,'legacy'),false);
+assert.equal(passwordSchema.safeParse('short').success,false);
+assert.equal(passwordSchema.safeParse('x'.repeat(129)).success,false);
+assert.equal(passwordSchema.safeParse(secret).success,true);
+assert.equal(passwordSchema.safeParse('عبارة مرور عربية طويلة وآمنة').success,true);
+console.log('Password tests passed: salted scrypt, correct/wrong passwords, legacy rejection, length validation and Unicode.');

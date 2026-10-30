@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+const base=process.env.TEST_URL||'http://localhost:3000';
+let cookie='';
+async function post(path,data,extra={}){const r=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',Origin:base,...(cookie?{Cookie:cookie}:{}),...extra},body:JSON.stringify(data)});if(r.headers.get('set-cookie'))cookie=r.headers.get('set-cookie').split(';')[0];return {status:r.status,data:await r.json()}}
+for(const path of ['/','/dashboard','/deposit','/withdraw','/sham-cash','/mobile-topup','/auth'])assert.equal((await fetch(base+path)).status,200);
+const before=await (await fetch(base+'/api/transactions')).json();
+const operations=[['/api/wallet/transfer',{recipient:'SC-1234',amount:5,pin:'123456'}],['/api/wallet/withdraw',{recipient:'0x'+'a'.repeat(40),chain:'BEP20',amount:5,pin:'123456'}],['/api/wallet/sham-cash',{recipient:'12345678',amount:5,pin:'123456'}],['/api/mobile/topup',{operator:'MTN',phone:'0912345678',amount:5,pin:'123456'}]];
+for(const [path,payload] of operations){assert.equal((await post(path,payload)).status,400);assert.equal((await post(path,payload,{'x-siro-approval':'forged-token'})).status,400)}
+const status=await post('/api/security/passkey',{action:'status'});assert.equal(status.status,400);
+assert.equal((await post('/api/security/passkey',{action:'register-options'})).status,400);
+assert.equal((await post('/api/security/passkey',{action:'register-verify',response:{}})).status,400);
+assert.equal((await post('/api/security/passkey',{action:'authenticate-options',path:operations[0][0],payload:operations[0][1]})).status,400);
+assert.equal((await post('/api/security/passkey',{action:'authenticate-verify',response:{}})).status,400);
+assert.equal((await post('/api/security/passkey',{action:'status'},{Origin:'https://evil.example'})).status,400);
+const after=await (await fetch(base+'/api/transactions')).json();assert.equal(after.balance,before.balance);assert.equal(after.transactions.length,before.transactions.length);
+console.log('Security API tests passed: all payments blocked without verified passkey, forged approvals rejected, registration requires platform user verification, malformed proofs and cross-origin attempts rejected, balances unchanged.');
+
+assert.equal((await post('/api/auth/request',{email:'invalid'})).status,400);
+assert.equal((await post('/api/auth/verify',{challengeId:'invalid',code:'000000'})).status,400);
+assert.equal((await post('/api/auth/request',{email:'test@example.com'},{Origin:'https://evil.example'})).status,503);
+const auth=await (await fetch(base+'/api/auth/session')).json();assert.equal(auth.user,null);
+console.log('Email API validation and unauthenticated passkey enrollment rejection passed.');
+
+assert.equal((await post('/api/auth/request',{email:'test@example.com',mode:'signup',password:'short'})).status,400);
+assert.equal((await post('/api/auth/request',{email:'test@example.com',mode:'login'})).status,400);
+const missingConfig=await post('/api/auth/request',{email:'test@example.com',mode:'signup',password:'a long unique password!'});
+if(missingConfig.status!==200)assert.equal(JSON.stringify(missingConfig.data).includes('Resend'),false);
+console.log('Password-required API validation and provider-neutral errors passed.');
+
+for(const [asset,chain] of [['USDT','TRC20'],['USDT','BEP20'],['USDC','ETHEREUM'],['USDC','POLYGON']]){
+ const result=await post('/api/deposit/generate-address',{asset,chain});assert.equal(result.status,200);assert.equal(result.data.asset,asset);assert.equal(result.data.chain,chain);assert.equal(result.data.demo,true);assert.ok(result.data.address.includes('DEMO'));
+}
+for(const chain of ['TRC20','BEP20'])assert.equal((await post('/api/deposit/generate-address',{asset:'USDC',chain})).status,400);
+assert.equal((await post('/api/wallet/withdraw',{asset:'USDC',chain:'ETHEREUM',recipient:'0x'+'a'.repeat(40),amount:1,pin:'123456'})).status,400);
+console.log('USDC API tests passed: supported demo pairs, rejected incompatible networks, and withdrawal blocked without device approval.');

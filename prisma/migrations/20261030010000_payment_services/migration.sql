@@ -1,0 +1,2 @@
+ALTER TYPE "TransactionType" ADD VALUE 'SHAM_CASH';
+ALTER TYPE "TransactionType" ADD VALUE 'MOBILE_TOPUP';

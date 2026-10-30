@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum KycStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+enum AccountType {
+  USER
+  AGENT
+  MERCHANT
+  MASTER_POOL
+}
+enum TransactionType {
+  P2P
+  DEPOSIT
+  WITHDRAWAL
+  SHAM_CASH
+  MOBILE_TOPUP
+}
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+enum Chain {
+  TRC20
+  BEP20
+  ETHEREUM
+  POLYGON
+}
+enum CryptoAsset {
+  USDT
+  USDC
+}
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  email String? @unique
+  emailVerifiedAt DateTime?
+  passwordHash String?
+  phone String? @unique
+  pinHash String?
+  // Cached USD balance. LedgerEntry is the source of truth.
+  balance Decimal @default(0) @db.Decimal(20, 6)
+  kycStatus KycStatus @default(UNVERIFIED)
+  createdAt DateTime @default(now())
+  authSessions AuthSession[]
+  accounts LedgerAccount[]
+  sent Transaction[] @relation("Sender")
+  received Transaction[] @relation("Receiver")
+  depositAddresses DepositAddress[]
+}
+model LedgerAccount {
+  id String @id @default(uuid()) @db.Uuid
+  userId String? @db.Uuid
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  accountType AccountType
+  // Updated only by database ledger trigger; never write directly.
+  balance Decimal @default(0) @db.Decimal(20, 6)
+  currency String @default("USD")
+  entries LedgerEntry[]
+  @@unique([userId, accountType, currency])
+}
+model Transaction {
+  id String @id @default(uuid()) @db.Uuid
+  senderId String? @db.Uuid
+  receiverId String? @db.Uuid
+  sender User? @relation("Sender", fields: [senderId], references: [id], onDelete: Restrict)
+  receiver User? @relation("Receiver", fields: [receiverId], references: [id], onDelete: Restrict)
+  amount Decimal @db.Decimal(20, 6)
+  type TransactionType
+  txid String? @unique
+  cryptoAsset CryptoAsset?
+  cryptoChain Chain?
+  idempotencyKey String @unique
+  status TransactionStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  entries LedgerEntry[]
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+}
+model LedgerEntry {
+  id String @id @default(uuid()) @db.Uuid
+  transactionId String @db.Uuid
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  accountId String @db.Uuid
+  account LedgerAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  // Signed delta: negative debit, positive credit. Sum per transaction = 0.
+  amount Decimal @db.Decimal(20, 6)
+  createdAt DateTime @default(now())
+  @@unique([transactionId, accountId])
+  @@index([accountId, createdAt])
+}
+model DepositAddress {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  chain Chain
+  asset CryptoAsset @default(USDT)
+  address String @unique
+  derivationIndex Int
+  createdAt DateTime @default(now())
+  @@unique([chain, derivationIndex])
+  @@unique([userId, chain, asset])
+}
+
+model AuthSession {
+  tokenHash String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+model EmailChallenge {
+  passwordHash String?
+  purpose String @default("legacy")
+  id String @id
+  email String
+  codeHash String
+  attempts Int @default(0)
+  expiresAt DateTime
+  @@index([email])
+  @@index([expiresAt])
+}
+model EmailRateLimit {
+  id String @id
+  lastSentAt DateTime @default(dbgenerated("'1970-01-01'::timestamp"))
+  windowStart DateTime @default(now())
+  count Int @default(0)
+}

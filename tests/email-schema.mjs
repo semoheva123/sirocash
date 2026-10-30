@@ -1,0 +1,26 @@
+import {PGlite} from '@electric-sql/pglite';
+import {readFile,readdir} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+for(const dir of (await readdir('prisma/migrations')).sort()){if(dir.endsWith('.toml'))continue;await db.exec(await readFile(`prisma/migrations/${dir}/migration.sql`,'utf8'))}
+const {rows:[user]}=await db.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES (gen_random_uuid(),$1,NOW()) RETURNING *',['test@example.com']);
+assert.equal(user.phone,null);assert.equal(user.pinHash,null);assert.equal(Number(user.balance),0);
+await assert.rejects(()=>db.query('INSERT INTO "User" (id,email) VALUES (gen_random_uuid(),$1)',['test@example.com']));
+await assert.rejects(()=>db.query('INSERT INTO "User" (id,email) VALUES (gen_random_uuid(),$1)',['TEST@example.com']));
+await db.query('INSERT INTO "EmailChallenge" (id,email,"codeHash","expiresAt") VALUES ($1,$2,$3,NOW()+INTERVAL \'10 minutes\')',['challenge','test@example.com','hashed-secret']);
+for(let i=0;i<5;i++)await db.query('UPDATE "EmailChallenge" SET attempts=attempts+1 WHERE id=$1',['challenge']);
+assert.equal((await db.query('SELECT * FROM "EmailChallenge" WHERE id=$1 AND attempts<5 AND "expiresAt">NOW()',['challenge'])).rows.length,0);
+await assert.rejects(()=>db.query('UPDATE "EmailChallenge" SET attempts=6 WHERE id=$1',['challenge']));
+await db.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt") VALUES ($1,$2,NOW()+INTERVAL \'1 day\')',['session-hash',user.id]);
+assert.equal((await db.query('SELECT * FROM "AuthSession" WHERE "tokenHash"=$1 AND "expiresAt">NOW()',['session-hash'])).rows.length,1);
+await db.query('UPDATE "AuthSession" SET "expiresAt"=NOW()-INTERVAL \'1 second\'');
+assert.equal((await db.query('SELECT * FROM "AuthSession" WHERE "tokenHash"=$1 AND "expiresAt">NOW()',['session-hash'])).rows.length,0);
+await db.query('DELETE FROM "AuthSession" WHERE "tokenHash"=$1',['session-hash']);
+assert.equal((await db.query('SELECT * FROM "AuthSession"')).rows.length,0);
+const original='scrypt$original-hash';
+await db.query('UPDATE "User" SET "passwordHash"=$1 WHERE id=$2',[original,user.id]);
+const collision=await db.query('INSERT INTO "User" (id,email,"passwordHash") VALUES (gen_random_uuid(),$1,$2) ON CONFLICT (email) DO NOTHING RETURNING id',['test@example.com','attacker-hash']);
+assert.equal(collision.rows.length,0);
+assert.equal((await db.query('SELECT "passwordHash" FROM "User" WHERE id=$1',[user.id])).rows[0].passwordHash,original);
+assert.equal((await db.query('SELECT id FROM "User" WHERE email=$1 AND "passwordHash"=$2',['test@example.com','wrong-hash'])).rows.length,0);
+await db.close();console.log('Email schema tests passed: all migrations, email uniqueness/normalization, optional phone/PIN, zero starting balance, attempt limits, session expiration and revocation.');
