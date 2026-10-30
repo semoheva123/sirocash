@@ -41,3 +41,13 @@ const readinessBody=await readiness.json();
 assert.deepEqual(Object.keys(readinessBody),['database']);
 assert.ok((readiness.status===200?['ready']:['not_configured','unavailable']).includes(readinessBody.database));
 console.log('Database readiness API passed: bounded response, no-store, and no database details exposed.');
+const guestOverview=await (await fetch(base+'/api/transactions')).json();
+assert.equal(guestOverview.demo,true);assert.equal(guestOverview.user,null);
+assert.equal(guestOverview.financialServicesEnabled,false);
+// An unknown session must not receive another user's financial data.
+const unknownSession=await fetch(base+'/api/transactions',{headers:{Cookie:'siro-auth='+'a'.repeat(64)}});
+const unknownBody=await unknownSession.json();
+assert.ok([200,503].includes(unknownSession.status));
+if(unknownSession.status===503){assert.equal(unknownBody.balance,null);assert.equal(unknownBody.demo,false);assert.deepEqual(unknownBody.transactions,[])}
+else{assert.equal(unknownBody.demo,true);assert.equal(unknownBody.user,null)}
+console.log('Account API: explicit guest demo and no account-error fallback to shared balances passed.');

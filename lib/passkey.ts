@@ -60,4 +60,6 @@ export async function requirePasskey(request:Request,payload:unknown){
  if(!approval||approval.token!==request.headers.get('x-siro-approval')||approval.expires<Date.now()||approval.digest!==digest(new URL(request.url).pathname,payload))throw Error('يلزم تأكيد العملية ببصمة الجهاز أو مفتاح المرور.');
  // Synchronous, single-use consumption, before any financial mutation.
  delete state.approval;
+ // Verified email accounts must never mutate the shared demonstration wallet.
+ throw Error('الخدمات المالية غير مفعّلة للحسابات المسجّلة حالياً. لم تُنفّذ أي عملية.');
 }

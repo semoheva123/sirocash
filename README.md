@@ -188,3 +188,7 @@ The same allowlist in `lib/crypto-assets.ts` drives the client and validation. U
 ### Hosted database status
 
 The dedicated Supabase schema, RLS isolation, and restricted backend role are provisioned. Production server credentials are installed; certificate-verified connectivity passed both Vercel build preflight and the live production readiness check. Trial email settings are configured with `onboarding@resend.dev` for the Resend account email only; actual OTP delivery still needs user verification after deployment. General email signup requires a verified sending domain. See [Supabase setup and verification](docs/supabase-setup.md) and [isolated Vercel deployment](docs/vercel-deployment.md). `/api/health/database` returns 503 until runtime connectivity and auth-schema permissions succeed.
+
+### Signed-in account versus demonstration wallet
+
+The header and wallet overview resolve the actual email session. Signed-in balances come from that user's database row; the shared SC-8901 demonstration balance and activity are never used as an account fallback. New accounts start at their persisted zero balance. Account-specific transaction history, receiving wallets and financial services remain inactive; both UI controls and backend guards prevent registered accounts from posting to the shared demonstration wallet. See [account interface behavior](docs/account-interface.md).
