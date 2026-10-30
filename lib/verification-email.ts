@@ -1,11 +1,12 @@
 /** Email-safe presentation only: no remote assets, tracking, or user-provided HTML. */
-export function verificationEmail(code:string,purpose:'signup'|'login'){
+export function verificationEmail(code:string,purpose:'signup'|'login'|'password_change'){
  if(!/^\d{6}$/.test(code))throw new Error('Invalid verification code');
  const signup=purpose==='signup';
- const heading=signup?'تأكيد بريدك الإلكتروني':'تأكيد تسجيل الدخول';
- const englishHeading=signup?'Verify your email address':'Confirm your sign-in';
- const description=signup?'لإتمام إنشاء حسابك في سيرو كاش، أدخل رمز التحقق التالي في صفحة التسجيل.':'لإتمام تسجيل الدخول إلى حسابك في سيرو كاش، أدخل رمز التحقق التالي في صفحة تسجيل الدخول.';
- const englishDescription=signup?'Enter this verification code on the registration page to complete your SiroCash account setup.':'Enter this verification code on the sign-in page to continue to your SiroCash account.';
+ const changing=purpose==='password_change';
+ const heading=changing?'تأكيد تغيير كلمة المرور':signup?'تأكيد بريدك الإلكتروني':'تأكيد تسجيل الدخول';
+ const englishHeading=changing?'Confirm your password change':signup?'Verify your email address':'Confirm your sign-in';
+ const description=changing?'لتأكيد تغيير كلمة المرور، أدخل الرمز التالي في صفحة إعدادات الحساب. لن تتغيّر كلمة المرور قبل اعتماد الرمز. إذا لم تطلب ذلك، فلا تشارك الرمز وراجع أمان حسابك.':signup?'لإتمام إنشاء حسابك في سيرو كاش، أدخل رمز التحقق التالي في صفحة التسجيل.':'لإتمام تسجيل الدخول إلى حسابك في سيرو كاش، أدخل رمز التحقق التالي في صفحة تسجيل الدخول.';
+ const englishDescription=changing?'Enter this code in account settings to authorize your password change. Your password will not change until confirmed. If you did not request this, do not share the code and review your account security.':signup?'Enter this verification code on the registration page to complete your SiroCash account setup.':'Enter this verification code on the sign-in page to continue to your SiroCash account.';
  const text=`SiroCash | سيرو كاش\n\n${heading}\n${description}\n\n${code}\n\nصالح لمدة 10 دقائق ولمرة واحدة فقط.\nلا تشارك هذا الرمز مع أي شخص. لن يطلب منك فريق سيرو كاش تزويده به.\nإذا لم تطلب هذا الإجراء، فلا تشارك الرمز ولا تستخدمه، ويمكنك تجاهل الرسالة.\n\n${englishHeading}\n${englishDescription}\n\n${code}\n\nValid for 10 minutes and a single use. Never share this code, including with anyone claiming to represent SiroCash. If you did not request this action, do not use or share the code. You can ignore this message.\n\nهذه رسالة تلقائية؛ يُرجى عدم الرد عليها.\nThis is an automated message. Please do not reply.`;
  const html=`<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>${heading} — SiroCash</title>

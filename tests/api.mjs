@@ -71,3 +71,9 @@ assert.equal((await post(passwordPath,passwordInput,{Origin:'https://evil.exampl
 const passwordResponse=await fetch(base+passwordPath,{method:'POST',headers:{'Content-Type':'application/json',Origin:base},body:JSON.stringify(passwordInput)});
 assert.equal(passwordResponse.headers.get('cache-control'),'no-store');
 console.log('Password-change API: unauthenticated, mismatched, weak, forged-target and cross-origin requests rejected.');
+
+assert.equal((await post(passwordPath,{challengeId:'a'.repeat(48),code:'123456'})).status,401);
+assert.equal((await post(passwordPath,{challengeId:'a'.repeat(48),code:'123'})).status,400);
+assert.equal((await post(passwordPath,{challengeId:'a'.repeat(48),code:'123456',newPassword:'forged-password-123'})).status,400);
+assert.equal((await post(passwordPath,{challengeId:'a'.repeat(48),code:'123456'},{Origin:'https://evil.example'})).status,403);
+console.log('Password OTP API: unauthenticated, malformed, payload substitution and cross-origin confirmations rejected.');

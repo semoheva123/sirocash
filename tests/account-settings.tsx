@@ -9,7 +9,8 @@ assert.ok(!/passwordHash|tokenHash|AUTH_SECRET|RESEND_API_KEY|SC-8901/.test(html
 assert.ok(html.includes('aria-pressed="true"'));
 for(const id of ['current-password','new-password','confirm-password'])assert.ok(html.includes(`id="${id}"`));
 assert.ok(html.includes('autoComplete="current-password"')||html.includes('autocomplete="current-password"'));
-assert.ok(html.includes('حفظ كلمة المرور وتسجيل الخروج'));
+assert.ok(html.includes('إرسال رمز التحقق'));
+assert.ok(html.includes('لن تتغيّر كلمة المرور إلا بعد تأكيد الرمز'));
 const unverified=renderToStaticMarkup(<AccountSettings user={{id:'other-account',email:'other@example.test',emailVerifiedAt:''}}/>);
 assert.ok(unverified.includes('لم يتم التحقق'));
 console.log('Account settings: own identity, verification state, private navigation, actual controls, honest unsupported features and no secrets in HTML passed.');

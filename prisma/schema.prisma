@@ -40,6 +40,7 @@ enum CryptoAsset {
   USDC
 }
 model User {
+  passwordChangeChallenges PasswordChangeChallenge[]
   id String @id @default(uuid()) @db.Uuid
   email String? @unique
   emailVerifiedAt DateTime?
@@ -134,4 +135,18 @@ model EmailRateLimit {
   lastSentAt DateTime @default(dbgenerated("'1970-01-01'::timestamp"))
   windowStart DateTime @default(now())
   count Int @default(0)
+}
+
+model PasswordChangeChallenge {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionHash String
+  oldPasswordHash String
+  newPasswordHash String
+  codeHash String
+  attempts Int @default(0)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
 }
