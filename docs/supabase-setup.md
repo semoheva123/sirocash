@@ -43,3 +43,9 @@ The direct database hostname returned only an IPv6 address during inspection. Do
 6. Complete a real signup → email OTP → login → logout test. Database readiness alone does not verify email delivery or WebAuthn hardware behavior.
 
 The actual user-supplied Session Pooler is `aws-0-eu-west-1.pooler.supabase.com:5432`, database `postgres`. Runtime uses the custom-role username `sirocash_app.pqzvkhwxarwwcsquhrea`, **not** the administrator username. Production-only `DATABASE_URL` and a freshly generated `AUTH_SECRET` are installed as sensitive variables on SiroCash only. The connection deployment has been requested; successful runtime readiness still requires verification. No email-provider key has been installed yet. Financial operations remain simulated and passkey state remains process-local; database provisioning does not change those limitations.
+
+### TLS activation diagnostics
+
+The first credentialed production connection failed certificate verification. The deployment preflight correctly blocked promotion with `TLS_CERTIFICATE` and did not print raw errors or credentials. The public Supabase Root 2021 CA was retrieved from the HTTPS URL used by the official Supabase dashboard, its X.509 fingerprint and self-signature checked, and installed as production `DATABASE_SSL_CA`. See [certificate provenance](../certificates/README.md). Verification remains enabled. Subsequent deployment readiness must be checked before claiming the database is connected.
+
+`npm run db:verify` performs a zero-record auth-schema query with the same connection options as runtime and rejects a superuser, RLS-bypassing role, or a role other than `sirocash_app`. Builds run this preflight when `DATABASE_URL` exists; unconfigured previews skip it. The per-instance pool is capped at one connection with finite connection/query timeouts.
