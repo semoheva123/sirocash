@@ -1,6 +1,7 @@
 import 'server-only';
 import {createHash,randomBytes,randomInt,createHmac,timingSafeEqual} from 'node:crypto';
 import {Resend} from 'resend';
+import {verificationEmail} from './verification-email';
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
 import {sameOrigin,apiError} from './api';
@@ -48,7 +49,8 @@ export async function requestCode(request:Request){
   await c.query('INSERT INTO "EmailChallenge" (id,email,"codeHash","expiresAt","passwordHash",purpose) VALUES ($1,$2,$3,NOW()+INTERVAL \'10 minutes\',$4,$5)',[id,email,codeHash,passwordHash,mode]);
  });
  try{
-  const {error}=await new Resend(process.env.RESEND_API_KEY).emails.send({from:process.env.RESEND_FROM_EMAIL,to:email,subject:'SiroCash — رمز التحقق / Verification code',text:`رمز التحقق الخاص بك في سيرو كاش: ${code}\nYour SiroCash verification code: ${code}\nExpires in 10 minutes. Do not share this code.\nصالح لمدة 10 دقائق. لا تشاركه مع أحد. إذا لم تطلبه فتجاهل الرسالة.`});
+  const message=verificationEmail(code,mode);
+  const {error}=await new Resend(process.env.RESEND_API_KEY).emails.send({from:process.env.RESEND_FROM_EMAIL,to:email,...message});
   if(error)throw Error('delivery');
  }catch{await pool().query('DELETE FROM "EmailChallenge" WHERE id=$1',[id]);throw Error('تعذّر إرسال رمز التحقق. يرجى المحاولة لاحقاً.');}
  return NextResponse.json({challengeId:id,expiresIn:600,resendAfter:60},{headers:{'Cache-Control':'no-store'}});
