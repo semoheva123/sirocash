@@ -10,7 +10,7 @@
     "db:generate": "prisma generate",
     "test:api": "node tests/api.mjs",
     "test:ledger": "node tests/ledger.mjs",
-    "test": "npm run lint && npm run test:ledger && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:email-template && npm run test:account && npm run test:routing && npm run test:settings && npm run test:password-change",
+    "test": "npm run lint && npm run test:ledger && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:email-template && npm run test:account && npm run test:routing && npm run test:settings && npm run test:password-change && npm run test:design",
     "test:email": "node tests/email-schema.mjs",
     "test:password": "node --experimental-strip-types tests/password.mjs",
     "test:copy": "node tests/arabic-copy.mjs",
@@ -23,9 +23,12 @@
     "test:account": "tsx tests/account-overview.ts",
     "test:routing": "node tests/account-routing.mjs",
     "test:settings": "tsx tests/account-settings.tsx",
-    "test:password-change": "tsx tests/change-password.ts"
+    "test:password-change": "tsx tests/change-password.ts",
+    "test:design": "tsx tests/design-system.tsx"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource-variable/noto-sans-arabic": "^5.3.0",
     "@prisma/client": "^5.22.0",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",
