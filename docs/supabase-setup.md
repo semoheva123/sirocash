@@ -55,3 +55,7 @@ Financial operations remain simulated and passkey state remains process-local. P
 The first credentialed production connection failed certificate verification. The deployment preflight correctly blocked promotion with `TLS_CERTIFICATE` and did not print raw errors or credentials. The public Supabase Root 2021 CA was retrieved from the HTTPS URL used by the official Supabase dashboard, its X.509 fingerprint and self-signature checked, and installed as production `DATABASE_SSL_CA`. See [certificate provenance](../certificates/README.md). Verification remains enabled. After installing the CA, the subsequent Vercel build preflight and the live production readiness endpoint both passed.
 
 `npm run db:verify` performs a zero-record auth-schema query with the same connection options as runtime and rejects a superuser, RLS-bypassing role, or a role other than `sirocash_app`. Builds run this preflight when `DATABASE_URL` exists; unconfigured previews skip it. The per-instance pool is capped at one connection with finite connection/query timeouts.
+
+
+## Financial foundation installation — 2026-10-31
+The later financial migrations through 20261031190000 are now applied and recorded: 31 Prisma migrations total and 20 new protected tables. See `financial-database-installation.md` for exact Supabase versions, hosted rollback drills, permissions, and remaining launch blockers. Earlier statements here about process-local passkeys or absent finance schema are historical, not the current schema state. Do not replay the baseline or the installed finance batches.

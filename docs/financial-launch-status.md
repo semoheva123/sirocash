@@ -1,5 +1,8 @@
 # Financial launch status
 
+> تحديث لاحق في 2026-10-31: طُبّقت البنية المالية فعليًا؛ 31 ترحيلًا و20 جدولًا محميًا، مع اختبارات مستضافة أُلغيت بعد التحقق. الأقوال أدناه عن غياب الجداول تصف الفحص السابق فقط. انظر `financial-database-installation.md`. قرار عدم الإطلاق المالي باقٍ لأسباب التشغيل والتحقق الأخرى.
+
+
 ## Prepared/tested locally
 - Double-entry wallet engine and reservations; 1% sender-added internal fee.
 - Private valuation-to-journal composition with explicit approved non-peg rate, inbox-evidence binding, atomic credit/audit state, rollback and replay tests; no pricing authority/runtime grants activated.
