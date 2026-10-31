@@ -39,7 +39,8 @@ async function main(){
  upload.set('metadata',JSON.stringify({main_module:'worker.mjs',compatibility_date:config.compatibility_date,keep_bindings:['secret_text'],observability:{enabled:false},bindings:[{type:'d1',name:'IDENTITY_DB',id}]}));
  upload.set('worker.mjs',new Blob([await fs.readFile('cloudflare/identity/worker.mjs','utf8')],{type:'application/javascript+module'}),'worker.mjs');
  await api(`/workers/scripts/${name}`,'PUT',upload);
- await api(`/workers/scripts/${name}/schedules`,'PUT',[{cron:'17 * * * *'}]);
+ try{await api(`/workers/scripts/${name}/schedules`,'PUT',[{cron:'17 * * * *'}])}
+ catch{console.log('::notice::Optional Worker hourly schedule is unavailable. The protected application daily lifecycle scheduler must be verified before collection.');}
  let subdomain=await api('/workers/subdomain','GET',undefined,true);
  if(!subdomain?.subdomain)subdomain=await api('/workers/subdomain','PUT',{subdomain:'sirocash-'+account.slice(0,10)});
  await api(`/workers/scripts/${name}/subdomain`,'POST',{enabled:true,previews_enabled:false});
