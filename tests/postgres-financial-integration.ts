@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {financialNotificationFixture} from './postgres-financial-events';
 import {depositDiscoveryAcceptance} from './deposit-discovery-acceptance';
 import {createDepositValuationWorker} from '../lib/deposit-valuation-worker';
 import {customerFinancialCommands} from '../lib/customer-financial-commands';
@@ -43,6 +44,7 @@ async function main(){
   const alice=randomUUID(),bob=randomUUID(),settlement=randomUUID(),revenue=randomUUID();
   await pool.query('INSERT INTO "User" (id,email,"emailVerifiedAt","kycStatus") VALUES ($1,\'race-alice@example.test\',now(),\'VERIFIED\'),($2,\'race-bob@example.test\',now(),\'VERIFIED\')',[alice,bob]);
   await pool.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[settlement,revenue]);
+  await financialNotificationFixture(pool,testUrl.toString(),alice);
   const deposit={ownerId:alice,requestKey:'postgres:deposit:replay',amount:'100',providerReference:'fixture:postgres:deposit:1',settlementAccountId:settlement};
   const credits=await Promise.all(Array.from({length:16},()=>creditConfirmedDeposit(db,deposit)));
   assert.equal(new Set(credits.map(c=>c.id)).size,1);

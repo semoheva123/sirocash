@@ -1,27 +1,53 @@
-# Financial screen synchronization
+# Financial synchronization: database events → SSE (no polling)
 
-This is bounded five-second **polling**, not server push, WebSockets, SSE, a blockchain subscription,
-or an immediate-finality guarantee. It updates the payments screen and the authenticated dashboard
-from the private ledger endpoint. It does not increase the blockchain worker frequency (the staged
-scheduler is still five minutes), enable financial gates or complete live launch readiness.
+The previous five-second polling implementation has been removed. The browser opens
+`/api/financial/events` with same-origin HttpOnly session cookies; no database key, private key,
+financial credential or cross-customer channel is exposed to it.
 
-- One read in flight per mounted controller; no overlapping periodic requests. A post-command
-  refresh waits for any older read, then fetches a fresh snapshot.
-- Pause and abort when hidden/offline; refresh on visibility, focus and reconnection. Unmount and
-  pause invalidate late results. Eight-second deadlines cover transports that ignore abort.
-- Exponential failure backoff up to 60 seconds. Retain last successful data with a stale warning,
-  last successful read timestamp and retry control. Session expiry clears private financial data
-  and stops requests. Dashboard snapshots are also bound to the expected authenticated user ID.
-- Mutating financial commands are never scheduled/retried by synchronization. Server-side balance,
-  passkey approval, spending/finality/idempotency checks remain authoritative. Payment preparation
-  and confirmation buttons are disabled while the snapshot is not current.
-- One repeatable-read private transaction checks the durable session, balance, unresolved holds,
-  outgoing command states and posted activity. Ledger-entry ownership includes incoming transfers
-  and deposits, not just commands initiated by this user. No customer-supplied owner ID is accepted.
-- Posted activity is NOT an unconfirmed deposit feed. Incoming network events appear only after
-  trusted verification/valuation/ledger posting. The current view is bounded to 30 latest rows;
-  pagination, durable notifications and server-push delivery are not claimed by this patch.
+## Delivery
 
-Tests cover single flight, post-command freshness, pause/abort, late-response rejection, timeout,
-backoff, session termination and owner-isolated incoming ledger history with an actual SQL fixture.
-Full production money/device acceptance and default-branch worker activation remain separate gates.
+1. Migration `20261101000000_financial_change_notifications` adds PostgreSQL triggers for user
+   ledger balances, wallet operations, transaction status and session revocation/expiry edits.
+2. `NOTIFY` contains **only an owner UUID**. PostgreSQL delivers after COMMIT and suppresses
+   rolled-back changes. Even spoofed notifications cannot supply financial data or execute commands.
+3. One dedicated, restricted financial-worker **session-mode** `LISTEN` connection per active
+   server instance multiplexes invalidations to authenticated owner subscriptions. Transaction
+   pooling is not used for LISTEN. Supabase pooler port 6543 is converted to its session port 5432;
+   other session endpoints may use server-only `FINANCIAL_EVENTS_DATABASE_URL`.
+4. Subscribe before the initial coherent, authenticated repeatable-read snapshot. Drain dirty
+   invalidations while reading, so commits during initial reads/reconnects are not lost. Subsequent
+   snapshots are read **only on events**, explicit manual/post-command refresh or reconnection.
+5. Browser receives SSE snapshots over the open HTTP response. Incoming and outgoing posted
+   ledger activity appears without page reloads. Intermediate state changes can be coalesced;
+   the stream is latest-state reconciliation, not an immutable notification/event replay log.
+
+## Safety and lifecycle
+
+- No GET interval, background balance polling, WebSocket provider or extra hosting service.
+- Fifteen-second heartbeats contain no financial data and make **no database reads**. The browser
+  uses a silence timeout to detect dead connections. Reconnection backoff is transport recovery,
+  not periodic financial polling. Old stream callbacks cannot update a newer session.
+- SSE closes/reconnects before Vercel's 300-second function deadline (270-second transport rotation).
+  A reconnect snapshot reconciles missed changes. This is required by serverless hosting, not a
+  five-second refresh substitute. Hidden/offline tabs close; visible/online tabs reconnect.
+- Initial and pushed snapshots validate the session using the existing private status reader.
+  Session deletion/change triggers revalidation; an expiry timer closes expired sessions even
+  without new financial events. The browser clears private data on terminal expiry/owner mismatch.
+- Disconnect, backpressure, listener failure and abort close the stream and release subscriptions.
+  A last-success timestamp remains visible on failure; commands are not retried by streaming.
+- Disabled financial services produce one disabled response and stop: no silent polling fallback.
+- No paid execution, signer, deposit-discovery, withdrawal or scheduler gate is enabled by this work.
+
+## Verification and limits
+
+- Unit/ReadableStream tests: trusted-owner subscriptions, framing, initial/pushed snapshots,
+  heartbeat without reads, stale-event exclusion, reconnect, session termination and cleanup.
+- Real PostgreSQL 16/17 fixture: separate LISTEN session, actual trigger delivery after commit,
+  no pre-commit or rollback notifications; existing concurrency/restore tests still run.
+- Production build preflight: verified restricted session connection and all four triggers, then
+  a separate connection sends a synthetic random-owner invalidation. No customer/ledger rows,
+  balance mutations, transactions on either chain or provider purchases are made by this probe.
+- Broadcasting ledger changes does **not** make blockchain discovery/finality instantaneous.
+  The existing worker schedule is unchanged. Latest history remains bounded to 30 rows.
+- Production browser/device acceptance and load/capacity testing are separate from SQL/transport
+  tests. Connection/memory/function usage must be capacity-planned; unlimited free scale is not promised.
