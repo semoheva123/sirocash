@@ -48,8 +48,8 @@ Direct cache writes, password/session reads and user mutation remain denied.
 
 ## Deployment distinction
 
-Migrations 37–39 are new staged source changes, not applied to production in this software-only
-follow-up. Database production remains at 36. New schema preflight expects 27 protected tables,
+Migrations 37–40 are new staged source changes, not applied to production in this software-only
+follow-up. Database production remains at 36. New schema preflight expects 28 protected tables,
 so code must not be promoted against the old schema. No paid request, broadcast, production key
 loading, monetary policy activation or financial login provisioning occurred.
 
@@ -60,6 +60,6 @@ its own SIRO_DEPOSIT_VALUATION_ENABLED gate. None is enabled by this patch. USDC
 pricing/fees are not invented; the new quote path explicitly supports the agreed USDT tariffs.
 
 This work closes specific code/permission/test gaps. It does not certify full-platform launch:
-whole-chain discovery/checkpoint/reorg orchestration, deposit-allocation production composition,
-real-device acceptance, live provider acceptance, credentials/liquidity and funded acceptance
-must not be represented as completed by these tests.
+The deposit-discovery and customer-allocation software gaps were subsequently closed; see
+`deposit-discovery-completion.md`. Real-device acceptance, live provider acceptance,
+credentials/liquidity and funded acceptance must not be represented as completed by these tests.

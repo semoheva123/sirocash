@@ -1,4 +1,5 @@
 import 'server-only';
+import {productionDepositDiscovery} from './deposit-discovery-runtime';
 import {createDepositValuationWorker} from './deposit-valuation-worker';
 import {createUnsentTronRenewal} from './unsent-tron-renewal';
 import {createFinancialPreflight} from './financial-preflight';
@@ -61,6 +62,8 @@ export function productionOutboxNetworkWorkers(db:WalletDb){
   sweep:(id:string)=>processSweepObservation(db,id,{...observations,dispatchEnabled,send}),
   batch:()=>runFinancialWorkerBatch(db,{enabled:true,process:async(job,signal)=>{
    if(signal.aborted)throw new Error('WORKER_ABORTED');
+   if((await db.transaction(tx=>tx.query('SELECT 1 FROM "DepositScanCursor" WHERE paused LIMIT 1'))).rows.length)return {state:'HELD',reason:'DEPOSIT_CHAIN_REVIEW_REQUIRED'};
+   if(job.kind==='DEPOSIT_SCAN')return process.env.SIRO_DEPOSIT_DISCOVERY_ENABLED==='true'?productionDepositDiscovery(db,signal).process(job.id,signal):{state:'HELD',reason:'DEPOSIT_DISCOVERY_DISABLED'};
    if(job.kind==='DEPOSIT_VALUE')return valueDeposit(job.id,signal);
    if(job.kind==='ENERGY')return execution?execution.energy(job.id,signal):{state:'HELD',reason:'ENERGY_WORKER_DISABLED'};
    if(job.kind==='GAS')return gas.process(job.id,signal);

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {depositDiscoveryAcceptance} from './deposit-discovery-acceptance';
 import {createDepositValuationWorker} from '../lib/deposit-valuation-worker';
 import {customerFinancialCommands} from '../lib/customer-financial-commands';
 import {observeUsdtUsdPrice} from '../lib/financial-price';
@@ -106,7 +107,7 @@ async function main(){
   const global=await Promise.allSettled([9,10].map(i=>reserveWithdrawal(db,{ownerId:owners[i],requestKey:'postgres:global:race:'+i,amount:'1000',destination:'fixture:global:race'})));
   assert.equal(global.filter(r=>r.status==='fulfilled').length,1);
   assert.match(String((global.find(r=>r.status==='rejected') as PromiseRejectedResult).reason),/PLATFORM_DAILY_WITHDRAWAL_LIMIT_EXCEEDED/);
-  // A real assigned deposit address supplies PREPARE_SWEEP, without any keys or network calls.
+  // A real assigned deposit address supplies DEPOSIT_SCAN and PREPARE_SWEEP, without any keys or network calls.
   const vault=randomUUID(),address=randomUUID();
   await pool.query('INSERT INTO "DepositAddressVault" (id,network,"accountXpub",enabled,"originVerified") VALUES ($1,\'TRC20\',\'xpub-fixture-not-a-key\',true,true)',[vault]);
   await pool.query('INSERT INTO "UserDepositAddress" (id,"ownerId","vaultId",network,address,"derivationIndex") VALUES ($1,$2,$3,\'TRC20\',\'fixture-address-no-network\',0)',[address,alice,vault]);
@@ -128,14 +129,16 @@ async function main(){
   await valuer(inbox,new AbortController().signal);
   assert.equal(Number((await pool.query('SELECT count(*) FROM "FinancialPriceObservation"')).rows[0].count),priceCount);
   await assert.rejects(()=>pool!.query('UPDATE "FinancialPriceObservation" SET "rateUsdMicros"=1'),/FINANCIAL_PRICE_IMMUTABLE/);
+  const adminDb:WalletDb={transaction:async run=>{const c=await pool!.connect();try{await c.query('BEGIN');const result=await run(c);await c.query('COMMIT');return result}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}};
+  await depositDiscoveryAcceptance(adminDb,db);
   // Production application role: actual permission-denial probes and catalog validation.
   const check=await pool.connect();
-  try{await check.query('BEGIN READ ONLY');await check.query('SET LOCAL ROLE sirocash_app');const result=await verifyFinancialSchema((sql,params)=>check.query(sql,params));assert.equal(result.tables,27);await check.query('ROLLBACK')}finally{check.release()}
+  try{await check.query('BEGIN READ ONLY');await check.query('SET LOCAL ROLE sirocash_app');const result=await verifyFinancialSchema((sql,params)=>check.query(sql,params));assert.equal(result.tables,28);await check.query('ROLLBACK')}finally{check.release()}
   const invariant=await pool.query('SELECT "transactionId" FROM "LedgerEntry" GROUP BY "transactionId" HAVING SUM(amount)<>0');assert.equal(invariant.rowCount,0);
   const cache=await pool.query('SELECT a.id FROM "LedgerAccount" a LEFT JOIN "LedgerEntry" e ON e."accountId"=a.id GROUP BY a.id HAVING a.balance<>COALESCE(SUM(e.amount),0)');assert.equal(cache.rowCount,0);
   // Forced exception after a real insert must leave neither operation nor balance changes.
   await assert.rejects(()=>db.transaction(async tx=>{await tx.query('UPDATE "FinancialWorkerLease" SET \"cursorTime\"=clock_timestamp(),\"cursorId\"=$1,\"cursorKind\"=\'SWEEP\' WHERE id=\'outbox\'',[randomUUID()]);throw Error('fixture-rollback')}));
-  assert.equal((await pool.query('SELECT \"cursorKind\" FROM "FinancialWorkerLease" WHERE id=\'outbox\'')).rows[0].cursorKind,'PREPARE_SWEEP');
+  assert.equal((await pool.query('SELECT \"cursorKind\" FROM "FinancialWorkerLease" WHERE id=\'outbox\'')).rows[0].cursorKind,'DEPOSIT_SCAN');
   if(process.env.SIRO_TEST_RESTORE_DRILL==='true')await restoreFixtureDrill(pool,admin,testUrl);
   console.log(`Real PostgreSQL PASS: ${pids.size} independent sessions; concurrent deposit/hold/settlement replay, overspend/global-cap races, lease exclusion, application RLS denials, balanced journal, caches and rollback. No production access or external financial calls.`);
  }finally{

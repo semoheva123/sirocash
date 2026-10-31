@@ -8,7 +8,8 @@ function validateCall(method:string,params:unknown[]){
  const empty=(method==='eth_chainId'||method==='eth_blockNumber')&&params.length===0;
  const receipt=method==='eth_getTransactionReceipt'&&params.length===1&&typeof params[0]==='string'&&/^0x[a-f0-9]{64}$/i.test(params[0]);
  const block=method==='eth_getBlockByNumber'&&params.length===2&&params[1]===false&&typeof params[0]==='string'&&(params[0]==='finalized'||/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(params[0]));
- if(!empty&&!receipt&&!block)throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
+ const logs=method==='eth_getLogs'&&params.length===1&&(()=>{const f=params[0] as Record<string,unknown>;return !!f&&typeof f==='object'&&Object.keys(f).sort().join(',')==='address,fromBlock,toBlock,topics'&&f.address==='0x55d398326f99059fF775485246999027B3197955'&&typeof f.fromBlock==='string'&&/^0x(?:0|[1-9a-f][a-f0-9]*)$/.test(f.fromBlock)&&f.toBlock===f.fromBlock&&Array.isArray(f.topics)&&f.topics.length===3&&f.topics[0]==='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'&&f.topics[1]===null&&typeof f.topics[2]==='string'&&/^0x0{24}[a-f0-9]{40}$/.test(f.topics[2])})();
+ if(!empty&&!receipt&&!block&&!logs)throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
 }
 /** Private operator-configured read-only transport. Never accept endpoint/headers from customers.
  * Errors intentionally omit URL, credentials, provider text and response content.

@@ -12,7 +12,6 @@ export async function stageBep20Deposit(db:WalletDb,input:Parameters<typeof veri
 async function stageVerifiedDeposit(db:WalletDb,event:ReturnType<typeof verifyTronUsdtDeposit>|ReturnType<typeof verifyBep20UsdtDeposit>) {
  const fingerprint=createHash('sha256').update(JSON.stringify(event)).digest('hex');
  return db.transaction(async tx=>{
-  await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
   // Beneficiary ownership comes from the durable address assignment, never a supplied user ID.
   const {rows:[assignment]}=await tx.query('SELECT id,"ownerId" FROM "UserDepositAddress" WHERE network=$2 AND address=$1 FOR SHARE',[event.to,event.network]);
   if(!assignment)throw new Error('UNASSIGNED_DEPOSIT_ADDRESS');

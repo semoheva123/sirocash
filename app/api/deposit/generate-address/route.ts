@@ -1,6 +1,23 @@
-import {readJson} from '@/lib/request-body';
-import {currentUser} from '@/lib/email-auth';
 import {NextResponse} from 'next/server';
-import {chainSchema} from '@/lib/validation';
-import {apiError,sameOrigin} from '@/lib/api';
-export async function POST(request:Request){try{sameOrigin(request);const {chain,asset}=chainSchema.parse(await readJson(request));if(await currentUser(request))throw Error('عناوين الإيداع غير مفعّلة للحسابات المسجّلة حالياً. يُرجى عدم إرسال أموال فعلية.');return NextResponse.json({chain,asset,address:chain==='TRC20'?'TDEMO000000000000000000000000000000':'0xDEMO000000000000000000000000000000000000',demo:true,warning:'Intentionally invalid placeholder. Not a derived address. Never send real funds.'})}catch(e){return apiError(e)}}
+import {sameOrigin} from '@/lib/api';
+import {readJson} from '@/lib/request-body';
+import {requireUser,sessionTokenHash} from '@/lib/email-auth';
+import {customerFinanceEnabled} from '@/lib/customer-financial-http';
+import {financialDatabase} from '@/lib/financial-database';
+import {productionDepositDiscovery} from '@/lib/deposit-discovery-runtime';
+import {customerDepositAddress} from '@/lib/customer-deposit-address';
+import {securityFailure,securityHeaders} from '@/lib/security-http';
+export const runtime='nodejs';
+export async function POST(request:Request){try{
+ sameOrigin(request);
+ if(!customerFinanceEnabled()||process.env.SIRO_CUSTOMER_DEPOSITS_ENABLED!=='true'||process.env.SIRO_DEPOSIT_DISCOVERY_ENABLED!=='true'||process.env.SIRO_DEPOSIT_VALUATION_ENABLED!=='true'||process.env.SIRO_PRICING_PROVIDER!=='coinbase-spot-v1')return securityFailure('الإيداع غير مفعّل. لا ترسل أموالًا.',503);
+ const user=await requireUser(request),sessionHash=sessionTokenHash(request),origin=process.env.WEBAUTHN_ORIGIN;
+ if(!sessionHash||!origin)throw Error('SESSION_REQUIRED');
+ const input=await readJson(request,2048),chain=(input as {chain?:unknown})?.chain;
+ if(chain!=='TRC20'&&chain!=='BEP20')throw Error('UNSUPPORTED_DEPOSIT_NETWORK');
+ const db=financialDatabase(),discovery=productionDepositDiscovery(db);
+ const historical=process.env[`SIRO_${chain}_DEPOSIT_START_BLOCK`];
+ if(historical!==undefined&&!/^\d{1,15}$/.test(historical))throw Error('INVALID_HISTORICAL_START');
+ const result=await customerDepositAddress(db,{userId:user.id,sessionHash,origin,rpID:new URL(origin).hostname},input,{vaultId:process.env[`SIRO_${chain}_DEPOSIT_VAULT_ID`]??'',finalHeight:discovery.finalHeight,historicalStart:historical===undefined?undefined:Number(historical)});
+ return NextResponse.json(result,{headers:securityHeaders});
+}catch{return securityFailure('تعذّر تخصيص عنوان إيداع موثوق. لا ترسل أموالًا قبل ظهور عنوان حسابك.',400)}}

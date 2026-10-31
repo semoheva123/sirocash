@@ -15,7 +15,7 @@ async function main(){
   }
   await db.exec('BEGIN; SET LOCAL ROLE sirocash_app;');
   const verified=await verifyFinancialSchema(async(sql,params)=>({rows:(await db.query(sql,params)).rows as Record<string,unknown>[]}));
-  assert.equal(verified.tables,27);assert.equal(verified.status,'VERIFIED');assert.equal(verified.runtimeFinancialAccess,false);
+  assert.equal(verified.tables,28);assert.equal(verified.status,'VERIFIED');assert.equal(verified.runtimeFinancialAccess,false);
   await db.exec('ROLLBACK;');
   await db.exec('BEGIN;');
   await assert.rejects(()=>verifyFinancialSchema(async(sql,params)=>({rows:(await db.query(sql,params)).rows as Record<string,unknown>[]})),/UNSAFE_ROLE/);
@@ -26,7 +26,7 @@ async function main(){
   await db.exec('REVOKE SELECT ON \"WalletOperation\" FROM sirocash_app; DROP INDEX payout_network_unresolved; BEGIN; SET LOCAL ROLE sirocash_app;');
   await assert.rejects(()=>verifyFinancialSchema(async(sql,params)=>({rows:(await db.query(sql,params)).rows as Record<string,unknown>[]})),/GUARDS_MISSING/);
   await db.exec('ROLLBACK;');
-  console.log('27 financial/auth tables: hosted-style default grants removed, RLS enabled, runtime limited to durable authentication storage.');
+  console.log('28 financial/auth tables: hosted-style default grants removed, RLS enabled, runtime limited to durable authentication storage.');
  }finally{await db.close()}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

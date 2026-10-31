@@ -7,7 +7,6 @@ import {creditConfirmedDepositInTransaction,moneyString,type WalletDb} from './w
 export async function postValuedDeposit(db:WalletDb,inboxId:string){
  if(!/^[a-f0-9-]{36}$/i.test(inboxId))throw new Error('INVALID_DEPOSIT_ID');
  return db.transaction(async tx=>{
-  await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
   const {rows:[inbox]}=await tx.query('SELECT * FROM "ChainDepositInbox" WHERE id=$1 FOR UPDATE',[inboxId]);
   if(!inbox)throw new Error('DEPOSIT_NOT_FOUND');
   const {rows:[value]}=await tx.query('SELECT *,"approvedAt"<=statement_timestamp() AND "expiresAt">statement_timestamp() AS fresh FROM "ApprovedDepositValuation" WHERE "inboxId"=$1 FOR UPDATE',[inboxId]);
@@ -23,6 +22,8 @@ export async function postValuedDeposit(db:WalletDb,inboxId:string){
    if(!operation||operation.state!=='COMPLETED'||String(operation.amount)!==moneyString(usdMicros))throw new Error('DEPOSIT_POSTING_CONFLICT');
    return {id:String(operation.id),transactionId:String(operation.transactionId),amount:moneyString(usdMicros),state:'COMPLETED' as const};
   }
+  const {rows:[scan]}=await tx.query('SELECT paused FROM "DepositScanCursor" WHERE "addressId"=$1',[inbox.addressId]);
+  if(scan?.paused===true)throw Error('DEPOSIT_CHAIN_REVIEW_REQUIRED');
   if(inbox.state!=='AWAITING_VALUATION'||value.operationId||value.fresh!==true)throw new Error('DEPOSIT_VALUATION_EXPIRED_OR_INVALID_STATE');
   const posted=await creditConfirmedDepositInTransaction(tx,{ownerId:String(assignment.ownerId),requestKey:'deposit:'+createHash('sha256').update(String(inbox.eventKey)).digest('hex'),amount:moneyString(usdMicros),providerReference:String(inbox.eventKey),settlementAccountId:String(value.settlementAccountId)});
   await tx.query('UPDATE "ApprovedDepositValuation" SET "operationId"=$2 WHERE "inboxId"=$1',[inboxId,posted.id]);
