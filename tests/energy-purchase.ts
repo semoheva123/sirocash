@@ -13,6 +13,11 @@ async function main(){
  CREATE TABLE "WalletOperation"(id UUID PRIMARY KEY,state TEXT,kind TEXT);
  CREATE TABLE "UserDepositAddress"(id UUID PRIMARY KEY,"vaultId" INTEGER,network TEXT,address TEXT);
  CREATE TABLE "DepositAddressVault"(id INTEGER PRIMARY KEY,enabled BOOLEAN,"originVerified" BOOLEAN);
+ CREATE TABLE "PayoutExpensePolicy"(network TEXT PRIMARY KEY,enabled BOOLEAN,"perPayoutCap" NUMERIC,"dailyCap" NUMERIC);
+ INSERT INTO "PayoutExpensePolicy" VALUES('TRC20',false,0,0);
+ CREATE TABLE "PayoutExpenseReservation"(network TEXT,"amountBaseUnits" NUMERIC,state TEXT,"settledAt" TIMESTAMPTZ);
+ CREATE TABLE "SweepDispatchAuthorization"(network TEXT,expense NUMERIC,state TEXT,"settledAt" TIMESTAMPTZ);
+ CREATE TABLE "NativeGasOutbox"(expense NUMERIC,state TEXT,"confirmedAt" TIMESTAMPTZ);
  CREATE TABLE "SignedSweepOutbox"(id UUID,"addressId" UUID,state TEXT);`);
  for(const m of ['20261031020000_energy_intents','20261031170000_unified_tron_energy','20261031200000_energy_purchase_budget','20261031220000_energy_delivery_recovery'])await pg.exec(await readFile(`prisma/migrations/${m}/migration.sql`,'utf8'));
  await pg.exec('ALTER TABLE "EnergyRentalIntent" ADD COLUMN "bandwidthAmount" INTEGER NOT NULL DEFAULT 0; ALTER TABLE "EnergyPurchaseAttempt" ADD COLUMN "bandwidthAmount" INTEGER NOT NULL DEFAULT 0;');
@@ -33,6 +38,7 @@ async function main(){
  const options={enabled:true,send:async()=>{calls++;return {orderId:'order-1'}}};
  await assert.rejects(()=>purchaseIntentEnergy(db,id(1),quote(),{...options,enabled:false}),/DISABLED/);
  await assert.rejects(()=>purchaseIntentEnergy(db,id(1),quote(),options),/POLICY_DISABLED/);
+ await pg.exec('UPDATE "PayoutExpensePolicy" SET enabled=true,"perPayoutCap"=10000,"dailyCap"=10000 WHERE network=\'TRC20\'');
  await pg.exec('UPDATE "EnergyPurchasePolicy" SET enabled=true,"perOrderSun"=100,"totalHeldSun"=100');
  await assert.rejects(()=>purchaseIntentEnergy(db,id(1),{...quote(),sender:'wrong'},options),/BINDING_FAILED/);
  await assert.rejects(()=>purchaseIntentEnergy(db,id(1),{...quote(),expiresAt:Date.now()-1},options),/STALE/);
@@ -51,8 +57,18 @@ async function main(){
  await assert.rejects(()=>purchaseIntentEnergy(failing,id(1),quote(),options),/SIMULATED_COMMIT/);
  assert.equal((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM "EnergyPurchaseAttempt"')).rows[0].n,0);
  assert.equal(calls,0);
+ await pg.exec(`INSERT INTO "PayoutExpenseReservation" VALUES('TRC20',50,'HELD',NULL); UPDATE "PayoutExpensePolicy" SET "dailyCap"=99 WHERE network='TRC20'`);
+ await assert.rejects(()=>purchaseIntentEnergy(db,id(1),quote(),options),/NETWORK_DAILY_CAP/);assert.equal(calls,0);
+ await pg.exec('DELETE FROM "PayoutExpenseReservation"');
+ // Provider purchases cannot spend from a second independent budget before dispatch.
+ await pg.exec('UPDATE "PayoutExpensePolicy" SET "dailyCap"=49 WHERE network=\'TRC20\'');
+ await assert.rejects(()=>purchaseIntentEnergy(db,id(1),quote(),options),/NETWORK_DAILY_CAP/);assert.equal(calls,0);
+ await pg.exec('UPDATE "PayoutExpensePolicy" SET "dailyCap"=10000 WHERE network=\'TRC20\'');
  assert.equal((await purchaseIntentEnergy(db,id(1),quote(),options)).state,'ACKNOWLEDGED');
  assert.equal((await purchaseIntentEnergy(db,id(1),quote(),options)).state,'ACKNOWLEDGED');assert.equal(calls,1);
+ await pg.exec('UPDATE "PayoutExpensePolicy" SET "dailyCap"=99 WHERE network=\'TRC20\'');
+ await assert.rejects(()=>purchaseIntentEnergy(db,id(2),quote(2),options),/NETWORK_DAILY_CAP/);assert.equal(calls,1);
+ await pg.exec('UPDATE "PayoutExpensePolicy" SET "dailyCap"=10000 WHERE network=\'TRC20\'');
  assert.equal((await purchaseIntentEnergy(db,id(2),quote(2),{enabled:true,send:async()=>{calls++;throw new Error('secret upstream body')}})).state,'UNKNOWN');
  assert.equal((await purchaseIntentEnergy(db,id(2),quote(2),options)).state,'UNKNOWN');assert.equal(calls,2);
  await assert.rejects(()=>purchaseIntentEnergy(db,id(3),quote(3),options),/TOTAL_BUDGET/);assert.equal(calls,2);

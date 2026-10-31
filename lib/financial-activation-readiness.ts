@@ -8,7 +8,7 @@ export function financialActivationReadiness(env:Record<string,string|undefined>
  try{const value=financialConnectionString(env);const u=value?new URL(value):undefined;if(!u||!['postgres:','postgresql:'].includes(u.protocol)||decodeURIComponent(u.username).split('.')[0]!=='sirocash_financial_worker'||!u.password)blockers.push('FINANCIAL_DATABASE_URL')}catch{blockers.push('FINANCIAL_DATABASE_URL')}
  requireValue('DATABASE_SSL_CA');
  requireValue('SIRO_FINANCIAL_WORKER_SECRET',v=>v.length>=32&&v.length<=512);
- for(const key of ['SIRO_SIGNER_ENABLED','SIRO_RPC_READ_ENABLED','SIRO_OUTBOX_WORKER_ENABLED','SIRO_AUTOMATIC_PREPARATION_ENABLED','SIRO_NATIVE_GAS_ENABLED','SIRO_BROADCAST_ENABLED','SIRO_RESOURCE_AUTHORIZATION_ENABLED','SIRO_ENERGY_WORKER_ENABLED','SIRO_ENERGY_PURCHASE_ENABLED','SIRO_ACCEPT_VARIABLE_ENERGY_PRICE'])requireValue(key,v=>v==='true');
+ for(const key of ['SIRO_CUSTOMER_FINANCE_ENABLED','SIRO_WITHDRAWALS_ENABLED','SIRO_CUSTOMER_DEPOSITS_ENABLED','SIRO_DEPOSIT_DISCOVERY_ENABLED','SIRO_DEPOSIT_VALUATION_ENABLED','SIRO_DURABLE_PASSKEY_ENABLED','SIRO_SIGNER_ENABLED','SIRO_RPC_READ_ENABLED','SIRO_OUTBOX_WORKER_ENABLED','SIRO_AUTOMATIC_PREPARATION_ENABLED','SIRO_NATIVE_GAS_ENABLED','SIRO_BROADCAST_ENABLED','SIRO_RESOURCE_AUTHORIZATION_ENABLED','SIRO_ENERGY_WORKER_ENABLED','SIRO_ENERGY_PURCHASE_ENABLED','SIRO_ACCEPT_VARIABLE_ENERGY_PRICE'])requireValue(key,v=>v==='true');
  for(const key of ['SIRO_BEP20_RPC_URL','SIRO_TRON_RPC_URL'])requireValue(key,v=>{try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash}catch{return false}});
  requireValue('SIRO_TRON_GENESIS_ID',v=>/^[a-f0-9]{64}$/.test(v));
  requireValue('SIRO_BEP20_MIN_CONFIRMATIONS',v=>/^\d+$/.test(v)&&Number.isSafeInteger(Number(v))&&Number(v)>=15);

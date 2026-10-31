@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {observeUsdtUsdPrice} from '../lib/financial-price';
-import {customerFinancialHttp} from '../lib/customer-financial-http';
+import {customerFinancialHttp,customerWithdrawalsEnabled} from '../lib/customer-financial-http';
 async function main(){
  const price=await observeUsdtUsdPrice(async(url,options)=>{assert.equal(url,'https://api.coinbase.com/v2/prices/USDT-USD/spot');assert.equal(options?.redirect,'error');return new Response(JSON.stringify({data:{base:'USDT',currency:'USD',amount:'0.998123999'}}))});
  assert.equal(price.rate,998123n);assert.match(price.evidenceHash,/^[a-f0-9]{64}$/);
@@ -25,6 +25,14 @@ async function main(){
   }
   assert.equal((await customerFinancialHttp(new Request('https://sirocash.example/api/financial/prepare',{method:'POST',headers:{origin:'https://evil.example'}}),'PREPARE')).status,400);
  }finally{for(const [k,v] of Object.entries(old)){if(v===undefined)delete process.env[k];else process.env[k]=v}}
+ const gateKeys=['VERCEL_ENV','SIRO_CUSTOMER_FINANCE_ENABLED','SIRO_DURABLE_PASSKEY_ENABLED','SIRO_OUTBOX_WORKER_ENABLED','SIRO_WITHDRAWALS_ENABLED'];
+ const saved=gateKeys.map(key=>[key,process.env[key]] as const);
+ try{
+  for(const key of gateKeys)process.env[key]=key==='VERCEL_ENV'?'production':'true';
+  assert.equal(customerWithdrawalsEnabled(),true);
+  delete process.env.SIRO_WITHDRAWALS_ENABLED;assert.equal(customerWithdrawalsEnabled(),false);
+  process.env.SIRO_WITHDRAWALS_ENABLED='false';assert.equal(customerWithdrawalsEnabled(),false);
+ }finally{for(const [key,value] of saved){if(value===undefined)delete process.env[key];else process.env[key]=value}}
  const ui=await readFile('components/customer-payments.tsx','utf8');
  assert(ui.includes('authorizePayment(prepared.path,prepared.payload)'));assert(ui.includes('quoteId:prepared.id'));
  assert(!ui.includes('verifyDemoPin'));assert(!ui.includes('123456'));assert(ui.includes('Preserve exact request/quote for retry'));assert(ui.includes('if(attempted&&!submitted)return'));assert(ui.includes('setAttempted(true)'));

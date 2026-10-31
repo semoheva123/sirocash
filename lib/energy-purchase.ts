@@ -1,4 +1,5 @@
 import 'server-only';
+import {nativeExpenseUsage} from './native-expense-usage';
 import {randomUUID} from 'node:crypto';
 import type {WalletDb} from './wallet-engine';
 import {validTronAddress} from './tron-addresses';
@@ -46,6 +47,11 @@ export async function purchaseIntentEnergy(db:WalletDb,intentId:string,quote:Quo
   if(quote.costSun>BigInt(String(intent.maxRentalSun))||quote.costSun>BigInt(String(policy.perOrderSun)))throw new Error('ENERGY_ORDER_BUDGET_EXCEEDED');
   const {rows:[held]}=await tx.query('SELECT COALESCE(sum(GREATEST("costSun",COALESCE("actualCostSun",0))),0)::text AS total FROM "EnergyPurchaseAttempt"');
   if(BigInt(String(held.total))+quote.costSun>BigInt(String(policy.totalHeldSun)))throw new Error('ENERGY_TOTAL_BUDGET_EXCEEDED');
+  // Reserve against the SAME network daily mutex before the external purchase, not only
+  // when a later outbox is authorized. An uncertain purchase never releases its budget.
+  const {rows:[networkPolicy]}=await tx.query('SELECT * FROM "PayoutExpensePolicy" WHERE network=\'TRC20\' FOR UPDATE');
+  if(!networkPolicy||networkPolicy.enabled!==true||quote.costSun>BigInt(String(networkPolicy.perPayoutCap)))throw Error('ENERGY_NETWORK_POLICY_DISABLED_OR_EXCEEDED');
+  if(await nativeExpenseUsage(tx,'TRC20')+quote.costSun>BigInt(String(networkPolicy.dailyCap)))throw Error('ENERGY_NETWORK_DAILY_CAP');
   const claimId=randomUUID();
   await tx.query('INSERT INTO "EnergyPurchaseAttempt" ("intentId","claimId","intentFingerprint","senderAddress","energyAmount","costSun","quoteExpiresAt","bandwidthAmount") VALUES ($1,$2,$3,$4,$5,$6,to_timestamp($7 / 1000.0),$8)',[intentId,claimId,intent.fingerprint,intent.senderAddress,intent.energyAmount,quote.costSun.toString(),quote.expiresAt,quote.bandwidthAmount??0]);
   await tx.query('UPDATE "EnergyRentalIntent" SET state=\'UNCERTAIN\',"updatedAt"=statement_timestamp() WHERE id=$1',[intentId]);

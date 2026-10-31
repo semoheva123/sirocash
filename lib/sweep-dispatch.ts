@@ -1,4 +1,5 @@
 import 'server-only';
+import {nativeExpenseUsage} from './native-expense-usage';
 import {createHash,randomUUID} from 'node:crypto';
 import {Transaction,Interface,getAddress} from 'ethers';
 import {utils} from 'tronweb';
@@ -63,8 +64,8 @@ export async function authorizeSweepDispatch(db:WalletDb,id:string,e:SweepResour
   if(prior&&BigInt(String(prior.expense))!==cost)throw new Error('SWEEP_REFRESH_BUDGET_CHANGED');
   const {rows:[policy]}=await tx.query('SELECT * FROM "PayoutExpensePolicy" WHERE network=$1 FOR UPDATE',[e.network]);
   if(!policy||policy.enabled!==true||cost>BigInt(String(policy.perPayoutCap)))throw new Error('SWEEP_EXPENSE_POLICY');
-  const {rows:[usage]}=await tx.query(`SELECT COALESCE(sum(n),0)::text AS used FROM (SELECT "amountBaseUnits" AS n FROM "PayoutExpenseReservation" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') UNION ALL SELECT expense AS n FROM "SweepDispatchAuthorization" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') UNION ALL SELECT expense AS n FROM "NativeGasOutbox" WHERE $1='BEP20' AND (state<>'CONFIRMED' OR "confirmedAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')) u`,[e.network]);
-  if(BigInt(String(usage.used))+(prior?0n:cost)>BigInt(String(policy.dailyCap)))throw new Error('SWEEP_DAILY_EXPENSE_CAP');
+  const used=await nativeExpenseUsage(tx,e.network);
+  if(used+(prior?0n:cost)>BigInt(String(policy.dailyCap)))throw new Error('SWEEP_DAILY_EXPENSE_CAP');
   if(prior){
    await tx.query('INSERT INTO "DispatchApprovalHistory"(id,kind,"outboxId",previous) SELECT $2,\'SWEEP\',"sweepId",to_jsonb(a) FROM "SweepDispatchAuthorization" a WHERE "sweepId"=$1',[id,randomUUID()]);
    await tx.query('UPDATE "SweepDispatchAuthorization" SET "evidenceHash"=$2,evidence=$3::jsonb,"approvedAt"=$4,"expiresAt"=$5 WHERE "sweepId"=$1',[id,hash,json,e.observedAt,e.expiresAt]);
