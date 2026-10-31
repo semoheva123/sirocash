@@ -4,7 +4,8 @@ const json=(body,status=200)=>Response.json(body,{status,headers});
 const fail=(status)=>json({error:'Identity service request failed.'},status);
 const validSubject=s=>/^[a-f0-9]{64}$/.test(s||'');
 const validId=s=>/^[a-f0-9-]{36}$/.test(s||'');
-const publicRow=r=>r?{id:r.id,kind:r.kind,status:r.status,reason:r.reason,createdAt:r.created_at,expiresAt:r.expires_at,documentsDeleted:!!r.purged_at}:null;
+const ACCOUNT_LIFETIME=8640000000000000;
+const publicRow=r=>r?{id:r.id,kind:r.kind,status:r.status,reason:r.reason,createdAt:r.created_at,expiresAt:r.expires_at===ACCOUNT_LIFETIME?null:r.expires_at,retentionPolicy:r.consent_version==='identity-v2-account-lifetime'?'account_lifetime':'fixed_days',documentsDeleted:!!r.purged_at}:null;
 async function authentic(request,secret){
  if(!secret||secret.length<32)return false;
  const candidate=request.headers.get('authorization')||'';
@@ -20,12 +21,24 @@ async function form(request){const body=await bounded(request,3300000);return ne
 async function audit(db,id,actor,action){await db.prepare('INSERT INTO identity_audit VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),id,actor,action,Date.now()).run()}
 async function removeFiles(env,row){for(const key of [row.front_key,row.back_key].filter(Boolean))await env.IDENTITY_DOCUMENTS.delete(key)}
 export async function purge(env){
- const now=Date.now();const rows=await env.IDENTITY_DB.prepare('SELECT * FROM identity_requests WHERE expires_at<=? AND purged_at IS NULL LIMIT 100').bind(now).all();
+ const now=Date.now();const rows=await env.IDENTITY_DB.prepare("SELECT * FROM identity_requests WHERE expires_at<=? AND purged_at IS NULL AND (status<>'uploading' OR created_at<?) LIMIT 100").bind(now,now-600000).all();
  for(const row of rows.results){
   try{await removeFiles(env,row);await env.IDENTITY_DB.batch([
    env.IDENTITY_DB.prepare("UPDATE identity_requests SET front_key=NULL,back_key=NULL,purged_at=?,status=CASE WHEN status IN ('uploading','pending_review') THEN 'resubmit' ELSE status END,reason=CASE WHEN status IN ('uploading','pending_review') THEN 'incomplete' ELSE reason END WHERE id=? AND purged_at IS NULL").bind(now,row.id),
    env.IDENTITY_DB.prepare('INSERT INTO identity_audit VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),row.id,'retention','documents_purged',now)
   ])}catch{/* Retain keys for the next retry; never log file contents, tokens or OCR text. */}
+ }
+ const closed=await env.IDENTITY_DB.prepare('SELECT subject FROM identity_closed_accounts LIMIT 100').all();
+ for(const {subject} of closed.results){
+  const pending=await env.IDENTITY_DB.prepare('SELECT count(*) AS n FROM identity_requests WHERE subject=? AND purged_at IS NULL').bind(subject).first();
+  if(pending.n===0)await env.IDENTITY_DB.batch([
+   env.IDENTITY_DB.prepare('DELETE FROM identity_audit WHERE request_id IN (SELECT id FROM identity_requests WHERE subject=?)').bind(subject),
+   env.IDENTITY_DB.prepare('DELETE FROM identity_requests WHERE subject=?').bind(subject),
+   env.IDENTITY_DB.prepare('DELETE FROM identity_quota WHERE subject=?').bind(subject),
+   env.IDENTITY_DB.prepare("UPDATE identity_audit SET actor='deleted-account' WHERE actor=?").bind(subject),
+   env.IDENTITY_DB.prepare('UPDATE identity_requests SET reviewer=NULL WHERE reviewer=?').bind(subject),
+   env.IDENTITY_DB.prepare('DELETE FROM identity_closed_accounts WHERE subject=?').bind(subject)
+  ]);
  }
  await env.IDENTITY_DB.prepare("DELETE FROM identity_quota WHERE (day NOT LIKE 'review:%' AND day<?) OR (day LIKE 'review:%' AND day<?)").bind(new Date(now-7*86400000).toISOString().slice(0,10),'review:'+new Date(now-7*86400000).toISOString().slice(0,13)).run();
 }
@@ -37,6 +50,20 @@ export default {
    if(!await authentic(request,review?env.IDENTITY_REVIEW_TOKEN:env.IDENTITY_SERVICE_TOKEN))return fail(401);
    const subject=request.headers.get(review?'x-identity-actor':'x-identity-subject');if(!validSubject(subject))return fail(403);
    const db=env.IDENTITY_DB,now=Date.now();
+   if(url.pathname==='/accounts/reconcile'&&request.method==='POST'){
+    const snapshot=JSON.parse(new TextDecoder().decode(await bounded(request,800000)));
+    if(!Number.isInteger(snapshot.observedAt)||Math.abs(now-snapshot.observedAt)>300000||snapshot.complete!==true||!Array.isArray(snapshot.active)||snapshot.active.length>10000||snapshot.active.some(s=>!validSubject(s))||new Set(snapshot.active).size!==snapshot.active.length)return fail(400);
+    const active=new Set(snapshot.active);
+    const stored=await db.prepare('SELECT subject FROM identity_requests GROUP BY subject HAVING MIN(created_at)<? LIMIT 10001').bind(snapshot.observedAt-600000).all();if(stored.results.length>10000)return fail(503);
+    let closed=0;
+    for(const row of stored.results){if(active.has(row.subject))continue;
+     await db.batch([
+      db.prepare('INSERT INTO identity_closed_accounts VALUES (?,?) ON CONFLICT(subject) DO NOTHING').bind(row.subject,now),
+      db.prepare("UPDATE identity_requests SET expires_at=?,status=CASE WHEN status='uploading' THEN status ELSE 'withdrawn' END WHERE subject=? AND purged_at IS NULL").bind(now,row.subject)
+     ]);closed++;
+    }
+    await purge(env);return json({ok:true,closed});
+   }
    if(url.pathname==='/requests'&&request.method==='GET'){
     const row=await db.prepare('SELECT * FROM identity_requests WHERE subject=? ORDER BY created_at DESC LIMIT 1').bind(subject).first();
     return json({request:publicRow(row)});
@@ -47,8 +74,9 @@ export default {
    if(url.pathname==='/requests'&&request.method==='POST'){
     // The app proxy reserves a quota attempt BEFORE image decoding/OCR. No browser has this token.
     const data=await form(request),kind=data.get('kind'),consent=data.get('consent'),days=Number(data.get('retentionDays'));
-    const front=data.get('front'),back=data.get('back');
-    if(!['national_id','passport','residence_permit'].includes(kind)||consent!=='identity-v1'||!Number.isInteger(days)||days<1||days>90)return fail(400);
+    const front=data.get('front'),back=data.get('back'),policy=data.get('retentionPolicy')||'fixed_days';
+    if(await db.prepare('SELECT subject FROM identity_closed_accounts WHERE subject=?').bind(subject).first())return fail(403);
+    if(!['national_id','passport','residence_permit'].includes(kind)||!((policy==='fixed_days'&&consent==='identity-v1'&&Number.isInteger(days)&&days>=1&&days<=90)||(policy==='account_lifetime'&&consent==='identity-v2-account-lifetime'&&days===0)))return fail(400);
     const files=kind==='passport'?[front]:[front,back];
     if(kind==='passport'&&back)return fail(400);
     for(const f of files){if(!(f instanceof File)||f.type!=='image/jpeg'||f.size<100||f.size>1500000)return fail(400);const magic=new Uint8Array(await f.slice(0,3).arrayBuffer());if(magic[0]!==255||magic[1]!==216||magic[2]!==255)return fail(400)}
@@ -56,7 +84,7 @@ export default {
     // Only aggregate diagnostics; never persist extracted names, ID numbers or raw OCR text.
     if(!Array.isArray(checks)||checks.length!==files.length||checks.some(c=>!Number.isFinite(c.width)||!Number.isFinite(c.height)||!Number.isFinite(c.contrast)||!['completed','unavailable'].includes(c.ocr?.status)||(c.ocr.status==='completed'&&(!Number.isFinite(c.ocr.confidence)||!Number.isInteger(c.ocr.characters)||c.ocr.characters<0))||Object.keys(c).some(k=>!['width','height','contrast','ocr'].includes(k))||Object.keys(c.ocr).some(k=>!['status','confidence','characters'].includes(k))))return fail(400);
     const id=crypto.randomUUID(),frontKey=`documents/${id}/front.jpg`,backKey=files.length===2?`documents/${id}/back.jpg`:null;
-    try{await db.prepare("INSERT INTO identity_requests(id,subject,kind,status,front_key,back_key,checks,consent_version,created_at,expires_at) VALUES (?,?,?,'uploading',?,?,?,?,?,?)").bind(id,subject,kind,frontKey,backKey,JSON.stringify(checks),consent,now,now+days*86400000).run()}catch{return fail(409)}
+    try{await db.prepare("INSERT INTO identity_requests(id,subject,kind,status,front_key,back_key,checks,consent_version,created_at,expires_at) VALUES (?,?,?,'uploading',?,?,?,?,?,?)").bind(id,subject,kind,frontKey,backKey,JSON.stringify(checks),consent,now,policy==='account_lifetime'?ACCOUNT_LIFETIME:now+days*86400000).run()}catch{return fail(409)}
     try{
      for(let i=0;i<files.length;i++)await env.IDENTITY_DOCUMENTS.put(i===0?frontKey:backKey,await files[i].arrayBuffer(),{httpMetadata:{contentType:'image/jpeg'}});
      await db.batch([db.prepare("UPDATE identity_requests SET status='pending_review' WHERE id=? AND status='uploading'").bind(id),db.prepare('INSERT INTO identity_audit VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),id,subject,'submitted',now)]);

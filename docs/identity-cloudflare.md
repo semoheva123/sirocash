@@ -1,50 +1,44 @@
-# Isolated identity intake: Cloudflare R2 + D1
+# Identity storage: private Cloudflare R2 + D1
 
-## Current boundary
+## Current deployment boundary
 
-Implemented and locally tested; **Cloudflare is not connected/provisioned in this session**. No real identity document has been collected or uploaded. Collection is disabled by default. Nothing migrates the PostgreSQL account/ledger database or enables money movement. Never upload real identities for testing.
+The account-owned Cloudflare token was verified through GitHub Actions, without exposing its value. The account ID is `54cf1f9f742ce2f8b674b2c3fa2cee51`. The first resource-provisioning attempt failed because **Cloudflare R2 is not enabled** (provider code 10042). The owner must activate R2 in the dashboard and accept any billing requirements. No billing method, subscriptions, domains or unrelated projects were changed. No Cloudflare database or bucket was created by that failed attempt; collection remains disabled.
 
-This is document intake with **human document review**, not certified KYC, document-authenticity assurance, face matching, liveness, sanctions/PEP screening or a regulatory eligibility decision. Open-source libraries have no license fee; hosting, Workers, D1, R2 and compute are subject to actual account limits/billing. No free-service guarantee is made.
+`CLOUDFLARE_API_TOKEN` stays in GitHub repository Actions secrets. The application never receives this broad deployment credential. The workflow creates/reuses only `sirocash-identity-private` and `sirocash-identity`, disables managed bucket public access, refuses enabled public custom domains, and emits only non-secret resource IDs/status. Generated binding configuration is ignored by Git. No user identity images or private tokens belong in artifacts, logs, repository files or chat.
 
-## Architecture and controls
+## Owner-selected account-lifetime retention
 
-- Settings → `IdentityVerification` → authenticated Next `/api/identity` proxy → backend-only Worker → private R2 images / D1 request metadata.
-- Reuses verified database sessions and requires verified email for submission. Owner identity comes from the server session, never a browser field.
-- Stable HMAC pseudonyms link D1 records to account UUIDs; emails, original filenames, identity numbers and extracted OCR text are not stored in D1. Pseudonyms/diagnostics are still personal data, not anonymous data.
-- Upload requires same-origin POST, explicit versioned consent, and an unchanged owner-approved retention period. No document intake while configuration is absent. Disabling new collection does not disable status access or withdrawal/deletion while storage credentials remain configured. Three document categories: national ID (two images), residence permit (two), passport (data page only). This is not a claim that every country's documents can be authenticated.
-- JPEG/PNG only, 1.5 MB per input/output image, 3.2 MB bounded multipart body, 12M decoded pixels, minimum 600px per side. Sharp 0.35.5+ decodes/re-encodes a JPEG copy, strips EXIF/location data, rotates and limits dimensions to 2400px. Original files are not retained. No PDFs/SVG/animated images or remote image URLs.
-- Tesseract.js uses locally packaged Arabic/English language models; no CDN or OCR SaaS. Only confidence/character counts and image dimensions/contrast are retained. Recognition has a 25-second deadline and worker termination; processing is one upload per application instance, plus four persisted attempts per subject/day before expensive work. Failed/unavailable OCR is clearly recorded and **never approves a request**. Cold-start worker initialization is not independently timeboxed; platform request limits remain relevant. Load testing and production memory/timeout validation remain release gates.
-- Backend-only, independent intake/review tokens, HTTPS, bounded bodies, private/no-store responses, attachment/sandbox headers, no public R2 URLs, no token/PII logs. R2 default encryption is not a claim of operator-exclusive/end-to-end encryption. Keep bucket public access/custom-domain access disabled.
-- D1 partial unique index prevents concurrent open requests. A persisted key manifest precedes R2 writes; failed partial writes remain discoverable for cleanup. Requests are never visible to another subject. Only pending, unexpired documents are available to reviewers. Uploading requests cannot be withdrawn mid-write (409); this prevents deleting the manifest before upload completion.
-- `/identity-review` + `/api/identity/review`: server-side immutable reviewer UUID allowlist, verified session/email, separate review token, explicit enable flag, current-password recheck per action, persisted 60 attempts/reviewer/hour, access/decision auditing, compare-and-set decisions and no self-approval. No extracted text, photos or password in localStorage. Browser preview is a temporary Blob URL revoked on close/unmount. Implement an approved reviewer Access/MFA perimeter **before enabling review**; the flag is an operator attestation, not automatic enforcement/verification of that perimeter.
-- Delete/withdraw marks the request withdrawn before removing files, preventing concurrent approval. Retries are safe. A Worker hourly cron removes expired image objects, clears keys and logs purge; pending requests become `resubmit`. R2 deletion failure retains the key manifest for retry. Deletion is scheduled, not an exact-time guarantee. Monitor cron failures, stale uploading records and backlog; stale upload failures may remain until their retention deadline.
-- Image deletion does not remove minimal request/audit records. Approvals mean human document review only and do not activate services. Operator must approve and implement separate metadata/audit retention and account-deletion handling before enabling collection.
+The owner explicitly selected: retain documents while the account remains registered and not closed. This means **no automatic expiry due to inactivity or elapsed days**, not evidence about a person's biological life. Consent version `identity-v2-account-lifetime` discloses the policy and early document withdrawal/deletion. R2 must not have an age-based lifecycle rule deleting these copies.
 
-## Provisioning (owner's authorized Cloudflare account only)
+- `IDENTITY_RETENTION_POLICY=account_lifetime` is the selected configuration. Legacy fixed-days requests keep their original policy and consent; existing records are never silently extended.
+- D1 stores an internal sentinel for account-lifetime expiry, but APIs return `expiresAt: null` plus `retentionPolicy: account_lifetime`; customers/reviewers never see a fictitious far-future date.
+- `/api/internal/identity-lifecycle` is authenticated by a 32+ character `CRON_SECRET` and runs on a daily Vercel schedule (`02:37 UTC`). It obtains a complete successful snapshot of registered primary-database User IDs, HMAC-pseudonymizes them and reconciles the private Worker. It never sends email, identity numbers or extracted text.
+- A missing session, unverified email, inactivity, database error, partial pagination, stale snapshot or oversized (>10,000 accounts) snapshot must never imply account closure. Such failures stop synchronization. A 10-minute creation grace window protects accounts/documents created concurrently with a snapshot. Larger installations need an explicitly designed paginated snapshot protocol before raising the bound.
+- Confirmed absent primary accounts are marked closed in D1; new submissions are blocked during cleanup, files are deleted with retries, and related request/audit/quota records are removed only after all expected objects are confirmed deleted. Reviewer references in other users' retained records are de-identified. An in-flight upload has a 10-minute safety window before cleanup so its key manifest cannot be deleted before object writes finish.
+- Early withdrawal removes document copies but does not delete the primary account or its minimal review/audit records. Account removal then removes those remaining identity records. No blanket claim is made about deleting ledger/account/security records in PostgreSQL.
+- The application does **not** yet provide a customer self-service primary-account closure flow. The reconciler handles confirmed primary-account removal; it does not invent a closed state from session revocation. A supported closure workflow must eventually invoke/rely on this lifecycle mechanism.
+- Account-lifetime collection fails closed unless `IDENTITY_LIFECYCLE_ENABLED=true` and `CRON_SECRET` is configured. Successful deployed synthetic lifecycle checks are required before activating these flags. Worker cron is a retry/cleanup mechanism, not an exact-time deletion SLA.
 
-Use an authenticated local Cloudflare CLI/session or secret manager. Never paste API tokens or identity images into chat, Git, CI logs or PR comments. These commands are instructions, **not executed provisioning**:
+## Intake and review controls
 
-```sh
-# From cloudflare/identity, using a supported Wrangler version:
-npx wrangler login
-npx wrangler r2 bucket create sirocash-identity-private
-npx wrangler d1 create sirocash-identity
-# Put the returned database ID into wrangler.jsonc (the committed value is a placeholder).
-npx wrangler d1 migrations apply sirocash-identity --remote
-npx wrangler secret put IDENTITY_SERVICE_TOKEN
-npx wrangler secret put IDENTITY_REVIEW_TOKEN
-npx wrangler deploy
-```
+Verified account session + verified email → bounded same-origin Next intake → backend-only Worker → private JPEG copies in R2 / pseudonymous metadata in D1. Account/wallet data remains in PostgreSQL. No financial activation or KYC status is inferred from document intake.
 
-Generate independent random tokens (32+ characters) locally; set matching intake/review tokens in the independent **SiroCash** application project's server secrets, together with the HTTPS Worker origin and a separate stable `IDENTITY_SUBJECT_SECRET`. Never rotate the pseudonym key without an explicit subject-mapping migration. No need for account-wide Cloudflare API credentials in Next.js. Do not modify the two protected Vercel projects.
+JPEG/PNG only; 1.5 MB per image, 3.2 MB bounded multipart body, 12M decoded pixels, minimum 600px on each side, normalized to <=2400px. Sharp re-encodes JPEG copies and strips EXIF/location metadata; original files are not retained. No PDF/SVG/animated images or remote URLs. Four persisted attempts per user/day and a synchronous one-upload-per-instance processing gate precede OCR.
 
-Before enabling `IDENTITY_COLLECTION_ENABLED=true`:
-1. Owner approves jurisdictions, operator identity, purpose/lawful basis, transfer/data residency requirements, privacy notice/contact, document retention (1–90 days) and separate metadata/audit retention/deletion procedures. No default period is invented.
-2. Configure `IDENTITY_RETENTION_DAYS`, private bucket bindings and both Worker secrets. Confirm R2 has no public access or public domain.
-3. Protect reviewer access with an approved Access/MFA perimeter; set `IDENTITY_REVIEWER_IDS` to authorized account UUIDs. Only then enable `IDENTITY_REVIEW_ENABLED=true`.
-4. Run synthetic end-to-end testing against deployed resources: session/authorization, two simultaneous uploads, review and self-review rejection, image access, token rotation, partial storage failures, withdrawal and retention. Test backup/deletion policy and jurisdiction requirements. Verify cron execution and alerting. Real hosted-account/inbox/hardware/provider operation is not established by local tests.
-5. Deploy Next with traced local OCR models; verify deployed function size, OCR memory, cold-start and max duration. No document telemetry or error-body logging. Review third-party access and incident response.
+Tesseract.js runs locally on the application server with packaged Arabic/English models, not a third-party OCR service/CDN. Only confidence/character counts and image contrast/dimensions are retained, never extracted names/numbers/text. Recognition has a 25-second timeout and worker termination; initialization/cold-start and actual hosted memory limits still need deployed testing. Libraries have no license fee; infrastructure/compute can incur usage costs.
 
-## Local validation
+This is human document review, **not** certified KYC, document authenticity/ownership proof, face matching, liveness or sanctions screening. No separate selfie or biometric template is collected. No automatic/self approval. Reviewer access requires a server-side UUID allowlist, verified session/email, current-password recheck for each action, separate review token, persisted attempt limits and audit records. An owner-approved reviewer Access/MFA perimeter is required before enabling review; the enable flag does not itself implement/verify that perimeter. Temporary browser Blob previews are revoked on close/unmount.
 
-`npm run test:identity` uses **real local Miniflare D1/R2 bindings**, synthetic generated images and actual local Arabic/English OCR. It covers disabled/invalid config, bounded bodies, origin enforcement, metadata stripping, unsupported image rejection, no initial upload before availability, owner isolation, private audited reviewer access, no automatic/self approval, immutable terminal decision, duplicate-open rejection (including concurrent requests), partial R2 failure manifest/cleanup, withdrawal, persisted quotas and scheduled purge. Browser component fixtures additionally cover Arabic/English at 390/1440px, disabled intake, file/consent requirements, pending state, withdrawal while collection is disabled, reviewer password clearing and Blob URL revocation. These are not hosted-account or Cloudflare-production tests. `npm test` includes it. No credentials or real documents are required. Test data is in ephemeral in-memory/emulator storage only.
+No public R2 URLs; HTTPS, independent intake/review tokens, no-store/sandbox/attachment headers. R2 platform encryption is not operator-exclusive/end-to-end encryption. A complete key manifest precedes R2 writes; partial failures remain discoverable and retryable. Disabling new collection does not prevent status access or document withdrawal while storage credentials remain configured.
+
+## Remaining activation steps
+
+1. Owner activates R2 and reviews billing. Re-run the project provisioning workflow. Never weaken scoped credentials to resolve a billing-disabled response.
+2. Apply both D1 migrations, deploy the Worker, configure independent server-generated intake/review secrets, and securely configure the matching SiroCash application server secrets. Never copy the deployment token into the app. A working verification workflow is not yet a completed app/Worker integration.
+3. Configure stable `IDENTITY_SUBJECT_SECRET`, Worker HTTPS origin, lifecycle/cron credentials and explicit reviewer UUIDs. Keep `IDENTITY_COLLECTION_ENABLED=false` until testing succeeds.
+4. Approve operator/privacy/rights contact, legal basis, jurisdiction/data residency and reviewer perimeter. Account-lifetime retention is the owner's instruction, not an independent legal compliance conclusion.
+5. Test synthetic uploads/review, privacy/authorization, token rotation, partial failures, early withdrawal, registered-account retention and confirmed account-removal cleanup against deployed resources. Confirm cron/retry monitoring, backups/deletion behavior, function size/memory/cold-start limits and load handling. Then enable collection/review separately.
+
+## Validation
+
+`npm test` includes `test:identity`: actual local Miniflare D1/R2 bindings, synthetic images, packaged Arabic/English OCR, metadata stripping, quotas, concurrent-open rejection, injected partial R2 failure cleanup, no self/automatic approval, audited reviewer reads, withdrawal, legacy expiry, account-lifetime non-expiry, fresh/complete snapshot validation, retention of registered accounts and deleted-account cleanup. No real documents or hosted account credentials are used. Browser fixtures cover Arabic/English mobile/desktop intake and private reviewer preview behavior; these are not proof of a real Cloudflare/Vercel end-to-end deployment.

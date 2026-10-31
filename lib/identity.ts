@@ -1,14 +1,17 @@
 import {createHmac} from 'node:crypto';
 export const IDENTITY_CONSENT='identity-v1';
+export const identityConsent=(policy:string)=>policy==='account_lifetime'?'identity-v2-account-lifetime':IDENTITY_CONSENT;
 export const DOCUMENT_LIMIT=1500000;
 export const BODY_LIMIT=3200000;
 export const identityKinds=['national_id','passport','residence_permit'] as const;
 export function identityStorageConfig(env:Readonly<Record<string,string|undefined>>=process.env){
- const days=Number(env.IDENTITY_RETENTION_DAYS);let url:URL;try{url=new URL(env.IDENTITY_WORKER_URL||'')}catch{return null}
- if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/'||!env.IDENTITY_SERVICE_TOKEN||env.IDENTITY_SERVICE_TOKEN.length<32||!env.IDENTITY_SUBJECT_SECRET||env.IDENTITY_SUBJECT_SECRET.length<32||!Number.isInteger(days)||days<1||days>90)return null;
- return {url:url.origin,token:env.IDENTITY_SERVICE_TOKEN,subjectSecret:env.IDENTITY_SUBJECT_SECRET,days};
+ const policy=env.IDENTITY_RETENTION_POLICY||'fixed_days';
+ if(!['fixed_days','account_lifetime'].includes(policy))return null;
+ const days=policy==='account_lifetime'?0:Number(env.IDENTITY_RETENTION_DAYS);let url:URL;try{url=new URL(env.IDENTITY_WORKER_URL||'')}catch{return null}
+ if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/'||!env.IDENTITY_SERVICE_TOKEN||env.IDENTITY_SERVICE_TOKEN.length<32||!env.IDENTITY_SUBJECT_SECRET||env.IDENTITY_SUBJECT_SECRET.length<32||(policy==='fixed_days'&&(!Number.isInteger(days)||days<1||days>90)))return null;
+ return {url:url.origin,token:env.IDENTITY_SERVICE_TOKEN,subjectSecret:env.IDENTITY_SUBJECT_SECRET,days,policy};
 }
-export function identityConfig(env:Readonly<Record<string,string|undefined>>=process.env){return env.IDENTITY_COLLECTION_ENABLED==='true'?identityStorageConfig(env):null}
+export function identityConfig(env:Readonly<Record<string,string|undefined>>=process.env){const config=identityStorageConfig(env);if(!config||env.IDENTITY_COLLECTION_ENABLED!=='true')return null;if(config.policy==='account_lifetime'&&(env.IDENTITY_LIFECYCLE_ENABLED!=='true'||(env.CRON_SECRET||'').length<32))return null;return config}
 export function identitySubject(id:string,secret:string){return createHmac('sha256',secret).update('sirocash-identity-v1:'+id).digest('hex')}
 export function identityOrigin(request:Request){
  const origin=request.headers.get('origin');if(!origin)throw Error('origin');

@@ -1,5 +1,6 @@
 // Invoked only by the protected project-specific Actions workflow. No secret values are logged.
 import fs from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
 if(!/^[a-f0-9]{32}$/.test(account||'')||!token)throw Error('Cloudflare credentials are not configured.');
 const base=`https://api.cloudflare.com/client/v4/accounts/${account}`;
@@ -10,15 +11,31 @@ async function api(path,method='GET',body){
  return data.result;
 }
 async function main(){
+ // D1 can be prepared even when R2 activation is still blocked by the account's billing setup.
+ const databases=await api('/d1/database?per_page=1000');let db=databases.find(d=>d.name==='sirocash-identity');
+ if(!db)db=await api('/d1/database','POST',{name:'sirocash-identity'});
+ const id=db.uuid||db.id;if(!/^[a-f0-9-]{36}$/.test(id||''))throw Error('Unexpected D1 database identifier.');
+ console.log(`::notice::SiroCash identity D1 database ID: ${id}.`);
+ const query=async(sql,params=[])=>{const result=await api(`/d1/database/${id}/query`,'POST',{sql,params});if(!Array.isArray(result)||result.some(r=>r.success===false||r.error))throw Error('Identity D1 query failed; no SQL response contents were logged.');return result};
+ const tables=(await query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%'"))[0].results;
+ if(tables.some(t=>t.name==='identity_requests')&&!tables.some(t=>t.name==='_siro_identity_migrations'))throw Error('Existing identity schema has no migration journal. Refusing to adopt or overwrite an untracked database.');
+ await query('CREATE TABLE IF NOT EXISTS _siro_identity_migrations (name TEXT PRIMARY KEY, checksum TEXT NOT NULL)');
+ for(const name of (await fs.readdir('cloudflare/identity/migrations')).filter(n=>n.endsWith('.sql')).sort()){
+  const sql=await fs.readFile('cloudflare/identity/migrations/'+name,'utf8'),hash=createHash('sha256').update(sql).digest('hex');
+  const record=(await query('SELECT checksum FROM _siro_identity_migrations WHERE name=?',[name]))[0].results[0];
+  if(record){if(record.checksum!==hash)throw Error('Applied identity migration checksum differs; refusing replay.');continue}
+  // These migrations contain only CREATE TABLE/INDEX. Idempotent DDL supports retry after a partial failure.
+  if(/\b(ALTER|DROP|DELETE|UPDATE)\s+(TABLE|FROM|identity_)/i.test(sql))throw Error('This provisioning runner requires explicit handling for destructive or altering migrations.');
+  await query(sql.replace(/CREATE (TABLE|UNIQUE INDEX|INDEX) /g,'CREATE $1 IF NOT EXISTS '));
+  await query('INSERT INTO _siro_identity_migrations(name,checksum) VALUES (?,?)',[name,hash]);
+ }
+ console.log('::notice::Identity D1 migrations applied. No primary account or wallet database was modified.');
  const buckets=await api('/r2/buckets');let bucket=(buckets.buckets||[]).find(b=>b.name==='sirocash-identity-private');
  if(!bucket)bucket=await api('/r2/buckets','POST',{name:'sirocash-identity-private'});
  // Explicitly disable public r2.dev access, without creating domains or changing unrelated buckets.
  await api('/r2/buckets/sirocash-identity-private/domains/managed','PUT',{enabled:false});
  const domains=await api('/r2/buckets/sirocash-identity-private/domains/custom');
  if((domains.domains||[]).some(d=>d.enabled))throw Error('Identity bucket has a public custom domain. Refusing to continue; no domains were altered.');
- const databases=await api('/d1/database?per_page=1000');let db=databases.find(d=>d.name==='sirocash-identity');
- if(!db)db=await api('/d1/database','POST',{name:'sirocash-identity'});
- const id=db.uuid||db.id;if(!/^[a-f0-9-]{36}$/.test(id||''))throw Error('Unexpected D1 database identifier.');
  const config=JSON.parse(await fs.readFile('cloudflare/identity/wrangler.jsonc','utf8'));config.account_id=account;config.d1_databases[0].database_id=id;
  await fs.writeFile('cloudflare/identity/wrangler.generated.json',JSON.stringify(config,null,2)+'\n');
  console.log(`::notice::Private identity bucket ready; D1 database ID: ${id}. No documents have been collected.`);
