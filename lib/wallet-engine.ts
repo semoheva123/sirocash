@@ -75,12 +75,14 @@ export function transferWallet(db:WalletDb,c:Command&{recipientId:string;feeAcco
  * providerReference must include provider+network+event/log index, never just a transaction hash.
  */
 export function creditConfirmedDeposit(db:WalletDb,c:Command&{providerReference:string;settlementAccountId:string}){
+ return transact(db,tx=>creditConfirmedDepositInTransaction(tx,c));
+}
+/** Private composition boundary: caller owns the transaction and trusted evidence/valuation checks. */
+export async function creditConfirmedDepositInTransaction(tx:WalletTx,c:Command&{providerReference:string;settlementAccountId:string}){
  const external=reference(c.providerReference),owner=id(c.ownerId);
- return transact(db,async tx=>{
-  const row=await begin(tx,c,'DEPOSIT',null,null,external);if(row.state==='COMPLETED')return operation(row);
-  const a=await accounts(tx,[owner],c.settlementAccountId);
-  return post(tx,row,'DEPOSIT',null,owner,id(c.settlementAccountId),String(a.get(owner)!.id));
- });
+ const row=await begin(tx,c,'DEPOSIT',null,null,external);if(row.state==='COMPLETED')return operation(row);
+ const a=await accounts(tx,[owner],c.settlementAccountId);
+ return post(tx,row,'DEPOSIT',null,owner,id(c.settlementAccountId),String(a.get(owner)!.id));
 }
 export function reserveWithdrawal(db:WalletDb,c:Command&{destination:string}){
  const destination=reference(c.destination),owner=id(c.ownerId);

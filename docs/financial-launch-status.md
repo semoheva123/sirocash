@@ -2,6 +2,8 @@
 
 ## Prepared/tested locally
 - Double-entry wallet engine and reservations; 1% sender-added internal fee.
+- Private valuation-to-journal composition with explicit approved non-peg rate, inbox-evidence binding, atomic credit/audit state, rollback and replay tests; no pricing authority/runtime grants activated.
+- Gated PostgreSQL-backed passkey credentials/challenges, hashed single-use approvals and transaction-local consumption; legacy financial routes still deny. Persistence tests mock WebAuthn verification, not real-device ceremonies.
 - USDT withdrawal tariff quotes: 5 TRC20 / 2 BEP20 gross-deducted. Live settlement binding still absent.
 - Watch-only TRON/BEP20 address derivation and gated transactional assignment.
 - Offline HD child sweep signing and durable signed-sweep preparation outbox, with fixed operating destinations.
@@ -14,8 +16,8 @@
 ## NOT implemented/deployed as live services
 - Vercel signer production provisioning, recovery/backup, secure secret ingestion and runtime authorization; offline operating and fixed-destination HD sweep signing primitives exist. Vercel is not an isolated HSM.
 - Authenticated mainnet RPC watcher, inclusion verification, replay/checkpoints and reorg reconciliation.
-- Approved valuation-to-ledger ingestion with restricted runtime posting privileges.
-- Persistent single-use device approval exactly bound to fees/net/idempotency.
+- Reviewed live pricing authority/import/audit policy and restricted runtime posting privileges. Private approved-valuation-to-ledger composition now exists, but no authority is provisioned or live posting enabled.
+- Real-device passkey ceremonies, credential management/recovery and authoritative quote-bound command integration. Durable storage/consumption now exists behind a disabled deployment flag; financial use remains blocked.
 - Persisted withdrawal tariff and balanced net/revenue settlement.
 - Paid energy dispatch, enforced provider price cap and independent delivery reconciliation.
 - Sweep/payout/refill workers with atomic budgets, durable signed transaction identities and crash recovery.

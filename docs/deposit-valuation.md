@@ -1,0 +1,11 @@
+# Approved deposit valuation and journal composition — private preparation
+
+`postValuedDeposit` takes only an inbox UUID. It does not take a customer user ID, amount, price, quote or provider-confirmed boolean. Ownership/network/amount/event identity come from the private receipt inbox and durable address assignment. A separate reviewed pricing authority must populate `ApprovedDepositValuation` using dedicated privileges; no public route or automatic pricing approval exists.
+
+The approval binds the inbox evidence fingerprint, quote reference, explicitly approved USD-micros-per-token rate, rounding policy, approval/expiry window and settlement account. There is no 1 USD stablecoin assumption. USD micros = floor(token base units × approved USD micros per whole token / 10^token decimals). TRON uses 6 decimals, BSC USDT uses 18. Dust rounding to zero or the existing wallet-engine amount bound fails closed.
+
+The private poster locks inbox and valuation, validates fingerprint, state, ownership and SQL-clock quote freshness, then composes the existing double-entry credit inside the same transaction. Journal, wallet operation, valuation operation reference and inbox `CREDITED` state either all commit or all roll back. Replay after expiry returns the previously posted operation if identity/amount still match; it never converts again or posts twice. The engine's existing external-reference uniqueness is an additional duplicate guard.
+
+Migration `20261031110000_deposit_valuation` is prepared, NOT remotely applied. The table has RLS and no `sirocash_app` grant, and does not approve a price source or runtime financial write permissions. Existing staged inbox records retain their evidence and become eligible only with a separately approved fresh valuation. Operator/database-owner access is not a tamper-proof pricing authority; controlled import/audit and immutable approved-price governance remain launch blockers.
+
+Fixture tests apply local migrations and verify a deliberately non-peg price of 0.98 USD per USDT: 20 USDT becomes 19.600000 USD, not 20 USD. Tests cover missing/expired/mismatched approvals, injected post-journal persistence failure with full rollback, single posting, exact replay after quote expiry, balanced journal and denied normal-app access. No market price fetch, mainnet deposit, real runtime grant, or remote migration occurs.

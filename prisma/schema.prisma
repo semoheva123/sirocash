@@ -40,6 +40,7 @@ enum CryptoAsset {
   USDC
 }
 model User {
+ durablePasskeys DurablePasskeyCredential[]
  depositAddresses UserDepositAddress[]
   walletOperations WalletOperation[] @relation("WalletOwner")
   walletCounterparties WalletOperation[] @relation("WalletCounterparty")
@@ -63,6 +64,7 @@ model User {
   depositAddresses DepositAddress[]
 }
 model LedgerAccount {
+ depositValuations ApprovedDepositValuation[]
   feeOperations WalletOperation[] @relation("WalletFeeAccount")
   id String @id @default(uuid()) @db.Uuid
   userId String? @db.Uuid
@@ -119,6 +121,8 @@ model DepositAddress {
 }
 
 model AuthSession {
+ passkeyChallenge DurablePasskeyChallenge?
+ paymentApprovals DurablePaymentApproval[]
   createdAt DateTime?
   deviceLabel String?
   tokenHash String @id
@@ -196,6 +200,7 @@ model SecurityNotification {
 }
 
 model WalletOperation {
+ depositValuation ApprovedDepositValuation?
  energyRentalIntent EnergyRentalIntent?
  feeAmount Decimal @default(0) @db.Decimal(20,6)
  feeAccountId String? @db.Uuid
@@ -266,6 +271,7 @@ model UserDepositAddress {
 }
 
 model ChainDepositInbox {
+ valuation ApprovedDepositValuation?
  id String @id @db.Uuid
  eventKey String @unique
  addressId String @db.Uuid
@@ -308,4 +314,54 @@ model SweepConfirmation {
  fingerprint String
  evidence Json
  createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model DurablePasskeyCredential {
+ id String @id
+ userId String @db.Uuid
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ rpId String
+ publicKey String
+ counter BigInt
+ transports Json @default("[]")
+ approvals DurablePaymentApproval[]
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([userId,rpId])
+}
+model DurablePasskeyChallenge {
+ sessionHash String @id
+ session AuthSession @relation(fields: [sessionHash], references: [tokenHash], onDelete: Cascade)
+ kind String
+ challenge String
+ rpId String
+ origin String
+ digest String?
+ expiresAt DateTime @db.Timestamptz(6)
+}
+model DurablePaymentApproval {
+ tokenHash String @id
+ sessionHash String
+ session AuthSession @relation(fields: [sessionHash], references: [tokenHash], onDelete: Cascade)
+ credentialId String
+ credential DurablePasskeyCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+ digest String
+ expiresAt DateTime @db.Timestamptz(6)
+ consumedAt DateTime? @db.Timestamptz(6)
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@index([sessionHash],map: "durable_approval_session")
+}
+
+model ApprovedDepositValuation {
+ inboxId String @id @db.Uuid
+ inbox ChainDepositInbox @relation(fields: [inboxId], references: [id], onDelete: Restrict)
+ inboxFingerprint String
+ quoteReference String
+ rateUsdMicrosPerToken Decimal @db.Decimal(30,0)
+ policy String
+ settlementAccountId String @db.Uuid
+ settlement LedgerAccount @relation(fields: [settlementAccountId], references: [id], onDelete: Restrict)
+ approvedAt DateTime @db.Timestamptz(6)
+ expiresAt DateTime @db.Timestamptz(6)
+ operationId String? @unique @db.Uuid
+ operation WalletOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
 }
