@@ -10,7 +10,7 @@
     "db:generate": "prisma generate",
     "test:api": "node tests/api.mjs",
     "test:ledger": "node tests/ledger.mjs",
-    "test": "npm run lint && npm run test:ledger && npm run test:wallet && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:email-template && npm run test:account && npm run test:routing && npm run test:settings && npm run test:password-change && npm run test:design && npm run test:account-security && npm run test:reconciliation && npm run test:atelier && npm run test:modern && npm run test:identity && npm run test:energy",
+    "test": "npm run lint && npm run test:ledger && npm run test:wallet && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:email-template && npm run test:account && npm run test:routing && npm run test:settings && npm run test:password-change && npm run test:design && npm run test:account-security && npm run test:reconciliation && npm run test:atelier && npm run test:modern && npm run test:identity && npm run test:energy && npm run test:tronzap",
     "test:email": "node tests/email-schema.mjs",
     "test:password": "node --experimental-strip-types tests/password.mjs",
     "test:copy": "node tests/arabic-copy.mjs",
@@ -33,7 +33,9 @@
     "test:identity": "node tests/identity-gateway-readiness.mjs && tsx tests/identity-ai.ts && tsx tests/identity.tsx",
     "identity:deployment-check": "node --conditions=react-server --import tsx scripts/check-identity-deployment.ts",
     "test:wallet": "tsx tests/wallet-engine.ts",
-    "test:energy": "tsx tests/tron-energy.ts"
+    "test:energy": "tsx tests/tron-energy.ts",
+    "test:tronzap": "node --conditions=react-server --import tsx tests/tronzap.ts",
+    "energy:check": "node --conditions=react-server --import tsx scripts/check-tronzap.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
