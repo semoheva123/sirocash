@@ -1,5 +1,5 @@
 import {NextResponse} from 'next/server';
-import {sameOrigin} from './api';
+import {sameOrigin,PublicApiError} from './api';
 import {requireUser,sessionTokenHash} from './email-auth';
 import {databaseTransaction} from './database';
 import {durablePasskeyAction} from './durable-passkey';
@@ -34,5 +34,5 @@ export async function requirePasskey(request:Request,_payload:unknown){
  context(request);await requireUser(request);
  // No detached approval consumption: a future financial service must consume the durable
  // approval in the SAME DB transaction as reservation/posting. Legacy demo debit stays unreachable.
- throw Error('الخدمات المالية غير مفعّلة للحسابات المسجّلة حالياً. لم تُنفّذ أي عملية.');
+ throw new PublicApiError('الخدمات المالية غير مفعّلة للحسابات المسجّلة حالياً. لم تُنفّذ أي عملية.');
 }

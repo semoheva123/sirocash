@@ -7,20 +7,20 @@ import {Resend} from 'resend';
 import {verificationEmail} from './verification-email';
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
-import {sameOrigin,apiError} from './api';
+import {sameOrigin,apiError,PublicApiError} from './api';
 import {database as pool,databaseTransaction as transaction} from './database';
 import {passwordSchema,hashPassword,verifyPassword} from './password';
 const COOKIE='siro-auth';
 const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
-function otpHash(id:string,code:string){const secret=process.env.AUTH_SECRET;if(!secret||secret.length<32)throw Error('خدمة الحسابات غير متاحة حالياً. يرجى المحاولة لاحقاً.');return createHmac('sha256',secret).update(id+':'+code).digest('hex')}
+function otpHash(id:string,code:string){const secret=process.env.AUTH_SECRET;if(!secret||secret.length<32)throw new PublicApiError('خدمة الحسابات غير متاحة حالياً. يرجى المحاولة لاحقاً.');return createHmac('sha256',secret).update(id+':'+code).digest('hex')}
 function cookieToken(request:Request){return request.headers.get('cookie')?.split(';').map(c=>c.trim()).find(c=>c.startsWith(COOKIE+'='))?.slice(COOKIE.length+1)}
 export function sessionTokenHash(request:Request){const token=cookieToken(request);return token?hash(token):null}
 export async function currentUser(request:Request){const token=cookieToken(request);if(!token)return null;const {rows}=await pool().query('SELECT u.id,u.email,u."emailVerifiedAt" FROM "AuthSession" s JOIN "User" u ON u.id=s."userId" WHERE s."tokenHash"=$1 AND s."expiresAt">NOW()',[hash(token)]);return rows[0] as {id:string;email:string;emailVerifiedAt:string}|undefined??null}
-export async function requireUser(request:Request){let user;try{user=await currentUser(request)}catch{throw Error('خدمة الحسابات غير متاحة مؤقتاً.')}if(!user)throw Error('يتطلّب هذا الإجراء تسجيل الدخول والتحقق من البريد الإلكتروني.');return user}
+export async function requireUser(request:Request){let user;try{user=await currentUser(request)}catch{throw new PublicApiError('خدمة الحسابات غير متاحة مؤقتاً.')}if(!user)throw new PublicApiError('يتطلّب هذا الإجراء تسجيل الدخول والتحقق من البريد الإلكتروني.');return user}
 export async function requestCode(request:Request){
  sameOrigin(request);
  const {email,password,mode}=z.object({email:z.string().trim().email('أدخل بريداً إلكترونياً صحيحاً.').max(254).transform(v=>v.toLowerCase()),password:passwordSchema,mode:z.enum(['signup','login'])}).parse(await request.json());
- if(!process.env.RESEND_API_KEY||!process.env.RESEND_FROM_EMAIL)throw Error('خدمة إرسال البريد غير متاحة حالياً. يرجى المحاولة لاحقاً.');
+ if(!process.env.RESEND_API_KEY||!process.env.RESEND_FROM_EMAIL)throw new PublicApiError('خدمة إرسال البريد غير متاحة حالياً. يرجى المحاولة لاحقاً.');
  const id=randomBytes(24).toString('hex'),code=String(randomInt(100000,1000000)),codeHash=otpHash(id,code);
  // Durable per-email cooldown and hourly quota. Infrastructure must also enforce IP/global quotas.
  const reserved=await transaction(async c=>{
@@ -56,7 +56,7 @@ export async function requestCode(request:Request){
   const message=verificationEmail(code,mode);
   const {error}=await new Resend(process.env.RESEND_API_KEY).emails.send({from:process.env.RESEND_FROM_EMAIL,to:email,...message});
   if(error)throw Error('delivery');
- }catch{await pool().query('DELETE FROM "EmailChallenge" WHERE id=$1',[id]);throw Error('تعذّر إرسال رمز التحقق. يرجى المحاولة لاحقاً.');}
+ }catch{await pool().query('DELETE FROM "EmailChallenge" WHERE id=$1',[id]);throw new PublicApiError('تعذّر إرسال رمز التحقق. يرجى المحاولة لاحقاً.');}
  return NextResponse.json({challengeId:id,expiresIn:600,resendAfter:60},{headers:{'Cache-Control':'no-store'}});
 }
 export async function verifyCode(request:Request){
@@ -91,6 +91,6 @@ export async function logout(request:Request){sameOrigin(request);const token=co
 
 export function emailAuthError(error:unknown){
  if(error instanceof z.ZodError||error instanceof SyntaxError)return apiError(error);
- const message=error instanceof Error&&/[\u0600-\u06ff]/.test(error.message)?error.message:'خدمة الحسابات غير متاحة مؤقتاً. يُرجى المحاولة لاحقاً.';
+ const message=error instanceof PublicApiError?error.message:'خدمة الحسابات غير متاحة مؤقتاً. يُرجى المحاولة لاحقاً.';
  return NextResponse.json({error:message},{status:503,headers:{'Cache-Control':'no-store'}});
 }

@@ -6,7 +6,8 @@ export const treasuryAddresses = Object.freeze({
  TRC20: Object.freeze({
   network: 'TRON_MAINNET',
   operating: 'TFMUACLuYyFcw9YzrAgESnQ9a6pvEiY1bL',
-  reserve: 'THici1qxA1dQZK52fJ18RHX8j1Ef1ktyDD',
+  // Owner reassigned the former reserve to deposits. New reserve is not configured.
+  reserve: null,
  }),
  BEP20: Object.freeze({
   network: 'BNB_SMART_CHAIN_MAINNET',
@@ -18,7 +19,9 @@ export const treasuryAddresses = Object.freeze({
 export function treasuryDestination(network: 'TRC20' | 'BEP20', role: 'operating' | 'reserve'): string {
  if (network !== 'TRC20' && network !== 'BEP20') throw new Error('UNSUPPORTED_TREASURY_NETWORK');
  if (role !== 'operating' && role !== 'reserve') throw new Error('INVALID_TREASURY_ROLE');
- return treasuryAddresses[network][role];
+ const address=treasuryAddresses[network][role];
+ if(!address)throw new Error('TREASURY_ROLE_NOT_CONFIGURED');
+ return address;
 }
 
 /** Owner manages operating liquidity; no automatic reserve-to-operating refill authorization. */
