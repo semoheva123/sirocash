@@ -14,8 +14,13 @@ export async function GET(request:Request){
   const observedAt=Date.now();
   const {rows}=await database().query<{id:string;total:string}>('SELECT id,count(*) OVER() AS total FROM "User" LIMIT 10001');
   if(rows.length>10000||rows.some(r=>Number(r.total)!==rows.length))return securityFailure('تجاوز حجم الحسابات الحد الآمن للمزامنة. لم يُطلب حذف أي وثيقة.',503);
-  const response=await identityGateway('identity-lifecycle','/accounts/reconcile',{method:'POST',body:JSON.stringify({complete:true,observedAt,active:rows.map(r=>identitySubject(r.id,config.subjectSecret))})});
-  if(!response.ok)return securityFailure('تعذّرت مزامنة حالة الحسابات. يُرجى التحقق من مهمة الحذف.',503);
-  return NextResponse.json({ok:true},{headers:securityHeaders});
+  const body=JSON.stringify({complete:true,observedAt,active:rows.map(r=>identitySubject(r.id,config.subjectSecret))});
+  const deadline=Date.now()+40000;
+  for(let batch=0;batch<10&&Date.now()<deadline;batch++){
+   const response=await identityGateway('identity-lifecycle','/accounts/reconcile',{method:'POST',body});
+   if(!response.ok)return securityFailure('تعذّرت مزامنة حالة الحسابات. يُرجى التحقق من مهمة الحذف.',503);
+   if(!(await response.json()).hasMore)return NextResponse.json({ok:true},{headers:securityHeaders});
+  }
+  return securityFailure('لم تكتمل دفعات الحذف. يلزم متابعة المهمة قبل تفعيل استقبال الوثائق.',503);
  }catch(error){return securityError(error)}
 }

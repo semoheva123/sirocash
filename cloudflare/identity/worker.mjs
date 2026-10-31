@@ -1,11 +1,11 @@
-// Backend-only gateway. Never expose either service token or an R2 object URL to a browser.
+// D1-only private identity gateway. Never expose service tokens or document bytes in public APIs.
 const headers={'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
 const json=(body,status=200)=>Response.json(body,{status,headers});
 const fail=(status)=>json({error:'Identity service request failed.'},status);
 const validSubject=s=>/^[a-f0-9]{64}$/.test(s||'');
 const validId=s=>/^[a-f0-9-]{36}$/.test(s||'');
 const ACCOUNT_LIFETIME=8640000000000000;
-const publicRow=r=>r?{id:r.id,kind:r.kind,status:r.status,reason:r.reason,createdAt:r.created_at,expiresAt:r.expires_at===ACCOUNT_LIFETIME?null:r.expires_at,retentionPolicy:r.consent_version==='identity-v2-account-lifetime'?'account_lifetime':'fixed_days',documentsDeleted:!!r.purged_at}:null;
+const publicRow=r=>r?{id:r.id,kind:r.kind,status:r.status,reason:r.reason,createdAt:r.created_at,expiresAt:r.expires_at===ACCOUNT_LIFETIME?null:r.expires_at,retentionPolicy:['identity-v2-account-lifetime','identity-v3-d1-account-lifetime'].includes(r.consent_version)?'account_lifetime':'fixed_days',documentsDeleted:!!r.purged_at}:null;
 async function authentic(request,secret){
  if(!secret||secret.length<32)return false;
  const candidate=request.headers.get('authorization')||'';
@@ -19,16 +19,22 @@ async function bounded(request,max){
 }
 async function form(request){const body=await bounded(request,3300000);return new Response(body,{headers:{'Content-Type':request.headers.get('content-type')||''}}).formData()}
 async function audit(db,id,actor,action){await db.prepare('INSERT INTO identity_audit VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),id,actor,action,Date.now()).run()}
-async function removeFiles(env,row){for(const key of [row.front_key,row.back_key].filter(Boolean))await env.IDENTITY_DOCUMENTS.delete(key)}
+async function removeFiles(env,row){await env.IDENTITY_DB.prepare('DELETE FROM identity_documents WHERE request_id=?').bind(row.id).run()}
+const sha256=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+async function storedImage(db,key){
+ const row=await db.prepare('SELECT bytes,sha256 FROM identity_documents WHERE document_key=?').bind(key).first();if(!row)return null;
+ const bytes=row.bytes instanceof ArrayBuffer?new Uint8Array(row.bytes):new Uint8Array(row.bytes);
+ if(bytes.length<100||bytes.length>1500000||await sha256(bytes)!==row.sha256)throw Error('stored image integrity');return bytes;
+}
 export async function purge(env){
- const now=Date.now();const rows=await env.IDENTITY_DB.prepare("SELECT * FROM identity_requests WHERE expires_at<=? AND purged_at IS NULL AND (status<>'uploading' OR created_at<?) LIMIT 100").bind(now,now-600000).all();
+ const now=Date.now();const rows=await env.IDENTITY_DB.prepare("SELECT * FROM identity_requests WHERE expires_at<=? AND purged_at IS NULL AND (status<>'uploading' OR created_at<?) LIMIT 5").bind(now,now-600000).all();
  for(const row of rows.results){
   try{await removeFiles(env,row);await env.IDENTITY_DB.batch([
    env.IDENTITY_DB.prepare("UPDATE identity_requests SET front_key=NULL,back_key=NULL,purged_at=?,status=CASE WHEN status IN ('uploading','pending_review') THEN 'resubmit' ELSE status END,reason=CASE WHEN status IN ('uploading','pending_review') THEN 'incomplete' ELSE reason END WHERE id=? AND purged_at IS NULL").bind(now,row.id),
    env.IDENTITY_DB.prepare('INSERT INTO identity_audit VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),row.id,'retention','documents_purged',now)
   ])}catch{/* Retain keys for the next retry; never log file contents, tokens or OCR text. */}
  }
- const closed=await env.IDENTITY_DB.prepare('SELECT subject FROM identity_closed_accounts LIMIT 100').all();
+ const closed=await env.IDENTITY_DB.prepare('SELECT subject FROM identity_closed_accounts LIMIT 3').all();
  for(const {subject} of closed.results){
   const pending=await env.IDENTITY_DB.prepare('SELECT count(*) AS n FROM identity_requests WHERE subject=? AND purged_at IS NULL').bind(subject).first();
   if(pending.n===0)await env.IDENTITY_DB.batch([
@@ -56,13 +62,14 @@ export default {
     const active=new Set(snapshot.active);
     const stored=await db.prepare('SELECT subject FROM identity_requests GROUP BY subject HAVING MIN(created_at)<? LIMIT 10001').bind(snapshot.observedAt-600000).all();if(stored.results.length>10000)return fail(503);
     let closed=0;
-    for(const row of stored.results){if(active.has(row.subject))continue;
+    const candidates=stored.results.filter(row=>!active.has(row.subject));
+    for(const row of candidates.slice(0,4)){
      await db.batch([
       db.prepare('INSERT INTO identity_closed_accounts VALUES (?,?) ON CONFLICT(subject) DO NOTHING').bind(row.subject,now),
       db.prepare("UPDATE identity_requests SET expires_at=?,status=CASE WHEN status='uploading' THEN status ELSE 'withdrawn' END WHERE subject=? AND purged_at IS NULL").bind(now,row.subject)
      ]);closed++;
     }
-    await purge(env);return json({ok:true,closed});
+    await purge(env);return json({ok:true,closed,hasMore:candidates.length>4});
    }
    if(url.pathname==='/requests'&&request.method==='GET'){
     const row=await db.prepare('SELECT * FROM identity_requests WHERE subject=? ORDER BY created_at DESC LIMIT 1').bind(subject).first();
@@ -76,7 +83,7 @@ export default {
     const data=await form(request),kind=data.get('kind'),consent=data.get('consent'),days=Number(data.get('retentionDays'));
     const front=data.get('front'),back=data.get('back'),policy=data.get('retentionPolicy')||'fixed_days';
     if(await db.prepare('SELECT subject FROM identity_closed_accounts WHERE subject=?').bind(subject).first())return fail(403);
-    if(!['national_id','passport','residence_permit'].includes(kind)||!((policy==='fixed_days'&&consent==='identity-v1'&&Number.isInteger(days)&&days>=1&&days<=90)||(policy==='account_lifetime'&&consent==='identity-v2-account-lifetime'&&days===0)))return fail(400);
+    if(!['national_id','passport','residence_permit'].includes(kind)||!((policy==='fixed_days'&&consent==='identity-v3-d1'&&Number.isInteger(days)&&days>=1&&days<=90)||(policy==='account_lifetime'&&consent==='identity-v3-d1-account-lifetime'&&days===0)))return fail(400);
     const files=kind==='passport'?[front]:[front,back];
     if(kind==='passport'&&back)return fail(400);
     for(const f of files){if(!(f instanceof File)||f.type!=='image/jpeg'||f.size<100||f.size>1500000)return fail(400);const magic=new Uint8Array(await f.slice(0,3).arrayBuffer());if(magic[0]!==255||magic[1]!==216||magic[2]!==255)return fail(400)}
@@ -86,10 +93,15 @@ export default {
     const id=crypto.randomUUID(),frontKey=`documents/${id}/front.jpg`,backKey=files.length===2?`documents/${id}/back.jpg`:null;
     try{await db.prepare("INSERT INTO identity_requests(id,subject,kind,status,front_key,back_key,checks,consent_version,created_at,expires_at) VALUES (?,?,?,'uploading',?,?,?,?,?,?)").bind(id,subject,kind,frontKey,backKey,JSON.stringify(checks),consent,now,policy==='account_lifetime'?ACCOUNT_LIFETIME:now+days*86400000).run()}catch{return fail(409)}
     try{
-     for(let i=0;i<files.length;i++)await env.IDENTITY_DOCUMENTS.put(i===0?frontKey:backKey,await files[i].arrayBuffer(),{httpMetadata:{contentType:'image/jpeg'}});
-     await db.batch([db.prepare("UPDATE identity_requests SET status='pending_review' WHERE id=? AND status='uploading'").bind(id),db.prepare('INSERT INTO identity_audit VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),id,subject,'submitted',now)]);
+     const writes=[];
+     for(let i=0;i<files.length;i++){
+      const bytes=await files[i].arrayBuffer();
+      writes.push(db.prepare('INSERT INTO identity_documents(document_key,request_id,side,bytes,sha256) VALUES (?,?,?,?,?)').bind(i===0?frontKey:backKey,id,i===0?'front':'back',bytes,await sha256(bytes)));
+     }
+     // D1 batch is transactional: both document copies and the review transition commit together.
+     await db.batch([...writes,db.prepare("UPDATE identity_requests SET status='pending_review' WHERE id=? AND status='uploading'").bind(id),db.prepare('INSERT INTO identity_audit VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),id,subject,'submitted',now)]);
     }catch{
-     // Persist the full expected key manifest even after partial R2 failure; cron retries cleanup.
+     // A failed document transaction leaves no partial image rows. The request remains retry-cleanable.
      await db.prepare("UPDATE identity_requests SET status='failed',expires_at=? WHERE id=?").bind(now,id).run();return fail(503);
     }
     return json({request:publicRow(await db.prepare('SELECT * FROM identity_requests WHERE id=?').bind(id).first())},201);
@@ -111,8 +123,8 @@ export default {
     const id=url.searchParams.get('id'),side=url.searchParams.get('side');if(!validId(id)||!['front','back'].includes(side))return fail(400);
     const row=await db.prepare("SELECT * FROM identity_requests WHERE id=? AND status='pending_review' AND expires_at>? AND purged_at IS NULL").bind(id,now).first();if(!row)return fail(404);
     const key=side==='front'?row.front_key:row.back_key;if(!key)return fail(404);
-    await audit(db,id,subject,'document_access_'+side);const object=await env.IDENTITY_DOCUMENTS.get(key);if(!object)return fail(404);
-    return new Response(object.body,{headers:{...headers,'Content-Type':'image/jpeg','Content-Disposition':'attachment; filename="identity-document.jpg"','Content-Security-Policy':"default-src 'none'; sandbox"}});
+    await audit(db,id,subject,'document_access_'+side);const bytes=await storedImage(db,key);if(!bytes)return fail(404);
+    return new Response(bytes,{headers:{...headers,'Content-Type':'image/jpeg','Content-Disposition':'attachment; filename="identity-document.jpg"','Content-Security-Policy':"default-src 'none'; sandbox"}});
    }
    if(url.pathname==='/review'&&request.method==='POST'){
     const body=JSON.parse(new TextDecoder().decode(await bounded(request,2048)));
