@@ -23,3 +23,9 @@
 https://tronbid.com/en/rent-tron-energy-api
 
 Documented quote: POST /api/v2/quick-rent/quote with energy_amount and duration_minutes; price_trx, available, expires_in_sec. API-key access is not provisioned. Published prices are not a guarantee or independent reliability assessment. No fallback provider has been integrated.
+
+## Durable preparation added
+
+`prepareEnergyIntent` and migration `20261031020000_energy_intents` stage one immutable-fingerprint rental intent per reserved/submitted USDT/TRC20 withdrawal. Retrying unchanged input returns the same key; repricing/changing sender conflicts. A partial unique index prevents two unresolved preparations allocating the same sender. RLS is enabled without application grants. Preparation never changes held funds or submits a withdrawal.
+
+This migration has NOT been remotely applied. The address syntax check is not Base58Check or custody verification; the trusted caller must provide those. No public caller exists. Dispatch/state-transition/reconciliation workers are not implemented: PREPARED intents intentionally stay blocked, and the table's other status labels are reserved for that future reviewed worker, not proof of delivery. Never manually mark DELIVERED to unlock a payout. The provider price-cap question and isolated signing remain hard activation gates.

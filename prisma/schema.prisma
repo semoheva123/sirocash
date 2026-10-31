@@ -195,6 +195,7 @@ model SecurityNotification {
 }
 
 model WalletOperation {
+ energyRentalIntent EnergyRentalIntent?
  feeAmount Decimal @default(0) @db.Decimal(20,6)
  feeAccountId String? @db.Uuid
  feeAccount LedgerAccount? @relation("WalletFeeAccount", fields: [feeAccountId], references: [id], onDelete: Restrict)
@@ -216,4 +217,21 @@ model WalletOperation {
  updatedAt DateTime @default(now())
  @@unique([ownerId,requestKey])
  @@index([ownerId,state])
+}
+
+// Private staging table; no runtime financial privileges or provider dispatch.
+model EnergyRentalIntent {
+ id String @id @db.Uuid
+ withdrawalId String @unique @db.Uuid
+ withdrawal WalletOperation @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+ senderAddress String
+ requestKey String @unique
+ fingerprint String
+ energyAmount Int
+ durationMinutes Int
+ maxRentalSun BigInt
+ state String @default("PREPARED")
+ providerOrderId String? @unique
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ updatedAt DateTime @default(now()) @db.Timestamptz(6)
 }

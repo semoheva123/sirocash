@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
+import {prepareEnergyIntent} from '../lib/energy-intent';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {transferWallet,creditConfirmedDeposit,reserveWithdrawal,submitWithdrawal,settleWithdrawal,walletBalances,moneyMicros,internalTransferQuote,type WalletDb,type WalletTx} from '../lib/wallet-engine';
 async function main(){
  const pg=new PGlite();
  try{
-  for(const path of ['20261030000000_ledger_invariants','20261030010000_payment_services','20261030020000_payment_service_constraints','20261030030000_email_auth','20261031000000_wallet_operations','20261031010000_internal_transfer_fee'])await pg.exec(await readFile('prisma/migrations/'+path+'/migration.sql','utf8'));
+  for(const path of ['20261030000000_ledger_invariants','20261030010000_payment_services','20261030020000_payment_service_constraints','20261030030000_email_auth','20261031000000_wallet_operations','20261031010000_internal_transfer_fee','20261031020000_energy_intents'])await pg.exec(await readFile('prisma/migrations/'+path+'/migration.sql','utf8'));
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>{const r=await tx.query(sql,params);return {rows:r.rows as Record<string,unknown>[]}}} as WalletTx))};
   const alice='00000000-0000-0000-0000-000000000001',bob='00000000-0000-0000-0000-000000000002',pool='00000000-0000-0000-0000-000000000003',treasury='00000000-0000-0000-0000-000000000004';
   await pg.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES ($1,\'alice@example.test\',CURRENT_TIMESTAMP),($2,\'bob@example.test\',CURRENT_TIMESTAMP)',[alice,bob]);
@@ -23,6 +24,14 @@ async function main(){
   assert.throws(()=>transferWallet(db,{...transfer,recipientId:alice}),/SELF_TRANSFER/);
   const held=await reserveWithdrawal(db,{ownerId:alice,requestKey:'withdraw:alice:001',amount:'50',destination:'USDT:TRC20:test-destination'});assert.equal(held.state,'RESERVED');
   assert.equal((await walletBalances(db,alice)).available,'19.700000');
+  const energyInput={withdrawalId:held.id,senderAddress:'T'+'A'.repeat(33),package:{energy:65000,durationMinutes:60 as const},maxRentalSun:2000000n};
+  const rental=await prepareEnergyIntent(db,energyInput);
+  assert.equal(rental.state,'PREPARED');
+  assert.deepEqual(await prepareEnergyIntent(db,energyInput),rental);
+  await assert.rejects(()=>prepareEnergyIntent(db,{...energyInput,maxRentalSun:3000000n}),/ENERGY_IDEMPOTENCY_CONFLICT/);
+  await assert.rejects(()=>prepareEnergyIntent(db,{...energyInput,withdrawalId:sent.id}),/INELIGIBLE_ENERGY_WITHDRAWAL/);
+  assert.equal((await walletBalances(db,alice)).held,'50.000000');
+
   await assert.rejects(()=>transferWallet(db,{...transfer,amount:'25',requestKey:'transfer:too-much'}),/INSUFFICIENT_AVAILABLE_BALANCE/);
   assert.equal((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM "WalletOperation" WHERE "requestKey"=\'transfer:too-much\'')).rows[0].n,0);
   await transferWallet(db,{...transfer,amount:'19.5',requestKey:'transfer:alice:002'});
