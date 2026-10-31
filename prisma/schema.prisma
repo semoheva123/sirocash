@@ -404,6 +404,7 @@ model WithdrawalSigningGuard {
  payouts SignedWithdrawalOutbox[]
 }
 model SignedWithdrawalOutbox {
+ dispatchApproval PayoutDispatchApproval?
  id String @id @db.Uuid
  quoteId String @unique @db.Uuid
  quote UsdtWithdrawalQuote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
@@ -420,4 +421,25 @@ model SignedWithdrawalOutbox {
  senderNonce BigInt?
  state String @default("SIGNED")
  createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model PayoutDispatchApproval {
+ payoutId String @id @db.Uuid
+ payout SignedWithdrawalOutbox @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+ txId String
+ payloadHash String
+ authorityReference String @unique
+ maxNativeFeeBaseUnits Decimal @db.Decimal(78,0)
+ approvedAt DateTime @db.Timestamptz(6)
+ expiresAt DateTime @db.Timestamptz(6)
+ consumedAt DateTime? @db.Timestamptz(6)
+ attempt PayoutDispatchAttempt?
+}
+model PayoutDispatchAttempt {
+ payoutId String @id @db.Uuid
+ approval PayoutDispatchApproval @relation(fields: [payoutId], references: [payoutId], onDelete: Restrict)
+ claimId String @unique @db.Uuid
+ state String @default("UNKNOWN")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ acknowledgedAt DateTime? @db.Timestamptz(6)
 }

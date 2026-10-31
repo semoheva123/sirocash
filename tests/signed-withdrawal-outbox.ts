@@ -4,6 +4,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFile,readdir} from 'node:fs/promises';
 import {Wallet,Transaction,Interface} from 'ethers';
 import {TronWeb,utils} from 'tronweb';
+import {dispatchSavedPayout} from '../lib/payout-dispatch';
 import {prepareSignedWithdrawal} from '../lib/signed-withdrawal-outbox';
 import {createUsdtWithdrawalQuote,reserveQuotedUsdtWithdrawal,settleQuotedUsdtWithdrawal} from '../lib/quoted-usdt-withdrawal';
 import {creditConfirmedDeposit,walletBalances,type WalletDb} from '../lib/wallet-engine';
@@ -80,10 +81,38 @@ async function main(){
   // An expired signature remains the SAME pending authorization, never a new transaction.
   await assert.rejects(()=>prepareSignedWithdrawal(db,{...tronCommand,transaction:{...tronCommand.transaction,timestamp:options.now+999999,expiration:options.now+1059999}},options),/IDEMPOTENCY_CONFLICT/);
   assert.equal((await walletBalances(db,owner)).held,'58.800000');
+  let sends=0;
+  const send=async()=>{sends++;throw Error('provider secret: disconnected')};
+  await assert.rejects(()=>dispatchSavedPayout(db,tronSigned.id,{send}),/DISABLED/);
+  await assert.rejects(()=>dispatchSavedPayout(db,tronSigned.id,{send,enabled:true,now:options.now}),/APPROVAL_REQUIRED/);assert.equal(sends,0);
+  const approveDispatch=async(id:string,txId:string,payload:string,cap:string)=>pg.query(`INSERT INTO "PayoutDispatchApproval" ("payoutId","txId","payloadHash","authorityReference","maxNativeFeeBaseUnits","approvedAt","expiresAt") VALUES ($1,$2,$3,$4,$5,now()-interval '1 minute',now()+interval '1 minute')`,[id,txId,createHash('sha256').update(payload).digest('hex'),'fixture:resource-budget:'+id,cap]);
+  await approveDispatch(tronSigned.id,tronSigned.txId,tronSaved.signedPayload,'1');
+  await assert.rejects(()=>dispatchSavedPayout(db,tronSigned.id,{send,enabled:true,now:options.now}),/APPROVED_FEE_EXCEEDED/);assert.equal(sends,0);
+  await pg.query('UPDATE "PayoutDispatchApproval" SET "maxNativeFeeBaseUnits"=4000000 WHERE "payoutId"=$1',[tronSigned.id]);
+  const ack=await dispatchSavedPayout(db,tronSigned.id,{enabled:true,now:options.now,send:async input=>{
+   sends++;assert.equal(input.signedPayload,tronSaved.signedPayload);
+   // Claim must be committed before the adapter sees the authorization.
+   assert.equal((await pg.query('SELECT * FROM "PayoutDispatchAttempt" WHERE "payoutId"=$1',[tronSigned.id])).rows.length,1);
+   return {txId:input.txId};
+  }});assert.equal(ack.state,'ACKNOWLEDGED');
+  assert.equal((await dispatchSavedPayout(db,tronSigned.id,{enabled:true,send})).state,'ACKNOWLEDGED');assert.equal(sends,1);
+  // Simulate a still-SIGNED BSC payout for timeout dispatch (prior UNKNOWN was a fixture).
+  // Cannot reverse its immutable lifecycle; do not automatically resend an unclaimed UNKNOWN.
+  // An existing UNKNOWN without a durable attempt is not automatically resent.
+  await approveDispatch(signed.id,signed.txId,saved.signedPayload,'10000000000000000');
+  await assert.rejects(()=>dispatchSavedPayout(db,signed.id,{enabled:true,send}),/NOT_DISPATCHABLE/);assert.equal(sends,1);
   // Direct fixture final status only to exercise retained nonce uniqueness, NOT chain verification.
   await pg.query('UPDATE "SignedWithdrawalOutbox" SET state=\'CONFIRMED\' WHERE id=$1',[signed.id]);
   await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,gasPrice:1000000001n}},options),/payout_sender_nonce/);
-  assert.equal((await pg.query('SELECT * FROM "SignedWithdrawalOutbox"')).rows.length,2);
+  const fresh=await prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,nonce:8}},options);
+  const payload=(await pg.query<{signedPayload:string}>('SELECT "signedPayload" FROM "SignedWithdrawalOutbox" WHERE id=$1',[fresh.id])).rows[0].signedPayload;
+  await approveDispatch(fresh.id,fresh.txId,payload,'10000000000000000');
+  const timed=await dispatchSavedPayout(db,fresh.id,{enabled:true,timeoutMs:100,send:async()=>{sends++;return new Promise(()=>{})}});
+  assert.equal(timed.state,'UNKNOWN');
+  assert.equal((await dispatchSavedPayout(db,fresh.id,{enabled:true,send})).state,'UNKNOWN');assert.equal(sends,2);
+  assert.equal((await walletBalances(db,owner)).held,'58.800000');
+  assert.equal((await pg.query('SELECT * FROM "SignedWithdrawalOutbox"')).rows.length,3);
+  console.log('Private payout dispatch: missing/capped approval rejection, durable pre-send claim, exact-byte ACK, bounded timeout and no-resend retry with holds preserved passed. Fixture adapters only.');
   await pg.exec('SET ROLE sirocash_app');for(const table of ['WithdrawalSigningGuard','SignedWithdrawalOutbox'])await assert.rejects(()=>pg.exec(`SELECT * FROM "${table}"`),/permission denied/);
   console.log('Signed payout outbox passed: real offline TRON/BSC signatures, exact DB quote net/recipient, durable bytes/hash plus SUBMITTED hold, rollback, no-key retries, extra-field/conflict rejection, unresolved network/nonce guards, immutable payload and unsafe settlement rejection. No broadcast; fixture final status is not verified chain evidence.');
  }finally{await pg.close()}

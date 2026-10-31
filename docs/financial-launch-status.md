@@ -14,6 +14,8 @@
 - Energy estimation/quote/preparation and treasury refill policy functions.
 - Private bounded read-only BSC HTTPS/JSON-RPC transport with request/body deadlines, streaming size cap, strict method/response validation and a disabled-by-default production gate. Integrated HTTP-adapter/observer fixtures pass; no live endpoint provisioned.
 
+- Private dispatch orchestration: separate signature-bound resource/budget approval required; durable pre-send UNKNOWN claim, exact-byte injected adapter, bounded timeout, ACK-only status and no-resend retry. Mock adapters only; no mainnet send adapter, approval authority or finality worker configured.
+
 ## NOT implemented/deployed as live services
 - Vercel signer production provisioning, recovery/backup, secure secret ingestion and runtime authorization; offline operating and fixed-destination HD sweep signing primitives exist. Vercel is not an isolated HSM.
 - Authenticated mainnet RPC watcher, inclusion verification, replay/checkpoints and reorg reconciliation.
