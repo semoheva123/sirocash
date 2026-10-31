@@ -27,7 +27,21 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm audit --audit-level=low
-      - run: npm test
+      - name: Run offline regression suite
+        run: |
+          mkdir -p .cache
+          set -o pipefail
+          npm test 2>&1 | tee .cache/regression.log
+      - name: Surface offline regression failure in check annotations
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          log = Path('.cache/regression.log')
+          if log.exists():
+              tail = log.read_text(errors='replace')[-8000:]
+              escaped = tail.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::error title=Offline regression failure::' + escaped)
       - run: npm run build
   scheduler-credential-check:
     # Never expose a repository secret to pull-request code or invoke the POST worker.
