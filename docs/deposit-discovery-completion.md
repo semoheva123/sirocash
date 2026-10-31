@@ -1,3 +1,5 @@
+> Production update 2026-11-01: migrations 37–41 are now applied and verified (41 total, 28 protected tables). See [production database evidence](production-database-2026-11-01.md). Earlier staged-only statements below are historical. Financial activation is unchanged.
+
 # Deposit discovery and customer allocation — software completion
 
 ## Customer path

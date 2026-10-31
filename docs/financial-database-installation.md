@@ -1,3 +1,5 @@
+> Production update 2026-11-01: migrations 37–41 are now applied and verified (41 total, 28 protected tables). See [production database evidence](production-database-2026-11-01.md). Earlier staged-only statements below are historical. Financial activation is unchanged.
+
 # تركيب البنية المالية والتحقق منها — 2026-10-31
 
 > تحديث تركيب الإنتاج 2026-10-31: بتفويض المالك طُبّق ترحيل ميزانية الطاقة فعليًا، وأصبح سجل Prisma 32 ترحيلًا. تحقق كتالوج الإنتاج من RLS وحجب وصول API/runtime للجدولين الجديدين، والسياسة بقيت disabled. فاحص البناء توسّع إلى 22 جدولًا وخمسة triggers وأصبح إلزاميًا في production. نُشر التطبيق بالمراجعة ac8a8a4 بنجاح READY/PROMOTED في النشر dpl_8wBWWpmBapbyv7a9EKWmtY4s9avB؛ نجح فحص الجداول الـ22 عبر اتصال الإنتاج الفعلي أثناء البناء. لا يعني هذا اكتمال أو تفعيل شراء الطاقة أو التشغيل المالي. انظر [دليل النشر](production-rollout-2026-10-31.md).
