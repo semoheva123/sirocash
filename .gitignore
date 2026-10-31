@@ -14,3 +14,6 @@ operations-data/
 .dev.vars
 .dev.vars.*
 .wrangler/
+
+# Generated Cloudflare binding configuration
+cloudflare/identity/wrangler.generated.json
