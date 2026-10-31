@@ -6,6 +6,8 @@ import {Wallet,Transaction,Interface} from 'ethers';
 import {TronWeb,utils} from 'tronweb';
 import {prepareTronResourceIntent} from '../lib/tron-resource-intent';
 import {authorizePayoutDispatch} from '../lib/payout-resource-authorization';
+import {createChainBroadcaster} from '../lib/chain-broadcast';
+import {processPayoutNetwork} from '../lib/payout-network-worker';
 import {confirmPayout} from '../lib/payout-confirmation';
 import {bep20UsdtContract,type Bep20ReceiptEvidence} from '../lib/bep20-deposit-verification';
 import {tronUsdtContract,type TronReceiptEvidence} from '../lib/tron-deposit-verification';
@@ -135,7 +137,15 @@ async function main(){
   assert.equal((await authorizePayoutDispatch(db,fresh.id,resourceEvidence)).state,'ALREADY_RESERVED');
   await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,nativeBalanceBaseUnits:2n*10n**18n}),/EVIDENCE_CONFLICT/);
 
-  const timed=await dispatchSavedPayout(db,fresh.id,{enabled:true,timeoutMs:100,send:async()=>{sends++;return new Promise(()=>{})}});
+  const liveShapeFetch=(async(_url,init)=>{
+   const p=JSON.parse(String(init!.body));
+   if(p.method==='eth_chainId')return new Response(JSON.stringify({jsonrpc:'2.0',id:p.id,result:'0x38'}),{headers:{'content-type':'application/json'}});
+   assert.equal(p.method,'eth_sendRawTransaction');assert.equal(p.params[0],payload);
+   assert.equal((await pg.query('SELECT * FROM "PayoutDispatchAttempt" WHERE "payoutId"=$1',[fresh.id])).rows.length,1);
+   sends++;return new Promise(()=>{});
+  }) as typeof fetch;
+  const realAdapter=createChainBroadcaster({enabled:true,bep20:{endpoint:'https://bsc.example.invalid',fetch:liveShapeFetch,timeoutMs:100},tron:{endpoint:'https://tron.example.invalid',fetch:liveShapeFetch},tronGenesisId:'0'.repeat(16)+'aa'.repeat(24)});
+  const timed=await dispatchSavedPayout(db,fresh.id,{enabled:true,timeoutMs:150,send:realAdapter});
   assert.equal(timed.state,'UNKNOWN');
   assert.equal((await dispatchSavedPayout(db,fresh.id,{enabled:true,send})).state,'UNKNOWN');assert.equal(sends,2);
   assert.equal((await walletBalances(db,owner)).held,'39.200000');
@@ -157,17 +167,37 @@ async function main(){
   assert.equal((await pg.query('SELECT * FROM "PayoutConfirmation"')).rows.length,1);
   assert.equal((await walletBalances(db,owner)).held,'39.200000');
   assert.equal((await pg.query<{state:string}>('SELECT state FROM "SignedWithdrawalOutbox" WHERE id=$1',[fresh.id])).rows[0].state,'BROADCAST_UNKNOWN');
+  const networkOptions={enabled:true,minimumBep20Confirmations:15,tronGenesisId:'0'.repeat(16)+'aa'.repeat(24),tron:async()=>{throw new Error('unused TRON RPC')},bep20:async(method:string,params:unknown[])=>{
+   if(method==='eth_chainId')return '0x38';
+   if(method==='eth_blockNumber')return '0x78';
+   if(method==='eth_getTransactionReceipt')return {transactionHash:fresh.txId,blockHash:bepReceipt.blockHash,blockNumber:'0x64',transactionIndex:'0x0',status:'0x1',logs:bepReceipt.logs.map(l=>({...l,transactionHash:fresh.txId,blockHash:bepReceipt.blockHash,blockNumber:'0x64',transactionIndex:'0x0',logIndex:'0x7'}))};
+   return params[0]==='finalized'?{hash:bepReceipt.blockHash,number:'0x73'}:{hash:bepReceipt.blockHash,number:'0x64',transactions:[fresh.txId]};
+  }};
+  await assert.rejects(()=>processPayoutNetwork(db,fresh.id,{...networkOptions,enabled:false}),/DISABLED/);
+  assert.equal((await processPayoutNetwork(failFinal,fresh.id,networkOptions)).state,'HELD');
+  assert.equal((await walletBalances(db,owner)).held,'39.200000');
+  assert.equal((await processPayoutNetwork(db,fresh.id,{...networkOptions,bep20:async()=>null})).state,'HELD');
+  assert.equal((await processPayoutNetwork(db,fresh.id,networkOptions)).state,'CONFIRMED');
+  assert.equal((await processPayoutNetwork(db,fresh.id,networkOptions)).state,'CONFIRMED');
+  assert.equal(sends,2); // Reconciliation did not resend the timed-out transaction.
   const final=await confirmPayout(db,confirmation);assert.equal(final.state,'COMPLETED');
   assert.equal((await pg.query<{state:string}>('SELECT state FROM "PayoutExpenseReservation" WHERE "payoutId"=$1',[fresh.id])).rows[0].state,'SETTLED');
   assert.deepEqual(await confirmPayout(db,confirmation),final);
   assert.deepEqual(await confirmPayout(db,{...confirmation,evidence:{...bepEvidence,block:{...bepEvidence.block,headHeight:130}}}),final);
   await assert.rejects(()=>confirmPayout(db,{...confirmation,evidence:{...bepEvidence,receipt:{...bepReceipt,blockHash:'0x'+'ef'.repeat(32)},block:{...bepEvidence.block,hash:'0x'+'ef'.repeat(32)}}}),/CONFIRMATION_CONFLICT/);
   const tronTopic=(v:string)=>TronWeb.address.toHex(v).slice(2).toLowerCase().padStart(64,'0');
-  const tronReceipt:TronReceiptEvidence={txId:tronSigned.txId,blockNumber:100,blockHash:'cd'.repeat(32),execution:'SUCCESS',logs:[{
+  const tronReceipt:TronReceiptEvidence={txId:tronSigned.txId,blockNumber:100,blockHash:'0000000000000064'+'cd'.repeat(24),execution:'SUCCESS',logs:[{
    address:TronWeb.address.toHex(tronUsdtContract).slice(2).toLowerCase(),topics:[transfer,tronTopic(tronSender),tronTopic(tron.payload.recipient)],data:(15000000n).toString(16).padStart(64,'0'),
   }]};
   const tronEvidence={receipt:tronReceipt,block:{height:100,hash:tronReceipt.blockHash,solidHeight:105},logIndex:0,assignedAddress:tron.payload.recipient,maxAmountBaseUnits:100000000n};
   // Signature timestamp is deliberately old: final successful execution remains reconcilable.
+  const tronRpc=async(path:string,body:Record<string,unknown>)=>{
+   if(path.endsWith('gettransactioninfobyid'))return {id:tronSigned.txId,blockNumber:100,receipt:{result:'SUCCESS'},log:tronReceipt.logs};
+   if(path.endsWith('getnowblock'))return {blockID:'0000000000000069'+'cd'.repeat(24),block_header:{raw_data:{number:105}}};
+   if(body.num===0)return {blockID:networkOptions.tronGenesisId,block_header:{raw_data:{number:0}}};
+   return {blockID:tronReceipt.blockHash,block_header:{raw_data:{number:100}},transactions:[{txID:tronSigned.txId,ret:[{contractRet:'SUCCESS'}]}]};
+  };
+  assert.equal((await processPayoutNetwork(db,tronSigned.id,{...networkOptions,tron:tronRpc})).state,'CONFIRMED');
   const tronFinal=await confirmPayout(db,{payoutId:tronSigned.id,network:'TRC20',evidence:tronEvidence});assert.equal(tronFinal.state,'COMPLETED');
   assert.deepEqual(await confirmPayout(db,{payoutId:tronSigned.id,network:'TRC20',evidence:tronEvidence}),tronFinal);
   assert.equal((await pg.query('SELECT * FROM "PayoutConfirmation"')).rows.length,3);

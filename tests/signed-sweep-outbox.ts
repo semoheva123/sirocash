@@ -3,6 +3,7 @@ import {HDKey} from '@scure/bip32';
 import {PGlite} from '@electric-sql/pglite';
 import {readFile} from 'node:fs/promises';
 import {Transaction,Interface} from 'ethers';
+import {processSweepObservation} from '../lib/sweep-network-observer';
 import {confirmBep20Sweep,confirmTronSweep} from '../lib/sweep-confirmation';
 import type {Bep20ReceiptEvidence} from '../lib/bep20-deposit-verification';
 import {prepareSignedSweep} from '../lib/signed-sweep-outbox';
@@ -49,6 +50,15 @@ async function main(){
   await assert.rejects(()=>confirm({...evidence,receipt:{...receipt,logs:[{...receipt.logs[0],data:'0x'+'0'.repeat(63)+'1'}]}}),/EXECUTION_MISMATCH/);
   assert.equal((await pg.query<{state:string}>('SELECT state FROM "SignedSweepOutbox" WHERE id=$1',[signed.id])).rows[0].state,'SIGNED');
   await pg.query('UPDATE "SignedSweepOutbox" SET state=\'BROADCAST_UNKNOWN\' WHERE id=$1',[signed.id]);
+  const networkOptions={enabled:true,minimumBep20Confirmations:15,tronGenesisId:'0'.repeat(16)+'aa'.repeat(24),tron:async()=>{throw new Error('unused TRON RPC')},bep20:async(method:string,params:unknown[])=>{
+   if(method==='eth_chainId')return '0x38';if(method==='eth_blockNumber')return '0x78';
+   if(method==='eth_getTransactionReceipt')return {transactionHash:signed.txId,blockHash:receipt.blockHash,blockNumber:'0x64',transactionIndex:'0x0',status:'0x1',logs:receipt.logs.map(l=>({...l,transactionHash:signed.txId,blockHash:receipt.blockHash,blockNumber:'0x64',transactionIndex:'0x0',logIndex:'0x7'}))};
+   return params[0]==='finalized'?{hash:receipt.blockHash,number:'0x73'}:{hash:receipt.blockHash,number:'0x64',transactions:[signed.txId]};
+  }};
+  await assert.rejects(()=>processSweepObservation(db,signed.id,{...networkOptions,enabled:false}),/DISABLED/);
+  assert.equal((await processSweepObservation(db,signed.id,{...networkOptions,bep20:async()=>null})).state,'HELD');
+  assert.equal((await processSweepObservation(db,signed.id,networkOptions)).state,'CONFIRMED');
+  assert.equal((await processSweepObservation(db,signed.id,networkOptions)).state,'CONFIRMED');
   const confirmed=await confirm();assert.equal(confirmed.state,'CONFIRMED');
   assert.deepEqual(await confirm(),confirmed);
   // Newer heads are not part of the immutable execution fingerprint.
@@ -70,7 +80,7 @@ async function main(){
   const tronSigned=await prepareSignedSweep(db,tronCommand,tronOptions);
   const destination=treasuryDestination('TRC20','operating');
   const tronTopic=(v:string)=>TronWeb.address.toHex(v).slice(2).toLowerCase().padStart(64,'0');
-  const tronReceipt:TronReceiptEvidence={txId:tronSigned.txId,blockNumber:100,blockHash:'cd'.repeat(32),execution:'SUCCESS',logs:[{
+  const tronReceipt:TronReceiptEvidence={txId:tronSigned.txId,blockNumber:100,blockHash:'0000000000000064'+'cd'.repeat(24),execution:'SUCCESS',logs:[{
    address:Buffer.from(base58.decode(tronUsdtContract).slice(1,21)).toString('hex'),
    topics:['ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',tronTopic(tronAddress),tronTopic(destination)],data:(20000000n).toString(16).padStart(64,'0'),
   }]};
@@ -85,6 +95,13 @@ async function main(){
   await pg.query('UPDATE "SignedSweepOutbox" SET "signedPayload"=$2 WHERE id=$1',[tronSigned.id,JSON.stringify(corrupted)]);
   await assert.rejects(()=>confirmTron());
   await pg.query('UPDATE "SignedSweepOutbox" SET "signedPayload"=$2,state=\'BROADCAST_UNKNOWN\' WHERE id=$1',[tronSigned.id,originalPayload]);
+  const tronRead=async(path:string,body:Record<string,unknown>)=>{
+   if(path.endsWith('gettransactioninfobyid'))return {id:tronSigned.txId,blockNumber:100,receipt:{result:'SUCCESS'},log:tronReceipt.logs};
+   if(path.endsWith('getnowblock'))return {blockID:'0000000000000069'+'cd'.repeat(24),block_header:{raw_data:{number:105}}};
+   if(body.num===0)return {blockID:networkOptions.tronGenesisId,block_header:{raw_data:{number:0}}};
+   return {blockID:tronReceipt.blockHash,block_header:{raw_data:{number:100}},transactions:[{txID:tronSigned.txId,ret:[{contractRet:'SUCCESS'}]}]};
+  };
+  assert.equal((await processSweepObservation(db,tronSigned.id,{...networkOptions,tron:tronRead})).state,'CONFIRMED');
   const tronConfirmed=await confirmTron();assert.equal(tronConfirmed.state,'CONFIRMED');
   assert.deepEqual(await confirmTron(),tronConfirmed);
   await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,blockHash:'ef'.repeat(32)},block:{...tronEvidence.block,hash:'ef'.repeat(32)}}),/CONFIRMATION_CONFLICT/);
