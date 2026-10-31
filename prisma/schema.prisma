@@ -40,6 +40,8 @@ enum CryptoAsset {
   USDC
 }
 model User {
+  walletOperations WalletOperation[] @relation("WalletOwner")
+  walletCounterparties WalletOperation[] @relation("WalletCounterparty")
   accountSecurityChallenges AccountSecurityChallenge[]
   securityEvents SecurityEvent[]
   passwordChangeChallenges PasswordChangeChallenge[]
@@ -71,6 +73,7 @@ model LedgerAccount {
   @@unique([userId, accountType, currency])
 }
 model Transaction {
+  walletOperation WalletOperation?
   id String @id @default(uuid()) @db.Uuid
   senderId String? @db.Uuid
   receiverId String? @db.Uuid
@@ -188,4 +191,25 @@ model SecurityNotification {
   nextAttemptAt DateTime @default(now())
   deliveredAt DateTime?
   @@index([nextAttemptAt])
+}
+
+model WalletOperation {
+ id String @id @db.Uuid
+ ownerId String @db.Uuid
+ owner User @relation("WalletOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+ requestKey String
+ fingerprint String
+ kind String
+ amount Decimal @db.Decimal(20,6)
+ counterpartyId String? @db.Uuid
+ counterparty User? @relation("WalletCounterparty", fields: [counterpartyId], references: [id], onDelete: Restrict)
+ destination String?
+ externalReference String? @unique
+ state String @default("PENDING")
+ transactionId String? @unique @db.Uuid
+ transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now())
+ @@unique([ownerId,requestKey])
+ @@index([ownerId,state])
 }
