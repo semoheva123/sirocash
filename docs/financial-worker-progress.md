@@ -3,9 +3,15 @@
 This is implementation progress, **not a completed launch or a production activation**.
 Migrations `20261031210000_sweep_dispatch_worker`,
 `20261031220000_energy_delivery_recovery` and `20261031230000_financial_worker_role`
-and `20261031240000_autonomous_financial_execution` are staged, not applied.
-Production remains at migration 32.
-No paid request, live signing, broadcast, financial permission or funding change was made.
+and `20261031240000_autonomous_financial_execution` were applied in order on 2026-10-31.
+Production now has 36 finished Prisma migration records with matching checksums for these four.
+Verified: 26 tables with RLS, no anon/authenticated access, application access limited to
+the three existing authentication/approval tables, nine checked guards and five safety indexes.
+The dedicated worker is NOLOGIN/NOBYPASSRLS, with no application/public membership.
+Supabase created a postgres ADMIN-only membership (INHERIT=false, SET=false).
+Energy purchase and both network payout policies remain disabled. Restricted worker grants
+were installed; no login credential, paid request, live signing, broadcast, funding change
+or production application redeployment was performed.
 
 ## Implemented in this patch
 

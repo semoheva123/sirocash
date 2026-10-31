@@ -80,9 +80,11 @@ PostgreSQL concurrency tests or funded mainnet end-to-end proof.
 
 ## Installation/configuration still intentionally separate
 
-Production remains unchanged (migration 32, financial execution disabled). Apply staged
-migrations 33–36 in order before deploying code expecting 26 protected tables and nine checked
-triggers. The last migration is `20261031240000_autonomous_financial_execution`.
+Production database migrations 33–36 were applied in order on 2026-10-31, with matching
+Prisma checksums recorded atomically with each migration. Catalog verification found all 26
+protected tables with RLS, nine enabled checked triggers and five valid unique safety indexes.
+The last migration is `20261031240000_autonomous_financial_execution`. Financial execution
+remains disabled and the production application has not been redeployed.
 
 In addition to existing private configuration, reviewed activation needs:
 - `SIRO_AUTOMATIC_PREPARATION_ENABLED=true`;
@@ -94,7 +96,9 @@ In addition to existing private configuration, reviewed activation needs:
 
 Do not enable a flag without its prerequisites or increase a budget to force a test through.
 The worker role remains NOLOGIN until a separate securely stored credential is provisioned.
-No production settings or permissions were changed by this patch. The workflow schedule only
+The migration added the restricted worker grants, but no runtime credential or financial
+activation setting was provisioned. Supabase automatically retains a postgres administrative
+membership (ADMIN only, INHERIT=false, SET=false); no application/public role has worker membership. The workflow schedule only
 runs from the default branch after merge; this working branch is not an active schedule.
 
 Other platform launch requirements (authoritative customer command/valuation integration,
