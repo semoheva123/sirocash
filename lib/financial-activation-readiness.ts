@@ -1,10 +1,11 @@
+import {financialConnectionString} from './financial-connection';
 /** Configuration-only diagnostic: never returns values or loads keys, connects, signs or sends. */
 export function financialActivationReadiness(env:Record<string,string|undefined>){
  const blockers:string[]=[];
  const requireValue=(key:string,valid:(value:string)=>boolean=v=>v.trim().length>0)=>{if(!valid(env[key]??''))blockers.push(key)};
  const positive=(v:string)=>/^[1-9]\d{0,77}$/.test(v);
  requireValue('VERCEL_ENV',v=>v==='production');
- requireValue('FINANCIAL_DATABASE_URL',v=>{try{const u=new URL(v);return ['postgres:','postgresql:'].includes(u.protocol)&&decodeURIComponent(u.username).split('.')[0]==='sirocash_financial_worker'&&!!u.password}catch{return false}});
+ try{const value=financialConnectionString(env);const u=value?new URL(value):undefined;if(!u||!['postgres:','postgresql:'].includes(u.protocol)||decodeURIComponent(u.username).split('.')[0]!=='sirocash_financial_worker'||!u.password)blockers.push('FINANCIAL_DATABASE_URL')}catch{blockers.push('FINANCIAL_DATABASE_URL')}
  requireValue('DATABASE_SSL_CA');
  requireValue('SIRO_FINANCIAL_WORKER_SECRET',v=>v.length>=32&&v.length<=512);
  for(const key of ['SIRO_SIGNER_ENABLED','SIRO_RPC_READ_ENABLED','SIRO_OUTBOX_WORKER_ENABLED','SIRO_AUTOMATIC_PREPARATION_ENABLED','SIRO_NATIVE_GAS_ENABLED','SIRO_BROADCAST_ENABLED','SIRO_RESOURCE_AUTHORIZATION_ENABLED','SIRO_ENERGY_WORKER_ENABLED','SIRO_ENERGY_PURCHASE_ENABLED','SIRO_ACCEPT_VARIABLE_ENERGY_PRICE'])requireValue(key,v=>v==='true');
