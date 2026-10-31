@@ -29,3 +29,43 @@ jobs:
       - run: npm audit --audit-level=low
       - run: npm test
       - run: npm run build
+  scheduler-credential-check:
+    # Never expose a repository secret to pull-request code or invoke the POST worker.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/arena/b6ad75ac-sirocash'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    permissions: {}
+    steps:
+      - name: Verify GitHub credential against authentication-only production probe
+        env:
+          WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
+        shell: python
+        run: |
+          import http.client, os, sys, time
+          secret = os.environ.get('WORKER_SECRET', '')
+          if not 32 <= len(secret) <= 512 or any(ord(c) < 33 or ord(c) > 126 for c in secret):
+              sys.exit('Scheduler secret is missing or malformed; no value printed.')
+          def request(headers):
+              connection = http.client.HTTPSConnection('sirocash.vercel.app', timeout=15)
+              try:
+                  connection.request('GET', '/api/internal/financial-worker', headers=headers)
+                  response = connection.getresponse()
+                  response.read()
+                  return response.status
+              finally:
+                  connection.close()
+          try:
+              for attempt in range(30):
+                  status = request({})
+                  if status == 401:
+                      break
+                  if status not in (404, 405, 502, 503, 504):
+                      sys.exit('Unexpected unauthenticated probe response; verification failed.')
+                  time.sleep(10)
+              else:
+                  sys.exit('Authentication-only probe deployment is not ready.')
+              if request({'Authorization': 'Bearer ' + secret}) != 204:
+                  sys.exit('Credential verification failed; check the same secret is saved in both stores.')
+              print('PASS: GitHub secret accepted by Vercel; unauthenticated request denied. GET only; no financial execution.')
+          except Exception:
+              sys.exit('Credential probe connection failed; no request headers or secret values printed.')
