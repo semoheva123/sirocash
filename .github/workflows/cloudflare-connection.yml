@@ -19,6 +19,7 @@ jobs:
     steps:
       - name: Validate token without exposing its value
         env:
+          CLOUDFLARE_ACCOUNT_ID: 54cf1f9f742ce2f8b674b2c3fa2cee51
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         shell: bash
         run: |
@@ -29,9 +30,11 @@ jobs:
             if (!token || token !== token.trim()) {
               throw new Error('CLOUDFLARE_API_TOKEN is missing or contains surrounding whitespace. Check the repository Actions secret.');
             }
+            const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+            if (!/^[a-f0-9]{32}$/.test(accountId || '')) throw new Error('Invalid Cloudflare account ID.');
             let response;
             try {
-              response = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+              response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/tokens/verify`, {
                 headers: { Authorization: `Bearer ${token}` },
                 redirect: 'error',
                 signal: AbortSignal.timeout(20000)
@@ -51,7 +54,7 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
               '## Cloudflare connection check\n\n' +
               '- Repository secret is present.\n' +
-              '- Cloudflare confirmed the token is active.\n' +
+              '- Cloudflare confirmed the account-owned token is active.\n' +
               '- No R2 bucket, D1 database or Worker was created or changed.\n' +
               '- Resource-specific permissions and application integration remain to be verified.\n');
           }
