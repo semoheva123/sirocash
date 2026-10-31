@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {readFile} from 'node:fs/promises';
+import {PlatformGuide} from '../components/platform-guide';
 import {ModernLanding} from '../components/modern-landing';
 import {AccountEssentials,AccountAssetCards} from '../components/account-essentials';
 import {SignatureVisual} from '../components/signature-visual';
@@ -10,6 +11,12 @@ import {BrandSculpture} from '../components/brand-sculpture';
 import {assetNetworks,networks} from '../lib/crypto-assets';
 async function main(){
  for(const ar of [true,false]){
+  const guide=renderToStaticMarkup(<PlatformGuide ar={ar}/>);
+  assert.equal((guide.match(/<details>/g)||[]).length,4);
+  assert.equal((guide.match(/<summary>/g)||[]).length,4);
+  for(const href of ['/trust','/support'])assert.ok(guide.includes(`href="${href}"`));
+  assert.ok(guide.includes(ar?'لا ترسل أموالًا':'Do not send funds'));
+  assert.ok(guide.includes('aria-labelledby="world-faq-title"'));
   const landing=renderToStaticMarkup(<ModernLanding ar={ar}/>);
   for(const anchor of ['main-content','business','how-it-works','security'])assert.ok(landing.includes(`id="${anchor}"`));
   for(const href of ['/auth','/dashboard','/deposit','/sham-cash','/mobile-topup','/trust'])assert.ok(landing.includes(`href="${href}"`));
