@@ -125,3 +125,8 @@ provisioning can be completed. Do not substitute the identity CRON_SECRET, appli
 credential, an administrative login or a chat-visible password. Worker login provisioning,
 shared scheduler credential, operator-reviewed monetary limits, RPC approval, policy activation
 and bounded paid acceptance remain open; this preparation does not claim full activation.
+
+Owner decision after preparation: no paid acceptance test is authorized; monetary limits must
+be proposed for review before any policy activation. Owner reported reconnecting GitHub, but
+an immediate retry of `gh secret list` still returned HTTP 403. No scheduler secret was
+created and no worker login or financial policy was enabled.
