@@ -25,6 +25,11 @@ async function main(){
  const offA=await hub.subscribe('a',()=>a++,()=>disconnected++),offB=await hub.subscribe('b',()=>b++,()=>disconnected++);
  assert.equal(connections,1);notify('invalid');notify(JSON.stringify({ownerId:'a',balance:'never-sent-to-client'}));assert.equal(a,1);assert.equal(b,0);offA();assert.equal(closes,0);offB();await Promise.resolve();assert.equal(closes,1);
  await hub.subscribe('a',()=>a++,()=>disconnected++);lost();await Promise.resolve();assert.equal(disconnected,1);assert.equal(closes,2);
+ // A duplicate callback from a retired listener must not kill its replacement.
+ const staleLost=lost;let replacementLost=0;const offNew=await hub.subscribe('new',()=>{},()=>replacementLost++);staleLost();assert.equal(replacementLost,0);offNew();
+ const disabledSource=new Source();const disabledStates:string[]=[];
+ const disabled=createFinancialStream({open:()=>disabledSource,active:()=>true,data:()=>{},state:s=>disabledStates.push(s)});
+ disabled.wake();disabledSource.emit('snapshot',{enabled:false,userId:'alice'});assert(disabledSource.closed);assert.equal(disabledStates.at(-1),'disabled');disabled.stop();
  assert.equal(new URL(financialEventConnection({FINANCIAL_DATABASE_URL:'postgresql://sirocash_financial_worker.project:fixture@aws-0-us-east-1.pooler.supabase.com:6543/postgres'})).port,'5432');
  assert.throws(()=>financialEventConnection({FINANCIAL_DATABASE_URL:'postgresql://postgres:fixture@example.test:6543/postgres'}),/UNSAFE_ROLE/);
  assert.throws(()=>financialEventConnection({FINANCIAL_DATABASE_URL:'postgresql://sirocash_financial_worker:fixture@example.test:6543/postgres'}),/SESSION_CONNECTION/);

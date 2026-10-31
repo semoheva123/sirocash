@@ -17,5 +17,5 @@ export function useFinancialStatus(enabled=true,expectedUserId?:string){
   return()=>{c.stop();controller.current=null;document.removeEventListener('visibilitychange',changed);window.removeEventListener('online',changed);window.removeEventListener('offline',changed);window.removeEventListener('focus',changed)};
  },[enabled,expectedUserId]);
  const refresh=useCallback(async()=>{await controller.current?.refresh()},[]);
- return {status,sync,updatedAt,refresh};
+ return {status:expectedUserId&&status?.userId!==expectedUserId?null:status,sync,updatedAt,refresh};
 }
