@@ -9,3 +9,8 @@ node_modules/
 
 # Authorized operational exports must never enter Git
 operations-data/
+
+# Cloudflare local secrets / emulated identity storage
+.dev.vars
+.dev.vars.*
+.wrangler/

@@ -89,3 +89,11 @@ assert.equal((await fetch(base+'/operations',{redirect:'manual'})).status,307);
 assert.ok([401,503].includes((await fetch(base+'/api/internal/security-notifications')).status));
 for(const path of ['/auth/recovery','/trust','/privacy','/terms','/support'])assert.equal((await fetch(base+path)).status,200);
 console.log('Lifecycle API: session/event privacy, email/recovery validation, cross-origin and guest revocation rejection, operations guard, job authentication and public information pages passed.');
+// Identity intake has no demo/anonymous document path and no side effects without authorization.
+assert.equal((await fetch(base+'/api/identity')).status,401);
+assert.equal((await post('/api/identity',{})).status,401);
+assert.equal((await post('/api/identity',{}, {Origin:'https://malicious.invalid'})).status,403);
+assert.equal((await post('/api/identity/review',{})).status,403);
+assert.equal((await fetch(base+'/api/identity',{method:'DELETE',headers:{Origin:base}})).status,401);
+const identityGuard=await fetch(base+'/identity-review',{redirect:'manual'});assert.equal(identityGuard.status,307);assert.ok(identityGuard.headers.get('location')?.endsWith('/auth'));
+console.log('Identity API: anonymous upload/status/delete denied, cross-origin rejected, reviewer denied by default, and private review page redirect preserved.');
