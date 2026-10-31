@@ -5,7 +5,7 @@ import {validTronAddress} from './tron-addresses';
 import {quoteUsdtWithdrawal,withdrawalFeePolicy} from './withdrawal-fees';
 import {assertDurableSession,consumeDurableApproval} from './durable-passkey';
 import {paymentDigest} from './payment-intent';
-import {accounts,available,moneyMicros,moneyString,reserveWithdrawalInTransaction,type WalletDb} from './wallet-engine';
+import {accounts,available,moneyMicros,moneyString,reserveWithdrawalInTransaction,type WalletDb,type WalletTx} from './wallet-engine';
 type Context=Parameters<typeof consumeDurableApproval>[1];
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 function quotePayload(row:Record<string,unknown>){
@@ -55,9 +55,14 @@ export async function reserveQuotedUsdtWithdrawal(db:WalletDb,c:Context,input:{q
  * A future chain reconciler must independently bind exact payout hash/recipient/amount/finality.
  */
 export async function settleQuotedUsdtWithdrawal(db:WalletDb,quoteId:string,evidence:{outcome:'confirmed'|'rejected';providerReference:string}){
- if(!uuid.test(quoteId)||!['confirmed','rejected'].includes(evidence.outcome)||typeof evidence.providerReference!=='string'||evidence.providerReference.length<8||evidence.providerReference.length>200||/[\x00-\x1f]/.test(evidence.providerReference))throw new Error('INVALID_WITHDRAWAL_SETTLEMENT');
  return db.transaction(async tx=>{
   await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+  return settleQuotedUsdtWithdrawalInTransaction(tx,quoteId,evidence);
+ });
+}
+/** Private transaction-local composition for verified chain reconciliation. */
+export async function settleQuotedUsdtWithdrawalInTransaction(tx:WalletTx,quoteId:string,evidence:{outcome:'confirmed'|'rejected';providerReference:string}){
+ if(!uuid.test(quoteId)||!['confirmed','rejected'].includes(evidence.outcome)||typeof evidence.providerReference!=='string'||evidence.providerReference.length<8||evidence.providerReference.length>200||/[\x00-\x1f]/.test(evidence.providerReference))throw new Error('INVALID_WITHDRAWAL_SETTLEMENT');
   const {rows:[quote]}=await tx.query('SELECT * FROM "UsdtWithdrawalQuote" WHERE id=$1 FOR UPDATE',[quoteId]);
   if(!quote?.operationId)throw new Error('WITHDRAWAL_QUOTE_NOT_RESERVED');
   const {rows:[row]}=await tx.query('SELECT * FROM "WalletOperation" WHERE id=$1 FOR UPDATE',[quote.operationId]);
@@ -79,5 +84,5 @@ export async function settleQuotedUsdtWithdrawal(db:WalletDb,quoteId:string,evid
   await tx.query('UPDATE "Transaction" SET status=\'COMPLETED\' WHERE id=$1',[transactionId]);
   await tx.query('UPDATE "WalletOperation" SET state=\'COMPLETED\',"transactionId"=$2,"externalReference"=$3,"updatedAt"=statement_timestamp() WHERE id=$1',[row.id,transactionId,evidence.providerReference]);
   return {id:String(row.id),state:'COMPLETED',transactionId};
- });
+
 }

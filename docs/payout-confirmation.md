@@ -1,0 +1,17 @@
+# Final successful payout confirmation and atomic settlement
+
+`confirmPayout` is a private trusted-observer service, NOT an HTTP endpoint accepting customer receipts. It supports finalized successful USDT Transfer evidence on TRON and BSC. It does not establish RPC authenticity, fetch receipts, buy resources, broadcast, or run a scheduler.
+
+The existing normalized receipt validators require canonical/solid-finalized block evidence, successful execution, exact token/event/recipient and positive bounded amounts; BSC additionally requires chain 56, explicit confirmations, global log index and nonremoved logs. Trusted observer transport, inclusion normalization and configuration must supply these observations/policies. There is no fallback from missing/failed/unfinalized evidence to a confirmed/rejected flag.
+
+Quote, operation and payout lock in the same order as dispatch. The shared saved-signature validator independently recovers the sender and checks chain/token/calldata/nonce or TRON raw data, exact quote net and recipient. Confirmation binds receipt transaction ID, source, destination and amount to this saved authorization. TRON expiry is NOT used to reject a successful historical execution: finality may be observed after the original signature expiration.
+
+In one database transaction the service inserts final evidence/fingerprint, marks payout CONFIRMED, and executes the exact three-leg quote settlement with `payout:<network>:<savedTxId>` as evidence reference. Journal failure rolls back the audit and terminal outbox transition as well as all financial entries. The existing trigger blocks premature settlement until the outbox resolves. Confirmation of a previously UNKNOWN send does not resend or re-sign.
+
+A replay must match the immutable execution fingerprint and consistent completed operation. Updated head heights do not create a new fingerprint; a changed canonical block hash conflicts and requires investigation, not another debit or automatic reversal. Audit rows reject UPDATE/DELETE. This is not tamper-proof against a DB owner disabling triggers or a consistently lying trusted RPC.
+
+Only successful final execution is implemented here. Failed execution, disappearance, expiration, dropped transaction or ambiguous provider responses preserve the hold. Definitive failed-chain/resource-cost accounting, nonce replacement, explicit identical-byte recovery sending, deep-reorg incident response, global budgets and live resource authority remain unimplemented. Provider ACK still is not finality.
+
+Migration `20261031150000_payout_confirmation` is prepared only, with RLS and no normal-app grants. No real pricing/resource authority, public financial route, mainnet send adapter or live worker is enabled. No production migrations were applied.
+
+`npm run test:payout-outbox` now exercises signing/reservation, fake dispatch with lost/unknown acknowledgement, synthetic final evidence, actual journal settlement, exact replay and failure injection after ledger writes. It covers both networks, incorrect amount/hash, failed/unfinalized evidence, changed block conflicts, old TRON signature reconciliation, preserved unrelated holds, fee revenue and zero-sum journals. Receipts/dispatch are synthetic, keys are public deterministic fixtures. These do not prove mainnet/provider behavior, real-device approval or independent PostgreSQL-session concurrency.

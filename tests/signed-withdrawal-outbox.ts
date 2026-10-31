@@ -4,6 +4,9 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFile,readdir} from 'node:fs/promises';
 import {Wallet,Transaction,Interface} from 'ethers';
 import {TronWeb,utils} from 'tronweb';
+import {confirmPayout} from '../lib/payout-confirmation';
+import {bep20UsdtContract,type Bep20ReceiptEvidence} from '../lib/bep20-deposit-verification';
+import {tronUsdtContract,type TronReceiptEvidence} from '../lib/tron-deposit-verification';
 import {dispatchSavedPayout} from '../lib/payout-dispatch';
 import {prepareSignedWithdrawal} from '../lib/signed-withdrawal-outbox';
 import {createUsdtWithdrawalQuote,reserveQuotedUsdtWithdrawal,settleQuotedUsdtWithdrawal} from '../lib/quoted-usdt-withdrawal';
@@ -113,7 +116,45 @@ async function main(){
   assert.equal((await walletBalances(db,owner)).held,'58.800000');
   assert.equal((await pg.query('SELECT * FROM "SignedWithdrawalOutbox"')).rows.length,3);
   console.log('Private payout dispatch: missing/capped approval rejection, durable pre-send claim, exact-byte ACK, bounded timeout and no-resend retry with holds preserved passed. Fixture adapters only.');
-  await pg.exec('SET ROLE sirocash_app');for(const table of ['WithdrawalSigningGuard','SignedWithdrawalOutbox'])await assert.rejects(()=>pg.exec(`SELECT * FROM "${table}"`),/permission denied/);
+  const evmTopic=(v:string)=>'0x'+v.slice(2).toLowerCase().padStart(64,'0');
+  const transfer='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+  const bepReceipt:Bep20ReceiptEvidence={chainId:56,txId:fresh.txId,blockNumber:100,blockHash:'0x'+'cd'.repeat(32),execution:'SUCCESS',logs:[{
+   address:bep20UsdtContract,topics:['0x'+transfer,evmTopic(evmSender),evmTopic(second.payload.recipient)],data:'0x'+(18n*10n**18n).toString(16).padStart(64,'0'),logIndex:7,removed:false,
+  }]};
+  const bepEvidence={receipt:bepReceipt,block:{chainId:56,height:100,hash:bepReceipt.blockHash,headHeight:120,finalizedHeight:115},logIndex:7,assignedAddress:second.payload.recipient,maxAmountBaseUnits:100n*10n**18n,minimumConfirmations:15};
+  const confirmation={payoutId:fresh.id,network:'BEP20' as const,evidence:bepEvidence};
+  await assert.rejects(()=>confirmPayout(db,{...confirmation,evidence:{...bepEvidence,receipt:{...bepReceipt,execution:'FAILED'}}}),/TRANSACTION_FAILED/);
+  await assert.rejects(()=>confirmPayout(db,{...confirmation,evidence:{...bepEvidence,block:{...bepEvidence.block,finalizedHeight:99}}}),/NOT_CANONICAL_AND_FINAL/);
+  await assert.rejects(()=>confirmPayout(db,{...confirmation,evidence:{...bepEvidence,receipt:{...bepReceipt,txId:'0x'+'ef'.repeat(32)}}}),/EXECUTION_MISMATCH/);
+  await assert.rejects(()=>confirmPayout(db,{...confirmation,evidence:{...bepEvidence,receipt:{...bepReceipt,logs:[{...bepReceipt.logs[0],data:'0x'+(17n*10n**18n).toString(16).padStart(64,'0')}]}}}),/EXECUTION_MISMATCH/);
+  const failFinal:WalletDb={transaction:run=>db.transaction(tx=>run({query:async(sql,params)=>{if(sql.startsWith('UPDATE "WalletOperation"'))throw Error('injected final journal failure');return tx.query(sql,params)}}))};
+  await assert.rejects(()=>confirmPayout(failFinal,confirmation),/injected final journal failure/);
+  assert.equal((await pg.query('SELECT * FROM "PayoutConfirmation"')).rows.length,0);
+  assert.equal((await walletBalances(db,owner)).held,'58.800000');
+  assert.equal((await pg.query<{state:string}>('SELECT state FROM "SignedWithdrawalOutbox" WHERE id=$1',[fresh.id])).rows[0].state,'BROADCAST_UNKNOWN');
+  const final=await confirmPayout(db,confirmation);assert.equal(final.state,'COMPLETED');
+  assert.deepEqual(await confirmPayout(db,confirmation),final);
+  assert.deepEqual(await confirmPayout(db,{...confirmation,evidence:{...bepEvidence,block:{...bepEvidence.block,headHeight:130}}}),final);
+  await assert.rejects(()=>confirmPayout(db,{...confirmation,evidence:{...bepEvidence,receipt:{...bepReceipt,blockHash:'0x'+'ef'.repeat(32)},block:{...bepEvidence.block,hash:'0x'+'ef'.repeat(32)}}}),/CONFIRMATION_CONFLICT/);
+  const tronTopic=(v:string)=>TronWeb.address.toHex(v).slice(2).toLowerCase().padStart(64,'0');
+  const tronReceipt:TronReceiptEvidence={txId:tronSigned.txId,blockNumber:100,blockHash:'cd'.repeat(32),execution:'SUCCESS',logs:[{
+   address:TronWeb.address.toHex(tronUsdtContract).slice(2).toLowerCase(),topics:[transfer,tronTopic(tronSender),tronTopic(tron.payload.recipient)],data:(15000000n).toString(16).padStart(64,'0'),
+  }]};
+  const tronEvidence={receipt:tronReceipt,block:{height:100,hash:tronReceipt.blockHash,solidHeight:105},logIndex:0,assignedAddress:tron.payload.recipient,maxAmountBaseUnits:100000000n};
+  // Signature timestamp is deliberately old: final successful execution remains reconcilable.
+  const tronFinal=await confirmPayout(db,{payoutId:tronSigned.id,network:'TRC20',evidence:tronEvidence});assert.equal(tronFinal.state,'COMPLETED');
+  assert.deepEqual(await confirmPayout(db,{payoutId:tronSigned.id,network:'TRC20',evidence:tronEvidence}),tronFinal);
+  assert.equal((await pg.query('SELECT * FROM "PayoutConfirmation"')).rows.length,2);
+  assert.equal((await dispatchSavedPayout(db,fresh.id,{enabled:true,send})).state,'CONFIRMED');
+  assert.equal((await dispatchSavedPayout(db,tronSigned.id,{enabled:true,send})).state,'CONFIRMED');
+  await assert.rejects(()=>pg.exec('DELETE FROM "PayoutConfirmation"'),/IMMUTABLE_PAYOUT_CONFIRMATION/);
+
+  assert.deepEqual(await walletBalances(db,owner),{currency:'USD',posted:'160.800000',available:'141.200000',held:'19.600000'});
+  assert.equal((await pg.query<{balance:string}>('SELECT balance FROM "LedgerAccount" WHERE id=$1',[fees])).rows[0].balance,'6.860000');
+  assert.equal(sends,2);
+  assert.equal(Number((await pg.query<{total:string}>('SELECT sum(amount)::text AS total FROM "LedgerEntry"')).rows[0].total),0);
+  console.log('Payout finality: TRON/BSC exact execution evidence, unknown-to-confirmed recovery without resend, immutable audit, atomic journal rollback, replay/reorg conflicts and balanced net/revenue settlement passed. Synthetic receipts only.');
+  await pg.exec('SET ROLE sirocash_app');for(const table of ['WithdrawalSigningGuard','SignedWithdrawalOutbox','PayoutConfirmation'])await assert.rejects(()=>pg.exec(`SELECT * FROM "${table}"`),/permission denied/);
   console.log('Signed payout outbox passed: real offline TRON/BSC signatures, exact DB quote net/recipient, durable bytes/hash plus SUBMITTED hold, rollback, no-key retries, extra-field/conflict rejection, unresolved network/nonce guards, immutable payload and unsafe settlement rejection. No broadcast; fixture final status is not verified chain evidence.');
  }finally{await pg.close()}
 }

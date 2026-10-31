@@ -404,6 +404,7 @@ model WithdrawalSigningGuard {
  payouts SignedWithdrawalOutbox[]
 }
 model SignedWithdrawalOutbox {
+ confirmation PayoutConfirmation?
  dispatchApproval PayoutDispatchApproval?
  id String @id @db.Uuid
  quoteId String @unique @db.Uuid
@@ -442,4 +443,12 @@ model PayoutDispatchAttempt {
  state String @default("UNKNOWN")
  createdAt DateTime @default(now()) @db.Timestamptz(6)
  acknowledgedAt DateTime? @db.Timestamptz(6)
+}
+
+model PayoutConfirmation {
+ payoutId String @id @db.Uuid
+ payout SignedWithdrawalOutbox @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+ fingerprint String
+ evidence Json
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
 }
