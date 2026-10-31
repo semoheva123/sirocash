@@ -97,3 +97,6 @@ assert.equal((await post('/api/identity/review',{})).status,403);
 assert.equal((await fetch(base+'/api/identity',{method:'DELETE',headers:{Origin:base}})).status,401);
 const identityGuard=await fetch(base+'/identity-review',{redirect:'manual'});assert.equal(identityGuard.status,307);assert.ok(identityGuard.headers.get('location')?.endsWith('/auth'));
 console.log('Identity API: anonymous upload/status/delete denied, cross-origin rejected, reviewer denied by default, and private review page redirect preserved.');
+assert.equal((await fetch(base+'/api/internal/identity-lifecycle')).status,401);
+assert.equal((await fetch(base+'/api/internal/identity-lifecycle',{headers:{Authorization:'Bearer forged'}})).status,401);
+console.log('Identity lifecycle job: missing/forged scheduler credentials denied; no anonymous account reconciliation.');
