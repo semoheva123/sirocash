@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/cloudflare-identity.yml
       - scripts/provision-cloudflare-identity.mjs
+      - scripts/identity-gateway-readiness.mjs
       - cloudflare/identity/**
       - .github/identity-bootstrap-public.pem
   workflow_dispatch:

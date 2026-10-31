@@ -30,7 +30,7 @@
     "test:reconciliation": "tsx tests/reconciliation.ts",
     "test:atelier": "tsx tests/atelier-design.tsx",
     "test:modern": "tsx tests/modern-fintech.tsx",
-    "test:identity": "tsx tests/identity.tsx"
+    "test:identity": "node tests/identity-gateway-readiness.mjs && tsx tests/identity.tsx"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

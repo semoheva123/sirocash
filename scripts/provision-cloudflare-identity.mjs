@@ -1,5 +1,6 @@
 // Invoked only by the protected project-specific Actions workflow. No secret values are logged.
 import fs from 'node:fs/promises';
+import {waitForIdentityGateway} from './identity-gateway-readiness.mjs';
 import {createHash,randomBytes,createCipheriv,publicEncrypt,constants} from 'node:crypto';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
 if(!/^[a-f0-9]{32}$/.test(account||'')||!token)throw Error('Cloudflare credentials are not configured.');
@@ -40,12 +41,14 @@ async function main(){
  upload.set('worker.mjs',new Blob([await fs.readFile('cloudflare/identity/worker.mjs','utf8')],{type:'application/javascript+module'}),'worker.mjs');
  await api(`/workers/scripts/${name}`,'PUT',upload);
  try{await api(`/workers/scripts/${name}/schedules`,'PUT',[{cron:'17 * * * *'}])}
- catch{console.log('::notice::Optional Worker hourly schedule is unavailable. The protected application daily lifecycle scheduler must be verified before collection.');}
+ catch(error){console.log('::notice::Optional Worker hourly schedule is unavailable: '+error.message+' The protected application daily lifecycle scheduler must be verified before collection.');}
  let subdomain=await api('/workers/subdomain','GET',undefined,true);
  if(!subdomain?.subdomain)subdomain=await api('/workers/subdomain','PUT',{subdomain:'sirocash-'+account.slice(0,10)});
  await api(`/workers/scripts/${name}/subdomain`,'POST',{enabled:true,previews_enabled:false});
  if(!/^[a-z0-9-]+$/.test(subdomain.subdomain||''))throw Error('Unexpected Worker subdomain.');
  const origin=`https://${name}.${subdomain.subdomain}.workers.dev`;
+ // Newly enabled workers.dev DNS/routing may not be ready immediately after upload.
+ const waitForGateway=()=>waitForIdentityGateway(origin,{report:message=>console.log('::notice::'+message)});
  const configured=(settings?.bindings||[]).filter(b=>b.type==='secret_text').map(b=>b.name);
  if(!configured.includes('IDENTITY_SERVICE_TOKEN')&&!configured.includes('IDENTITY_REVIEW_TOKEN')){
   const secrets=Object.fromEntries(['IDENTITY_SERVICE_TOKEN','IDENTITY_REVIEW_TOKEN','IDENTITY_SUBJECT_SECRET','CRON_SECRET'].map(key=>[key,randomBytes(32).toString('hex')]));
@@ -60,6 +63,7 @@ async function main(){
   const sealed={v:1,key:publicEncrypt({key:publicKey,oaepHash:'sha256',padding:constants.RSA_PKCS1_OAEP_PADDING},key).toString('base64'),iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),data:ciphertext.toString('base64')};
   console.log('::notice::IDENTITY_BOOTSTRAP_SEALED_V1='+Buffer.from(JSON.stringify(sealed)).toString('base64'));
   await fs.appendFile(process.env.GITHUB_ENV,'IDENTITY_BOOTSTRAP_CREATED=true\nIDENTITY_BOOTSTRAP_CRON_SECRET='+secrets.CRON_SECRET+'\n');
+  await waitForGateway();
   // Deployed synthetic test only: private JPEG in D1, isolation, audited read, no self approval,
   // human decision and withdrawal. No real customer account or identity is used.
   const subject=randomBytes(32).toString('hex'),reviewer=randomBytes(32).toString('hex');
@@ -92,8 +96,8 @@ async function main(){
    await query('DELETE FROM identity_quota WHERE subject=?',[subject]);
   }
  }else if(!configured.includes('IDENTITY_SERVICE_TOKEN')||!configured.includes('IDENTITY_REVIEW_TOKEN'))throw Error('Partial existing service credentials; refusing implicit rotation.');
- const probe=await fetch(origin+'/requests',{redirect:'error',signal:AbortSignal.timeout(20000)});
- if(![401,503].includes(probe.status))throw Error('Worker did not deny unauthenticated access. Collection remains disabled.');
+ await waitForGateway();
+ if(configured.includes('IDENTITY_SERVICE_TOKEN'))console.log('::notice::Existing service credentials preserved. This rerun verifies gateway reachability only, not authenticated document or application lifecycle integration.');
  console.log(`::notice::D1-only identity storage and migrated schema ready. Worker deployed at ${origin}; unauthenticated reads denied. Application collection remains disabled pending server credentials and lifecycle validation.`);
 
  await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,`## SiroCash Cloudflare resources\n\n- Documents and request metadata use D1 only; no R2 resources or billing activation required.\n- D1: sirocash-identity (${id}).\n- Collection remains disabled pending application integration and lifecycle checks.\n`);
