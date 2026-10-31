@@ -287,6 +287,7 @@ model PlatformWithdrawalGuard {
 }
 
 model SignedSweepOutbox {
+ confirmation SweepConfirmation?
  id String @id @db.Uuid
  addressId String @db.Uuid
  address UserDepositAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
@@ -299,4 +300,12 @@ model SignedSweepOutbox {
  state String @default("SIGNED")
  createdAt DateTime @default(now()) @db.Timestamptz(6)
  @@unique([addressId,requestKey])
+}
+
+model SweepConfirmation {
+ sweepId String @id @db.Uuid
+ sweep SignedSweepOutbox @relation(fields: [sweepId], references: [id], onDelete: Restrict)
+ fingerprint String
+ evidence Json
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
 }

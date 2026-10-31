@@ -1,0 +1,15 @@
+# Successful BEP20 sweep reconciliation (private, not activated)
+
+`confirmBep20Sweep` is a private trusted-observer consumer. It does not send a transaction, accept customer evidence, establish RPC authenticity, approve resource spending or post a journal entry.
+
+Before closing a pending sweep it verifies successful canonical/finalized receipt evidence using the BEP20 intake validator. It independently parses the *persisted signed transaction* and binds chain 56, legacy type, zero native value, USDT contract, recovered sender, transaction hash, persisted nonce, exact transfer calldata, fixed operating recipient and exact token amount to the confirmed Transfer log. A matching hash alone is insufficient.
+
+Source lock precedes outbox lock, matching signing preparation. Successful evidence and `CONFIRMED` transition are committed in the same transaction. A retry returns metadata only and never loads keys. Changes to immutable execution evidence conflict; newer observer heads do not change the fingerprint. Final success releases the pending-source constraint; nonce uniqueness remains in force.
+
+Missing, expired, failed, removed, unfinalized or contradictory evidence never closes the source or authorizes another signature. This implementation intentionally does **not** infer failure from a timeout, mark `REJECTED`, replace a nonce or refund anything. Conflicting final evidence must trigger operator/reorg investigation in a future worker, not an automatic retry. TRON sweep confirmation is not yet implemented.
+
+Prepared migration `20261031090000_sweep_confirmation` adds a private RLS-enabled evidence audit table; no runtime grants. It has not been remotely applied. An audit row is written once by this module, but database-owner access is not tamper-proof audit storage.
+
+`npm run test:sweep-outbox` covers deterministic offline signatures plus synthetic finalized evidence: altered hash, failed execution, wrong amount, pending preservation, unknown-to-confirmed recovery, exact retry, changed block conflict, one audit row and fresh-nonce signing after confirmation. No real broadcast or production PostgreSQL concurrent-session test occurs.
+
+Launch blockers remain: authenticated mainnet observer and inclusion normalization, authorization and shared budgets/nonce claims across payouts and sweeps, resource delivery, broadcast/finality workers, durable device approval, journal settlement and full crash/funded failure drills. Confirmation policy must come from reviewed trusted worker configuration, never a customer parameter. Do not expose this module through a public route.

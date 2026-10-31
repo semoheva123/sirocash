@@ -5,6 +5,7 @@
 - USDT withdrawal tariff quotes: 5 TRC20 / 2 BEP20 gross-deducted. Live settlement binding still absent.
 - Watch-only TRON/BEP20 address derivation and gated transactional assignment.
 - Offline HD child sweep signing and durable signed-sweep preparation outbox, with fixed operating destinations.
+- Private successful BEP20 sweep confirmation bound to persisted signed bytes and exact finalized Transfer evidence, with atomic audit/state and conservative pending retention. Not a dispatcher or live observer.
 - Successful live TronZap authentication/balance and energy-cost read probe (no purchase).
 - Synthetic TRON/BEP20 receipt validation and durable deduplicated inbox tied to assigned ownership; BEP20 finality/confirmation checks and network-bound replay protection.
 - Energy estimation/quote/preparation and treasury refill policy functions.
