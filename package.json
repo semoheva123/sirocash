@@ -30,7 +30,7 @@
     "test:reconciliation": "tsx tests/reconciliation.ts",
     "test:atelier": "tsx tests/atelier-design.tsx",
     "test:modern": "tsx tests/modern-fintech.tsx",
-    "test:identity": "node tests/identity-gateway-readiness.mjs && tsx tests/identity.tsx",
+    "test:identity": "node tests/identity-gateway-readiness.mjs && tsx tests/identity-ai.ts && tsx tests/identity.tsx",
     "identity:deployment-check": "node --conditions=react-server --import tsx scripts/check-identity-deployment.ts"
   },
   "dependencies": {

@@ -37,7 +37,7 @@ async function main(){
  const name='sirocash-identity',settings=await api(`/workers/scripts/${name}/settings`,'GET',undefined,true);
  if(settings){const binding=(settings.bindings||[]).find(b=>b.type==='d1'&&b.name==='IDENTITY_DB');if(!binding||binding.id!==id)throw Error('Existing Worker does not match this project identity database; refusing overwrite.');}
  const upload=new FormData();
- upload.set('metadata',JSON.stringify({main_module:'worker.mjs',compatibility_date:config.compatibility_date,keep_bindings:['secret_text'],observability:{enabled:false},bindings:[{type:'d1',name:'IDENTITY_DB',id}]}));
+ upload.set('metadata',JSON.stringify({main_module:'worker.mjs',compatibility_date:config.compatibility_date,keep_bindings:['secret_text'],observability:{enabled:false},bindings:[{type:'d1',name:'IDENTITY_DB',id},{type:'ai',name:'AI'},{type:'plain_text',name:'IDENTITY_AI_ENABLED',text:'true'}]}));
  upload.set('worker.mjs',new Blob([await fs.readFile('cloudflare/identity/worker.mjs','utf8')],{type:'application/javascript+module'}),'worker.mjs');
  await api(`/workers/scripts/${name}`,'PUT',upload);
  try{await api(`/workers/scripts/${name}/schedules`,'PUT',[{cron:'17 * * * *'}])}

@@ -1,7 +1,7 @@
 import {NextResponse} from 'next/server';
 import {currentUser} from '@/lib/email-auth';
 import {securityFailure,securityError,securityHeaders} from '@/lib/security-http';
-import {identityConfig,identityStorageConfig,identityGateway,identityOrigin,boundedIdentityBody,identityKinds,identityConsent} from '@/lib/identity';
+import {identityConfig,identityStorageConfig,identityGateway,identityOrigin,boundedIdentityBody,identityKinds,identityConsent,identityAiEnabled} from '@/lib/identity';
 import {normalizeIdentityImage,identityOcr} from '@/lib/identity-image';
 export const runtime='nodejs';export const dynamic='force-dynamic';export const maxDuration=60;
 let processing=false;
@@ -9,7 +9,8 @@ export async function GET(request:Request){try{
  const user=await currentUser(request);if(!user)return securityFailure('يُرجى تسجيل الدخول مجدداً.',401);
  const config=identityStorageConfig();if(!config)return NextResponse.json({available:false,request:null},{headers:securityHeaders});
  const response=await identityGateway(user.id,'/requests');if(!response.ok)return securityFailure('خدمة التوثيق غير متاحة مؤقتاً.',503);
- return NextResponse.json({available:!!identityConfig(),retentionDays:config.days,retentionPolicy:config.policy,...await response.json()},{headers:securityHeaders});
+ const data=await response.json();const aiEnabled=identityAiEnabled()&&data.aiAvailable===true;
+ return NextResponse.json({...data,available:!!identityConfig()&&(!identityAiEnabled()||aiEnabled),aiEnabled,consentVersion:identityConsent(config.policy),retentionDays:config.days,retentionPolicy:config.policy},{headers:securityHeaders});
 }catch(error){return securityError(error)}}
 export async function POST(request:Request){
  try{identityOrigin(request)}catch{return securityFailure('الطلب غير مسموح من هذا المصدر.',403)}

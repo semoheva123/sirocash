@@ -1,6 +1,7 @@
 import {createHmac} from 'node:crypto';
 export const IDENTITY_CONSENT='identity-v3-d1';
-export const identityConsent=(policy:string)=>policy==='account_lifetime'?'identity-v3-d1-account-lifetime':IDENTITY_CONSENT;
+export const identityAiEnabled=(env:Readonly<Record<string,string|undefined>>=process.env)=>env.IDENTITY_AI_ENABLED==='true';
+export const identityConsent=(policy:string,ai=identityAiEnabled())=>ai?(policy==='account_lifetime'?'identity-v4-d1-ai-account-lifetime':'identity-v4-d1-ai'):(policy==='account_lifetime'?'identity-v3-d1-account-lifetime':IDENTITY_CONSENT);
 export const DOCUMENT_LIMIT=1500000;
 export const BODY_LIMIT=3200000;
 export const identityKinds=['national_id','passport','residence_permit'] as const;

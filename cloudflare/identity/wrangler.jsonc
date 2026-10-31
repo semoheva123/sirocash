@@ -18,5 +18,11 @@
     "crons": [
       "17 * * * *"
     ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "IDENTITY_AI_ENABLED": "true"
   }
 }

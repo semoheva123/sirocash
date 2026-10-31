@@ -1,7 +1,7 @@
 // Opt-in production preflight. Uses synthetic bytes only; never creates primary accounts.
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
-import {identityGateway,identityStorageConfig,identityConsent} from '../lib/identity';
+import {identityGateway,identityStorageConfig,identityConsent,identityAiEnabled} from '../lib/identity';
 import {normalizeIdentityImage,identityOcr} from '../lib/identity-image';
 import {GET as lifecycle} from '../app/api/internal/identity-lifecycle/route';
 import {database} from '../lib/database';
@@ -27,6 +27,16 @@ async function main(){
   form.set('checks',JSON.stringify([{...normalized.checks,ocr}]));form.set('front',new Blob([new Uint8Array(normalized.data)],{type:'image/jpeg'}),'synthetic.jpg');
   phase='D1-upload';const response=await identityGateway(subject,'/requests',{method:'POST',body:form});requireStatus(response,201);created=true;
   const {request:record}=await response.json();if(!/^[a-f0-9-]{36}$/.test(record.id)||record.expiresAt!==null)throw Error('retention');
+  if(identityAiEnabled()){
+   phase='Workers-AI-synthetic-analysis';let analysis;
+   for(let attempt=0;attempt<35;attempt++){
+    const status=await identityGateway(subject,'/requests');requireStatus(status,200);const data=await status.json();if(data.aiAvailable!==true)throw Error('AI binding');analysis=data.analysis;
+    if(analysis&&analysis.state!=='processing')break;
+    await new Promise(resolve=>setTimeout(resolve,1000));
+   }
+   if(analysis?.state!=='resubmit'||!analysis.reasons?.includes('document_type'))throw Error('synthetic image must not pass');
+   console.log('Identity deployment preflight: live Workers AI recognized the synthetic non-document; no identity approval issued.');
+  }
   phase='owner-isolation';const isolated=await identityGateway(other,'/requests');requireStatus(isolated,200);if((await isolated.json()).request!==null)throw Error('isolation');
   phase='private-D1-read';const path='/review/document?id='+record.id+'&side=front';const read=await identityGateway(other,path,{review:true});requireStatus(read,200);
   if(!read.headers.get('cache-control')?.includes('no-store')||!Buffer.from(await read.arrayBuffer()).equals(normalized.data))throw Error('bytes');
