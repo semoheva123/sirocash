@@ -3,9 +3,14 @@ import {HDKey} from '@scure/bip32';
 import {PGlite} from '@electric-sql/pglite';
 import {readFile} from 'node:fs/promises';
 import {Transaction,Interface} from 'ethers';
-import {confirmBep20Sweep} from '../lib/sweep-confirmation';
+import {confirmBep20Sweep,confirmTronSweep} from '../lib/sweep-confirmation';
 import type {Bep20ReceiptEvidence} from '../lib/bep20-deposit-verification';
 import {prepareSignedSweep} from '../lib/signed-sweep-outbox';
+import {TronWeb} from 'tronweb';
+import {base58} from '@scure/base';
+import {deriveTronDepositAddress} from '../lib/tron-addresses';
+import {tronUsdtContract,type TronReceiptEvidence} from '../lib/tron-deposit-verification';
+import {treasuryDestination} from '../lib/treasury-addresses';
 import {deriveBep20DepositAddress} from '../lib/evm-deposit-addresses';
 import type {WalletDb} from '../lib/wallet-engine';
 async function main(){
@@ -54,6 +59,37 @@ async function main(){
   // Only successful final confirmation releases the source; signing uses a fresh nonce.
   const next=await prepareSignedSweep(db,{...command,requestKey:'sweep:test:002',transaction:{...command.transaction,nonce:1}},options);
   assert.equal(next.state,'SIGNED');assert.equal(keyLoads,2);
+  const tronAccount=HDKey.fromMasterSeed(new Uint8Array(32).fill(12)).derive("m/44'/195'/0'");
+  const tronVault='00000000-0000-0000-0000-000000000004',tronId='00000000-0000-0000-0000-000000000005';
+  const tronAddress=deriveTronDepositAddress(tronAccount.publicExtendedKey,0).address;
+  await pg.query('INSERT INTO "DepositAddressVault" (id,network,"accountXpub",enabled,"originVerified") VALUES ($1,\'TRC20\',$2,true,true)',[tronVault,tronAccount.publicExtendedKey]);
+  await pg.query('INSERT INTO "UserDepositAddress" (id,"ownerId","vaultId",network,address,"derivationIndex") VALUES ($1,$2,$3,\'TRC20\',$4,0)',[tronId,owner,tronVault,tronAddress]);
+  const now=1700000000000;
+  const tronOptions={now,loadKeys:()=>({accountXpub:tronAccount.publicExtendedKey,accountXprv:tronAccount.privateExtendedKey})};
+  const tronCommand={network:'TRC20' as const,addressId:tronId,requestKey:'tron:sweep:001',maxAmountBaseUnits:1000000000n,maxNetworkFeeBaseUnits:5000000n,transaction:{amountBaseUnits:20000000n,refBlockBytes:'1234',refBlockHash:'ab'.repeat(8),timestamp:now,expiration:now+60000,feeLimitSun:4000000}};
+  const tronSigned=await prepareSignedSweep(db,tronCommand,tronOptions);
+  const destination=treasuryDestination('TRC20','operating');
+  const tronTopic=(v:string)=>TronWeb.address.toHex(v).slice(2).toLowerCase().padStart(64,'0');
+  const tronReceipt:TronReceiptEvidence={txId:tronSigned.txId,blockNumber:100,blockHash:'cd'.repeat(32),execution:'SUCCESS',logs:[{
+   address:Buffer.from(base58.decode(tronUsdtContract).slice(1,21)).toString('hex'),
+   topics:['ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',tronTopic(tronAddress),tronTopic(destination)],data:(20000000n).toString(16).padStart(64,'0'),
+  }]};
+  const tronEvidence={receipt:tronReceipt,block:{height:100,hash:tronReceipt.blockHash,solidHeight:105},logIndex:0,assignedAddress:destination,maxAmountBaseUnits:1000000000n};
+  const confirmTron=(e=tronEvidence)=>confirmTronSweep(db,{sweepId:tronSigned.id,evidence:e});
+  await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,execution:'FAILED'}}),/TRANSACTION_FAILED/);
+  await assert.rejects(()=>confirmTron({...tronEvidence,block:{...tronEvidence.block,solidHeight:99}}),/NOT_CANONICAL_AND_FINAL/);
+  await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,txId:'ef'.repeat(32)}}),/IDENTITY_MISMATCH/);
+  await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,logs:[{...tronReceipt.logs[0],data:(21000000n).toString(16).padStart(64,'0')}]}}),/EXECUTION_MISMATCH/);
+  const originalPayload=(await pg.query<{signedPayload:string}>('SELECT "signedPayload" FROM "SignedSweepOutbox" WHERE id=$1',[tronSigned.id])).rows[0].signedPayload;
+  const corrupted=JSON.parse(originalPayload);corrupted.signature[0]='00'.repeat(65);
+  await pg.query('UPDATE "SignedSweepOutbox" SET "signedPayload"=$2 WHERE id=$1',[tronSigned.id,JSON.stringify(corrupted)]);
+  await assert.rejects(()=>confirmTron());
+  await pg.query('UPDATE "SignedSweepOutbox" SET "signedPayload"=$2,state=\'BROADCAST_UNKNOWN\' WHERE id=$1',[tronSigned.id,originalPayload]);
+  const tronConfirmed=await confirmTron();assert.equal(tronConfirmed.state,'CONFIRMED');
+  assert.deepEqual(await confirmTron(),tronConfirmed);
+  await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,blockHash:'ef'.repeat(32)},block:{...tronEvidence.block,hash:'ef'.repeat(32)}}),/CONFIRMATION_CONFLICT/);
+  assert.equal(Number((await pg.query<{n:number}>('SELECT count(*) AS n FROM "SweepConfirmation"')).rows[0].n),2);
+  console.log('TRON confirmation: recovered signature, exact signed transfer, finalized success, pending safety, corrupt signature rejection and immutable retry evidence passed. No broadcast.');
   console.log('Sweep confirmation: signed identity/amount/recipient binding, unknown-to-confirmed recovery, atomic evidence audit, retry, conflicts and next-nonce source release passed. No broadcast.');
   console.log('Signed sweep outbox: persistent exact bytes/TXID, DB-owned source, retry without re-signing, conflicting/new pending request rejection passed. No broadcast.');
  }finally{await pg.close()}

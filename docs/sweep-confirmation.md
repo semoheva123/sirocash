@@ -1,4 +1,4 @@
-# Successful BEP20 sweep reconciliation (private, not activated)
+# Successful TRON/BEP20 sweep reconciliation (private, not activated)
 
 `confirmBep20Sweep` is a private trusted-observer consumer. It does not send a transaction, accept customer evidence, establish RPC authenticity, approve resource spending or post a journal entry.
 
@@ -6,10 +6,10 @@ Before closing a pending sweep it verifies successful canonical/finalized receip
 
 Source lock precedes outbox lock, matching signing preparation. Successful evidence and `CONFIRMED` transition are committed in the same transaction. A retry returns metadata only and never loads keys. Changes to immutable execution evidence conflict; newer observer heads do not change the fingerprint. Final success releases the pending-source constraint; nonce uniqueness remains in force.
 
-Missing, expired, failed, removed, unfinalized or contradictory evidence never closes the source or authorizes another signature. This implementation intentionally does **not** infer failure from a timeout, mark `REJECTED`, replace a nonce or refund anything. Conflicting final evidence must trigger operator/reorg investigation in a future worker, not an automatic retry. TRON sweep confirmation is not yet implemented.
+Missing, expired, failed, removed, unfinalized or contradictory evidence never closes the source or authorizes another signature. This implementation intentionally does **not** infer failure from a timeout, mark `REJECTED`, replace a nonce or refund anything. Conflicting final evidence must trigger operator/reorg investigation in a future worker, not an automatic retry. TRON confirmation is implemented privately via `confirmTronSweep`: canonical solid-block success, persisted raw-data/hash validation, single recovered signature matching the assigned source, exact USDT TriggerSmartContract transfer to the operating wallet, no native/token call value, and exact amount/from/to log matching. It uses the same source lock, audit and terminal-state checks.
 
 Prepared migration `20261031090000_sweep_confirmation` adds a private RLS-enabled evidence audit table; no runtime grants. It has not been remotely applied. An audit row is written once by this module, but database-owner access is not tamper-proof audit storage.
 
-`npm run test:sweep-outbox` covers deterministic offline signatures plus synthetic finalized evidence: altered hash, failed execution, wrong amount, pending preservation, unknown-to-confirmed recovery, exact retry, changed block conflict, one audit row and fresh-nonce signing after confirmation. No real broadcast or production PostgreSQL concurrent-session test occurs.
+`npm run test:sweep-outbox` covers deterministic offline signatures plus synthetic finalized evidence: altered hash, failed execution, wrong amount, pending preservation, unknown-to-confirmed recovery, exact retry, changed block conflict, one audit row and fresh-nonce signing after confirmation. TRON fixtures additionally test failed/unfinalized evidence, wrong hash/amount, corrupt signature rejection, unknown-to-confirmed recovery and conflicting block evidence. No real broadcast or production PostgreSQL concurrent-session test occurs.
 
 Launch blockers remain: authenticated mainnet observer and inclusion normalization, authorization and shared budgets/nonce claims across payouts and sweeps, resource delivery, broadcast/finality workers, durable device approval, journal settlement and full crash/funded failure drills. Confirmation policy must come from reviewed trusted worker configuration, never a customer parameter. Do not expose this module through a public route.
