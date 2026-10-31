@@ -40,6 +40,7 @@ enum CryptoAsset {
   USDC
 }
 model User {
+ depositAddresses UserDepositAddress[]
   walletOperations WalletOperation[] @relation("WalletOwner")
   walletCounterparties WalletOperation[] @relation("WalletCounterparty")
   accountSecurityChallenges AccountSecurityChallenge[]
@@ -234,4 +235,66 @@ model EnergyRentalIntent {
  providerOrderId String? @unique
  createdAt DateTime @default(now()) @db.Timestamptz(6)
  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+
+model DepositAddressVault {
+ id String @id @db.Uuid
+ network String
+ accountXpub String @unique
+ originVerified Boolean @default(false)
+ nextIndex BigInt @default(0)
+ enabled Boolean @default(false)
+ addresses UserDepositAddress[]
+ @@unique([id,network], map: "deposit_vault_network")
+}
+model UserDepositAddress {
+ signedSweeps SignedSweepOutbox[]
+ deposits ChainDepositInbox[]
+ id String @id @db.Uuid
+ ownerId String @db.Uuid
+ owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+ vaultId String @db.Uuid
+ vault DepositAddressVault @relation(fields: [vaultId,network], references: [id,network], onDelete: Restrict)
+ network String
+ address String @unique
+ derivationIndex BigInt
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([ownerId,network])
+ @@unique([vaultId,derivationIndex])
+}
+
+model ChainDepositInbox {
+ id String @id @db.Uuid
+ eventKey String @unique
+ addressId String @db.Uuid
+ address UserDepositAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+ txId String
+ logIndex Int
+ blockNumber BigInt
+ blockHash String
+ amountBaseUnits Decimal @db.Decimal(78,0)
+ fingerprint String
+ state String @default("AWAITING_VALUATION")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([txId,logIndex])
+}
+
+model PlatformWithdrawalGuard {
+ id Int @id
+}
+
+model SignedSweepOutbox {
+ id String @id @db.Uuid
+ addressId String @db.Uuid
+ address UserDepositAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+ requestKey String
+ network String
+ fingerprint String
+ txId String @unique
+ signedPayload String
+ senderNonce BigInt?
+ state String @default("SIGNED")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([addressId,requestKey])
 }

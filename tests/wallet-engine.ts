@@ -6,7 +6,7 @@ import {transferWallet,creditConfirmedDeposit,reserveWithdrawal,submitWithdrawal
 async function main(){
  const pg=new PGlite();
  try{
-  for(const path of ['20261030000000_ledger_invariants','20261030010000_payment_services','20261030020000_payment_service_constraints','20261030030000_email_auth','20261031000000_wallet_operations','20261031010000_internal_transfer_fee','20261031020000_energy_intents'])await pg.exec(await readFile('prisma/migrations/'+path+'/migration.sql','utf8'));
+  for(const path of ['20261030000000_ledger_invariants','20261030010000_payment_services','20261030020000_payment_service_constraints','20261030030000_email_auth','20261031000000_wallet_operations','20261031010000_internal_transfer_fee','20261031020000_energy_intents','20261031050000_platform_withdrawal_limit'])await pg.exec(await readFile('prisma/migrations/'+path+'/migration.sql','utf8'));
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>{const r=await tx.query(sql,params);return {rows:r.rows as Record<string,unknown>[]}}} as WalletTx))};
   const alice='00000000-0000-0000-0000-000000000001',bob='00000000-0000-0000-0000-000000000002',pool='00000000-0000-0000-0000-000000000003',treasury='00000000-0000-0000-0000-000000000004';
   await pg.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES ($1,\'alice@example.test\',CURRENT_TIMESTAMP),($2,\'bob@example.test\',CURRENT_TIMESTAMP)',[alice,bob]);
@@ -24,6 +24,8 @@ async function main(){
   assert.throws(()=>transferWallet(db,{...transfer,recipientId:alice}),/SELF_TRANSFER/);
   const held=await reserveWithdrawal(db,{ownerId:alice,requestKey:'withdraw:alice:001',amount:'50',destination:'USDT:TRC20:test-destination'});assert.equal(held.state,'RESERVED');
   assert.equal((await walletBalances(db,alice)).available,'19.700000');
+  await assert.rejects(()=>reserveWithdrawal(db,{ownerId:alice,requestKey:'withdraw:identity-limit',amount:'100.000001',destination:'USDT:TRC20:test-destination'}),/WITHDRAWAL_IDENTITY_LIMIT_EXCEEDED/);
+  assert.equal((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM \"WalletOperation\" WHERE \"requestKey\"=\'withdraw:identity-limit\'')).rows[0].n,0);
   const energyInput={withdrawalId:held.id,senderAddress:'T'+'A'.repeat(33),package:{energy:65000,durationMinutes:60 as const},maxRentalSun:2000000n};
   const rental=await prepareEnergyIntent(db,energyInput);
   assert.equal(rental.state,'PREPARED');
@@ -64,6 +66,19 @@ async function main(){
   const {rows:imbalanced}=await pg.query('SELECT "transactionId" FROM "LedgerEntry" GROUP BY "transactionId" HAVING SUM(amount)<>0');assert.equal(imbalanced.length,0);
   const {rows:cache}=await pg.query('SELECT u.id FROM "User" u JOIN "LedgerAccount" a ON a."userId"=u.id WHERE u.balance<>a.balance');assert.equal(cache.length,0);
   assert.equal((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM "LedgerEntry" e JOIN "WalletOperation" w ON w."transactionId"=e."transactionId" WHERE w.id=$1',[failed.id])).rows[0].n,0);
+  const budgetUser='00000000-0000-0000-0000-000000000010';
+  await pg.query('INSERT INTO "User" (id,email,"kycStatus","emailVerifiedAt") VALUES ($1,\'budget@example.test\',\'VERIFIED\',CURRENT_TIMESTAMP)',[budgetUser]);
+  await creditConfirmedDeposit(db,{...deposit,ownerId:budgetUser,amount:'11000',requestKey:'deposit:budget:001',providerReference:'provider:budget:deposit:001'});
+  const {rows:[usage]}=await pg.query<{used:string}>(`SELECT COALESCE(SUM(amount),0)::text AS used FROM "WalletOperation" WHERE kind='WITHDRAWAL' AND (state IN ('RESERVED','SUBMITTED') OR (state='COMPLETED' AND "updatedAt">=date_trunc('day',statement_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'))`);
+  let room=10000000000n-moneyMicros(usage.used),counter=0;
+  while(room>0n){const portion=room>1000000000n?1000000000n:room;const value=`${portion/1000000n}.${String(portion%1000000n).padStart(6,'0')}`;
+   const c={ownerId:budgetUser,amount:value,requestKey:'withdraw:budget:'+counter++,destination:'USDT:TRC20:budget-test'};
+   const reserved=await reserveWithdrawal(db,c);assert.deepEqual(await reserveWithdrawal(db,c),reserved);room-=portion;
+  }
+  const budgetBefore=await walletBalances(db,budgetUser);
+  await assert.rejects(()=>reserveWithdrawal(db,{ownerId:budgetUser,amount:'1',requestKey:'withdraw:budget:over',destination:'USDT:BEP20:budget-test'}),/PLATFORM_DAILY_WITHDRAWAL_LIMIT_EXCEEDED/);
+  assert.deepEqual(await walletBalances(db,budgetUser),budgetBefore);
+  assert.equal((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM "WalletOperation" WHERE "requestKey"=\'withdraw:budget:over\'')).rows[0].n,0);
   console.log('Wallet engine: confirmed deposits, atomic send/receive, exact decimals, idempotency, reserved withdrawal protection, confirmed settlement, definitive rejection release, rollback and balanced journal passed. PGlite serializes transactions; separate-connection PostgreSQL contention testing remains required.');
  }finally{await pg.close()}
 }

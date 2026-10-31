@@ -3,6 +3,7 @@
  * Runtime financial writes remain disabled until dedicated privileges and durable approval exist.
  */
 import {createHash,randomUUID} from 'node:crypto';
+import {enforceWithdrawalLimit,withdrawalLimits} from './withdrawal-limits';
 export type WalletTx={query:(sql:string,params?:unknown[])=>Promise<{rows:Record<string,unknown>[]}>};
 export type WalletDb={transaction:<T>(run:(tx:WalletTx)=>Promise<T>)=>Promise<T>};
 function transact<T>(db:WalletDb,run:(tx:WalletTx)=>Promise<T>){return db.transaction(async tx=>{
@@ -52,7 +53,7 @@ async function post(tx:WalletTx,row:Record<string,unknown>,type:string,sender:st
  await tx.query('INSERT INTO "Transaction" (id,"senderId","receiverId",amount,type,"idempotencyKey") VALUES ($1,$2,$3,$4,$5,$6)',[transactionId,sender,receiver,value,type,'wallet:'+row.id]);
  await tx.query('INSERT INTO "LedgerEntry" (id,"transactionId","accountId",amount) VALUES ($1,$2,$3,-$4::numeric),($5,$2,$6,$4::numeric)',[randomUUID(),transactionId,debit,value,randomUUID(),credit]);
  await tx.query('UPDATE "Transaction" SET status=\'COMPLETED\' WHERE id=$1',[transactionId]);
- const {rows:[result]}=await tx.query('UPDATE "WalletOperation" SET state=\'COMPLETED\',"transactionId"=$2,"updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *',[row.id,transactionId]);return operation(result);
+ const {rows:[result]}=await tx.query('UPDATE "WalletOperation" SET state=\'COMPLETED\',"transactionId"=$2,"updatedAt"=statement_timestamp() WHERE id=$1 RETURNING *',[row.id,transactionId]);return operation(result);
 }
 export function transferWallet(db:WalletDb,c:Command&{recipientId:string;feeAccountId:string}){
  const recipient=id(c.recipientId),owner=id(c.ownerId),treasury=id(c.feeAccountId),quote=internalTransferQuote(c.amount);if(owner===recipient)throw Error('SELF_TRANSFER');
@@ -66,7 +67,7 @@ export function transferWallet(db:WalletDb,c:Command&{recipientId:string;feeAcco
   await tx.query('INSERT INTO "Transaction" (id,"senderId","receiverId",amount,type,"idempotencyKey") VALUES ($1,$2,$3,$4,\'P2P\',$5)',[transactionId,owner,recipient,quote.totalDebit,'wallet:'+row.id]);
   await tx.query('INSERT INTO "LedgerEntry" (id,"transactionId","accountId",amount) VALUES ($1,$2,$3,-$4::numeric),($5,$2,$6,$7::numeric),($8,$2,$9,$10::numeric)',[randomUUID(),transactionId,String(from.id),quote.totalDebit,randomUUID(),String(a.get(recipient)!.id),quote.amount,randomUUID(),treasury,quote.fee]);
   await tx.query('UPDATE "Transaction" SET status=\'COMPLETED\' WHERE id=$1',[transactionId]);
-  const {rows:[result]}=await tx.query('UPDATE "WalletOperation" SET state=\'COMPLETED\',"transactionId"=$2,"updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *',[row.id,transactionId]);return operation(result);
+  const {rows:[result]}=await tx.query('UPDATE "WalletOperation" SET state=\'COMPLETED\',"transactionId"=$2,"updatedAt"=statement_timestamp() WHERE id=$1 RETURNING *',[row.id,transactionId]);return operation(result);
  });
 }
 /** ONLY a trusted settlement adapter may call this, after finality, asset/network, beneficiary
@@ -85,7 +86,17 @@ export function reserveWithdrawal(db:WalletDb,c:Command&{destination:string}){
  const destination=reference(c.destination),owner=id(c.ownerId);
  return transact(db,async tx=>{
   const row=await begin(tx,c,'WITHDRAWAL',null,destination);if(row.state!=='PENDING')return operation(row);
-  const a=await accounts(tx,[owner]);if(await available(tx,owner,String(a.get(owner)!.balance))<moneyMicros(String(row.amount)))throw Error('INSUFFICIENT_AVAILABLE_BALANCE');
+  const a=await accounts(tx,[owner]);
+  const {rows:[identity]}=await tx.query('SELECT "kycStatus" FROM "User" WHERE id=$1',[owner]);
+  enforceWithdrawalLimit(String(row.amount),identity?.kycStatus);
+  if(await available(tx,owner,String(a.get(owner)!.balance))<moneyMicros(String(row.amount)))throw Error('INSUFFICIENT_AVAILABLE_BALANCE');
+  const {rows:[guard]}=await tx.query('SELECT id FROM "PlatformWithdrawalGuard" WHERE id=1 FOR UPDATE');
+  if(!guard)throw Error('PLATFORM_WITHDRAWAL_GUARD_UNAVAILABLE');
+  // Query AFTER the global lock under READ COMMITTED. Outstanding older holds carry over.
+  const {rows:[usage]}=await tx.query(`SELECT COALESCE(SUM(amount),0)::text AS used FROM "WalletOperation"
+    WHERE kind='WITHDRAWAL' AND (state IN ('RESERVED','SUBMITTED') OR
+      (state='COMPLETED' AND "updatedAt">=date_trunc('day',statement_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'))`);
+  if(moneyMicros(String(usage.used))+moneyMicros(String(row.amount))>withdrawalLimits.platformDailyMicros)throw Error('PLATFORM_DAILY_WITHDRAWAL_LIMIT_EXCEEDED');
   const {rows:[reserved]}=await tx.query('UPDATE "WalletOperation" SET state=\'RESERVED\',"updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *',[row.id]);return operation(reserved);
  });
 }

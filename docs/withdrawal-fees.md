@@ -1,0 +1,12 @@
+# Approved USDT withdrawal tariff
+
+TRC20 (TRON): fixed 5 USDT. BEP20 (BNB Smart Chain): fixed 2 USDT.
+Fees are deducted from requested gross, not added to sender debit: request 20 => debit 20, recipient 15 TRC20 / 18 BEP20. Gross must strictly exceed fee. These are platform tariffs, not measured blockchain costs or a guarantee of profitability. No USDC tariff implied; no assumed execution-time USD/USDT conversion.
+
+Implemented exact six-decimal quote helper, bilingual withdrawal-modal summary and quote on demo withdrawal responses. Existing financial/passkey guards remain intact. Live ledger reservations/settlements are NOT repriced or wired to this policy. Before activation, persist and bind exact gross/fee/net/policy/asset/network/recipient/idempotency to device approval and the withdrawal reservation, then atomically allocate payout and revenue on definitive settlement. Real network costs need separate accounting. Never change a pending withdrawal's quote on retry.
+
+## Owner-approved limits
+
+Gross per-withdrawal USD accounting limit: 100 for unverified/pending/rejected/missing final identity status; 1,000 only for trusted persisted User.kycStatus=VERIFIED. Email approval and preliminary AI screening do not qualify. Enforced during a NEW wallet withdrawal reservation using server-read status; exact existing idempotent reservations are not silently repriced/rejected. Signing/dispatch must revalidate current applicable authorization before sending. Demo routes are not proof of live enforcement. UI labels corrected from an inaccurate fixed daily1,000 claim.
+
+Owner confirmed daily10,000 is PLATFORM-WIDE across users and networks, counted in gross USD ledger units. New reservations serialize through a singleton guard row, then under READ COMMITTED sum all RESERVED/SUBMITTED withdrawals (including prior-day unresolved holds) plus COMPLETED withdrawals settled since UTC midnight. Definitively FAILED withdrawals do not consume this budget; ambiguous outcomes stay SUBMITTED. Exact retries return the existing operation without double allocation. UTC day is the explicit technical default, not a user-selected local reset. Completed updatedAt is settlement time and must remain immutable through restricted DB access. This is engine-side protection, not a live signer daily-budget implementation or proof of real PostgreSQL contention. Pending new migration has not been remotely applied. Operating liquidity target is owner-managed; reserve auto-refill is explicitly not authorized in treasuryFundingPolicy. No production changes.
