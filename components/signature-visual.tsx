@@ -1,5 +1,6 @@
 'use client';
 import {useState} from 'react';
+import {BrandSculpture} from './brand-sculpture';
 import {ArrowLeftRight,ArrowUpRight,ArrowDownLeft,Plus,ShieldCheck,Layers,Wifi,EyeOff,Check,LockKeyhole,Mail} from 'lucide-react';
 
 /** Interactive interface illustration. Never an issued card or a live account. */
@@ -8,7 +9,7 @@ export function SignatureVisual({ar,compact=false}:{ar:boolean;compact?:boolean}
  const t=(en:string,arabic:string)=>ar?arabic:en;
  return <div className={'fintech-scene'+(compact?' fintech-scene-compact':'')} aria-label={t('Illustrative app preview, not an issued payment card','معاينة توضيحية للتطبيق، لا تمثّل بطاقة دفع فعلية')}>
   <div className="fintech-scene-disc" aria-hidden="true"/><div className="fintech-scene-grid" aria-hidden="true"/>
-  <span className="fintech-scene-word" aria-hidden="true">S.</span>
+  <BrandSculpture className="premium-hero-sculpture"/>
   <div className="fintech-phone" dir={ar?'rtl':'ltr'}><div className="fintech-phone-status" aria-hidden="true"><span>9:41</span><span><Wifi size={12}/><i/></span></div>
    <div className="fintech-phone-brand"><span><ArrowLeftRight size={19}/>SiroCash<span>.</span></span><span className="fintech-phone-avatar">S</span></div>
    <div className="fintech-phone-greeting"><span>{t('A new perspective','تجربة مالية أوضح')}</span><strong>{t('Your personal space','أهلًا بمساحتك الجديدة')}<span>✦</span></strong></div>

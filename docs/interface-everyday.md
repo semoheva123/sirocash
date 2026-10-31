@@ -22,3 +22,11 @@ No backend permission, ledger, credential workflow, hosted database migration, c
 `npm test` now includes `test:modern` for bilingual landing structure, truthful artwork, inactive states, neutral account-state styling, asset deep links and theme contracts. Production build and API regression remain required. Browser review uses actual public routes and synthetic private component fixtures; it is not a real hosted sign-in, email delivery or device-verification test.
 
 Browser checks cover public/private AR/EN layouts at desktop/tablet/phone sizes, product-preview switches, search dialog keyboard behavior, balance privacy, settings anchors, valid asset selection from URLs, and login-mode selection. Generated review screenshots/bundles belong in ignored `.cache`, not source control.
+
+## Premium refinement (same modern/daylight direction)
+
+The follow-up request for more luxury keeps the selected light/modern layout rather than reverting to the rejected dark-and-gold concept. Midnight-blue gradient surfaces, opal/glass detailing, calmer typography and original ornamental ribbon artwork now connect the landing, illustrated app, dashboard balance, navigation, services and authentication. The decorative SVG has unique gradient IDs and is hidden from assistive technology; it is not a chart, card or financial proof.
+
+The static crypto drawing in the services bento is replaced by `AssetSpotlight`: working USDT/USDC controls, network compatibility from the existing asset allowlist, an asset-bound deposit exploration link and explicit preview/non-settlement wording. No prices, yields, network fees, holdings, activation promises or operating days are invented.
+
+Validation extends `test:modern` for the default selector state, compatibility metadata, truthful disclosures and SVG ID uniqueness. Browser review covers 64 public and 36 synthetic private page/locale/viewport cases, including both asset selections, matching destinations, app-preview screens, keyboard search, balance privacy, settings anchors and Sham Cash wording. This does not prove real hosted account, email, biometric or financial-provider operation.

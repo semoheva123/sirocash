@@ -5,6 +5,9 @@ import {readFile} from 'node:fs/promises';
 import {ModernLanding} from '../components/modern-landing';
 import {AccountEssentials,AccountAssetCards} from '../components/account-essentials';
 import {SignatureVisual} from '../components/signature-visual';
+import {AssetSpotlight} from '../components/asset-spotlight';
+import {BrandSculpture} from '../components/brand-sculpture';
+import {assetNetworks,networks} from '../lib/crypto-assets';
 async function main(){
  for(const ar of [true,false]){
   const landing=renderToStaticMarkup(<ModernLanding ar={ar}/>);
@@ -17,6 +20,13 @@ async function main(){
   assert.ok(art.includes('fintech-phone'));
   assert.equal((art.match(/aria-pressed="true"/g)||[]).length,1);
   assert.ok(!art.includes('signature-metal-card'));
+  const spotlight=renderToStaticMarkup(<AssetSpotlight ar={ar}/>);
+  assert.equal((spotlight.match(/aria-pressed="true"/g)||[]).length,1);
+  assert.equal((spotlight.match(/aria-pressed="false"/g)||[]).length,1);
+  for(const network of assetNetworks.USDT)assert.ok(spotlight.includes(networks[network].name));
+  assert.ok(spotlight.includes('/deposit?asset=USDT'));
+  assert.ok(spotlight.includes(ar?'خيارات تجريبية':'Preview only'));
+  assert.ok(!/APR|APY|0%|Visa|Mastercard/.test(spotlight));
   const assets=renderToStaticMarkup(<AccountAssetCards ar={ar}/>);
   assert.ok(assets.includes('/deposit?asset=USDC'));
   assert.ok(assets.includes('/deposit?asset=USDT'));
@@ -29,6 +39,10 @@ async function main(){
    assert.ok(html.includes(ar?'غير مفعّلة':'Not activated'));
   }
  }
+ const artwork=renderToStaticMarkup(<><BrandSculpture/><BrandSculpture/></>);
+ const ids=[...artwork.matchAll(/id="([^"]+)"/g)].map(m=>m[1]);
+ assert.equal(ids.length,6);assert.equal(new Set(ids).size,6);
+ assert.equal((artwork.match(/aria-hidden="true"/g)||[]).length,2);
  const layout=await readFile('app/layout.tsx','utf8');
  assert.ok(layout.indexOf('./fintech.css')>layout.indexOf('./atelier.css'));
  const css=await readFile('app/fintech.css','utf8');
