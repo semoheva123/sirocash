@@ -62,6 +62,7 @@ model User {
   depositAddresses DepositAddress[]
 }
 model LedgerAccount {
+  feeOperations WalletOperation[] @relation("WalletFeeAccount")
   id String @id @default(uuid()) @db.Uuid
   userId String? @db.Uuid
   user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
@@ -194,6 +195,9 @@ model SecurityNotification {
 }
 
 model WalletOperation {
+ feeAmount Decimal @default(0) @db.Decimal(20,6)
+ feeAccountId String? @db.Uuid
+ feeAccount LedgerAccount? @relation("WalletFeeAccount", fields: [feeAccountId], references: [id], onDelete: Restrict)
  id String @id @db.Uuid
  ownerId String @db.Uuid
  owner User @relation("WalletOwner", fields: [ownerId], references: [id], onDelete: Restrict)

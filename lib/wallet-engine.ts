@@ -10,7 +10,7 @@ function transact<T>(db:WalletDb,run:(tx:WalletTx)=>Promise<T>){return db.transa
  await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');return run(tx);
 })}
 type Command={ownerId:string;requestKey:string;amount:string};
-type Operation={id:string;state:string;transactionId:string|null;amount:string};
+type Operation={id:string;state:string;transactionId:string|null;amount:string;fee:string;totalDebit:string};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function id(value:string){if(!uuid.test(value))throw Error('INVALID_ACCOUNT');return value.toLowerCase()}
 export function moneyMicros(value:string){
@@ -19,12 +19,14 @@ export function moneyMicros(value:string){
 }
 export function moneyString(value:bigint){if(value<0n)throw Error('INVALID_BALANCE');return `${value/1000000n}.${String(value%1000000n).padStart(6,'0')}`}
 function amount(value:string){const micros=moneyMicros(value);if(micros<=0n||micros>100000n*1000000n)throw Error('INVALID_AMOUNT');return moneyString(micros)}
+export function internalTransferQuote(value:string){const principal=moneyMicros(amount(value)),fee=(principal+99n)/100n;return {amount:moneyString(principal),fee:moneyString(fee),totalDebit:moneyString(principal+fee),feeRateBps:100,feePolicy:'internal-sender-1pct-v1' as const}}
 function reference(value:string){if(typeof value!=='string'||value.length<8||value.length>200||/[\x00-\x1f]/.test(value))throw Error('INVALID_REFERENCE');return value}
-function operation(row:Record<string,unknown>):Operation{return {id:String(row.id),state:String(row.state),transactionId:row.transactionId?String(row.transactionId):null,amount:String(row.amount)}}
-async function begin(tx:WalletTx,c:Command,kind:string,other:string|null=null,destination:string|null=null,external:string|null=null){
+function operation(row:Record<string,unknown>):Operation{return {id:String(row.id),state:String(row.state),transactionId:row.transactionId?String(row.transactionId):null,amount:String(row.amount),fee:moneyString(moneyMicros(String(row.feeAmount??'0'))),totalDebit:moneyString(moneyMicros(String(row.amount))+moneyMicros(String(row.feeAmount??'0')))}}
+async function begin(tx:WalletTx,c:Command,kind:string,other:string|null=null,destination:string|null=null,external:string|null=null,pricing?:{fee:string;accountId:string}){
  const owner=id(c.ownerId),value=amount(c.amount);if(!/^[A-Za-z0-9:_-]{8,128}$/.test(c.requestKey))throw Error('INVALID_REQUEST_KEY');
- const fingerprint=createHash('sha256').update(JSON.stringify([kind,owner,value,other,destination,external])).digest('hex');
- await tx.query('INSERT INTO "WalletOperation" (id,"ownerId","requestKey",fingerprint,kind,amount,"counterpartyId",destination,"externalReference") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT ("ownerId","requestKey") DO NOTHING',[randomUUID(),owner,c.requestKey,fingerprint,kind,value,other,destination,external]);
+ const details:unknown[]=[kind,owner,value,other,destination,external];if(pricing)details.push([pricing.fee,pricing.accountId,'internal-sender-1pct-v1']);
+ const fingerprint=createHash('sha256').update(JSON.stringify(details)).digest('hex');
+ await tx.query('INSERT INTO "WalletOperation" (id,"ownerId","requestKey",fingerprint,kind,amount,"counterpartyId",destination,"externalReference","feeAmount","feeAccountId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT ("ownerId","requestKey") DO NOTHING',[randomUUID(),owner,c.requestKey,fingerprint,kind,value,other,destination,external,pricing?.fee||'0',pricing?.accountId||null]);
  const {rows:[row]}=await tx.query('SELECT * FROM "WalletOperation" WHERE "ownerId"=$1 AND "requestKey"=$2 FOR UPDATE',[owner,c.requestKey]);
  if(!row||row.fingerprint!==fingerprint)throw Error('IDEMPOTENCY_CONFLICT');return row;
 }
@@ -52,13 +54,19 @@ async function post(tx:WalletTx,row:Record<string,unknown>,type:string,sender:st
  await tx.query('UPDATE "Transaction" SET status=\'COMPLETED\' WHERE id=$1',[transactionId]);
  const {rows:[result]}=await tx.query('UPDATE "WalletOperation" SET state=\'COMPLETED\',"transactionId"=$2,"updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *',[row.id,transactionId]);return operation(result);
 }
-export function transferWallet(db:WalletDb,c:Command&{recipientId:string}){
- const recipient=id(c.recipientId),owner=id(c.ownerId);if(owner===recipient)throw Error('SELF_TRANSFER');
+export function transferWallet(db:WalletDb,c:Command&{recipientId:string;feeAccountId:string}){
+ const recipient=id(c.recipientId),owner=id(c.ownerId),treasury=id(c.feeAccountId),quote=internalTransferQuote(c.amount);if(owner===recipient)throw Error('SELF_TRANSFER');
  return transact(db,async tx=>{
-  const row=await begin(tx,c,'TRANSFER',recipient);if(row.state==='COMPLETED')return operation(row);
-  const a=await accounts(tx,[owner,recipient]),from=a.get(owner)!;
-  if(await available(tx,owner,String(from.balance))<moneyMicros(String(row.amount)))throw Error('INSUFFICIENT_AVAILABLE_BALANCE');
-  return post(tx,row,'P2P',owner,recipient,String(from.id),String(a.get(recipient)!.id));
+  const row=await begin(tx,c,'TRANSFER',recipient,null,null,{fee:quote.fee,accountId:treasury});if(row.state==='COMPLETED')return operation(row);
+  const a=await accounts(tx,[owner,recipient],treasury),from=a.get(owner)!;
+  if(await available(tx,owner,String(from.balance))<moneyMicros(quote.totalDebit))throw Error('INSUFFICIENT_AVAILABLE_BALANCE');
+  const transactionId=randomUUID();
+  // The declared journal amount equals TOTAL sender debit, matching positive postings.
+  // The operation amount remains the recipient principal, with an explicit separate fee.
+  await tx.query('INSERT INTO "Transaction" (id,"senderId","receiverId",amount,type,"idempotencyKey") VALUES ($1,$2,$3,$4,\'P2P\',$5)',[transactionId,owner,recipient,quote.totalDebit,'wallet:'+row.id]);
+  await tx.query('INSERT INTO "LedgerEntry" (id,"transactionId","accountId",amount) VALUES ($1,$2,$3,-$4::numeric),($5,$2,$6,$7::numeric),($8,$2,$9,$10::numeric)',[randomUUID(),transactionId,String(from.id),quote.totalDebit,randomUUID(),String(a.get(recipient)!.id),quote.amount,randomUUID(),treasury,quote.fee]);
+  await tx.query('UPDATE "Transaction" SET status=\'COMPLETED\' WHERE id=$1',[transactionId]);
+  const {rows:[result]}=await tx.query('UPDATE "WalletOperation" SET state=\'COMPLETED\',"transactionId"=$2,"updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *',[row.id,transactionId]);return operation(result);
  });
 }
 /** ONLY a trusted settlement adapter may call this, after finality, asset/network, beneficiary
