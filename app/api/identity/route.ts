@@ -19,8 +19,9 @@ export async function POST(request:Request){
   if(!user.emailVerifiedAt)return securityFailure('يجب التحقق من البريد الإلكتروني أولاً.',403);
   const config=identityConfig();if(!config)return securityFailure('استقبال وثائق الهوية غير مفعّل حالياً. لم تُحفظ أي وثيقة.',503);
   if(processing)return securityFailure('الفحص مشغول حالياً. يُرجى المحاولة لاحقاً.',429);
-  const quota=await identityGateway(user.id,'/quota',{method:'POST'});if(!quota.ok)return securityFailure('تعذّر استقبال طلب جديد حالياً.',quota.status===429?429:503);
+  // Claim synchronously before the first await: concurrent requests cannot both enter OCR.
   processing=true;locked=true;
+  const quota=await identityGateway(user.id,'/quota',{method:'POST'});if(!quota.ok)return securityFailure('تعذّر استقبال طلب جديد حالياً.',quota.status===429?429:503);
   let form:FormData;try{const bytes=await boundedIdentityBody(request);form=await new Response(new Uint8Array(bytes),{headers:{'Content-Type':request.headers.get('content-type')||''}}).formData()}catch{return securityFailure('حجم الملفات أو صيغة الطلب غير صالح. الحد الإجمالي 3 ميغابايت.',400)}
   if(Number(form.get('retentionDays'))!==config.days)return securityFailure('تغيّرت مدة الاحتفاظ. حدّث الصفحة وراجع الموافقة قبل الإرسال.',400);
   const kind=form.get('kind');if(!identityKinds.includes(kind as typeof identityKinds[number])||form.get('consent')!==IDENTITY_CONSENT)return securityFailure('يُرجى اختيار نوع الوثيقة والموافقة على سياسة معالجتها.',400);
