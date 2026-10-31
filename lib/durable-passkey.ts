@@ -13,6 +13,9 @@ function decode(row:Record<string,unknown>):WebAuthnCredential{
  return {id:String(row.id),publicKey:new Uint8Array(Buffer.from(String(row.publicKey),'base64')),counter,transports:row.transports as WebAuthnCredential['transports']};
 }
 export async function assertDurableSession(tx:WalletTx,c:Context){
+ const {rows:[role]}=await tx.query("SELECT current_user='sirocash_financial_worker' AS financial");
+ if(role?.financial===true){await tx.query('SELECT public.financial_assert_session($1::uuid,$2)',[c.userId,c.sessionHash]);return}
+
  const {rows:[session]}=await tx.query('SELECT "userId" FROM "AuthSession" WHERE "tokenHash"=$1 AND "userId"=$2 AND "expiresAt">statement_timestamp() FOR UPDATE',[c.sessionHash,c.userId]);
  if(!session)throw new Error('PASSKEY_SESSION_EXPIRED');
 }
@@ -66,6 +69,8 @@ export async function durablePasskeyAction(db:WalletDb,c:Context,input:Input,ver
 export async function consumeDurableApproval(tx:WalletTx,c:Context,token:string,digest:string){
  if(!/^[a-f0-9]{64}$/.test(token)||!/^[a-f0-9]{64}$/.test(digest))throw new Error('PAYMENT_APPROVAL_REQUIRED');
  await assertDurableSession(tx,c);
+ const {rows:[role]}=await tx.query("SELECT current_user='sirocash_financial_worker' AS financial");
+ if(role?.financial===true){await tx.query('SELECT public.financial_consume_approval($1::uuid,$2,$3,$4,$5)',[c.userId,c.sessionHash,c.rpID,hash(token),digest]);return}
  const {rows:[row]}=await tx.query(`UPDATE "DurablePaymentApproval" a SET "consumedAt"=statement_timestamp() FROM "DurablePasskeyCredential" k WHERE a."tokenHash"=$1 AND a."sessionHash"=$2 AND a.digest=$3 AND a."consumedAt" IS NULL AND a."expiresAt">statement_timestamp() AND k.id=a."credentialId" AND k."userId"=$4 AND k."rpId"=$5 RETURNING a."tokenHash"`,[hash(token),c.sessionHash,digest,c.userId,c.rpID]);
  if(!row)throw new Error('PAYMENT_APPROVAL_REQUIRED');
 }

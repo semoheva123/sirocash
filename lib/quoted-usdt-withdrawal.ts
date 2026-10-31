@@ -26,7 +26,7 @@ export async function createUsdtWithdrawalQuote(db:WalletDb,c:{ownerId:string;re
  const fingerprint=createHash('sha256').update(JSON.stringify([c.ownerId.toLowerCase(),c.requestKey,c.network,recipient,tariff.gross,tariff.fee,tariff.net,c.rateUsdMicrosPerToken.toString(),c.rateReference,new Date(c.expiresAt).toISOString(),c.settlementAccountId.toLowerCase(),c.feeAccountId.toLowerCase(),withdrawalFeePolicy])).digest('hex');
  return db.transaction(async tx=>{
   await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
-  await tx.query('SELECT id FROM "User" WHERE id=$1 FOR UPDATE',[c.ownerId]);
+  await tx.query('SELECT id FROM "User" WHERE id=$1 FOR NO KEY UPDATE',[c.ownerId]);
   const {rows:[prior]}=await tx.query('SELECT * FROM "UsdtWithdrawalQuote" WHERE "ownerId"=$1 AND "requestKey"=$2',[c.ownerId,c.requestKey]);
   if(prior){if(prior.fingerprint!==fingerprint)throw new Error('WITHDRAWAL_QUOTE_CONFLICT');return summary(prior)}
   const {rows:[row]}=await tx.query(`INSERT INTO "UsdtWithdrawalQuote" (id,"ownerId","requestKey",fingerprint,network,recipient,"grossTokens","feeTokens","netTokens","grossUsd","feeUsd","netUsd","rateUsdMicrosPerToken","rateReference","settlementAccountId","feeAccountId","expiresAt")

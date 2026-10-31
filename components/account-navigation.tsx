@@ -9,6 +9,7 @@ export function AccountNavigation({active,ar}:{active:string;ar:boolean}){
   {href:'/dashboard',icon:LayoutDashboard,en:'Overview',ar:'نظرة عامة'},
   {href:'/deposit',icon:ArrowDownLeft,en:'Deposit',ar:'الإيداع'},
   {href:'/withdraw',icon:ArrowUpRight,en:'Withdraw',ar:'السحب'},
+  {href:'/payments',icon:ArrowLeftRight,en:'Financial commands',ar:'الطلبات المالية'},
   {href:'/sham-cash',icon:ArrowLeftRight,en:'Sham Cash',ar:'شام كاش'},
   {href:'/mobile-topup',icon:Smartphone,en:'Mobile top-up',ar:'شحن الهاتف'},
   {href:'/settings',icon:Settings2,en:'Settings',ar:'الإعدادات'},

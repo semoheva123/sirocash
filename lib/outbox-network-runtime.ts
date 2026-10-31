@@ -1,4 +1,5 @@
 import 'server-only';
+import {createDepositValuationWorker} from './deposit-valuation-worker';
 import {createUnsentTronRenewal} from './unsent-tron-renewal';
 import {createFinancialPreflight} from './financial-preflight';
 import {createFinancialPreparation} from './financial-preparation';
@@ -39,6 +40,7 @@ export function productionOutboxNetworkWorkers(db:WalletDb){
   resources:createOutboxResourceObserver({bep20:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},tron,tronGenesisId:genesis}),
  }):undefined;
  const gas=createNativeGasWorker(db,{rpc:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},enabled:process.env.SIRO_NATIVE_GAS_ENABLED==='true'&&dispatchEnabled,minimumConfirmations:Number(minimum)});
+ const valueDeposit=createDepositValuationWorker(db,{enabled:process.env.SIRO_DEPOSIT_VALUATION_ENABLED==='true'&&process.env.SIRO_PRICING_PROVIDER==='coinbase-spot-v1',settlementAccountId:process.env.SIRO_SETTLEMENT_ACCOUNT_ID??''});
  const preparationEnabled=process.env.SIRO_AUTOMATIC_PREPARATION_ENABLED==='true';
  const preparation=preparationEnabled&&execution?createFinancialPreparation(db,{
   enabled:true,gas,energy:execution.energy,bandwidthPackage:client?.bandwidthPackage,
@@ -59,6 +61,7 @@ export function productionOutboxNetworkWorkers(db:WalletDb){
   sweep:(id:string)=>processSweepObservation(db,id,{...observations,dispatchEnabled,send}),
   batch:()=>runFinancialWorkerBatch(db,{enabled:true,process:async(job,signal)=>{
    if(signal.aborted)throw new Error('WORKER_ABORTED');
+   if(job.kind==='DEPOSIT_VALUE')return valueDeposit(job.id,signal);
    if(job.kind==='ENERGY')return execution?execution.energy(job.id,signal):{state:'HELD',reason:'ENERGY_WORKER_DISABLED'};
    if(job.kind==='GAS')return gas.process(job.id,signal);
    if(job.kind==='PREPARE_PAYOUT'||job.kind==='PREPARE_SWEEP'){

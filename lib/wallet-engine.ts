@@ -33,13 +33,15 @@ async function begin(tx:WalletTx,c:Command,kind:string,other:string|null=null,de
 }
 export async function accounts(tx:WalletTx,users:string[],poolId?:string,extraPoolIds:string[]=[]){
  const pools=[...new Set([...(poolId?[poolId]:[]),...extraPoolIds].map(id))];
- // Lock in deterministic UUID order. All balance-consuming operations use these same locks.
+ // Lock owners before account creation, in deterministic UUID order. ON CONFLICT inserts
+ // otherwise take FK/index locks before ordered account locks and can deadlock on real PostgreSQL.
+ // All balance-consuming operations use this same owner-then-account lock order.
  const owners=[...new Set(users.map(id))].sort();
  for(const owner of owners){
-  const {rows:[user]}=await tx.query('SELECT id FROM "User" WHERE id=$1 AND "emailVerifiedAt" IS NOT NULL',[owner]);if(!user)throw Error('ACCOUNT_UNAVAILABLE');
+  const {rows:[user]}=await tx.query('SELECT id FROM "User" WHERE id=$1 AND "emailVerifiedAt" IS NOT NULL FOR NO KEY UPDATE',[owner]);if(!user)throw Error('ACCOUNT_UNAVAILABLE');
   await tx.query('INSERT INTO "LedgerAccount" (id,"userId","accountType",currency) VALUES ($1,$2,\'USER\',\'USD\') ON CONFLICT ("userId","accountType",currency) DO NOTHING',[randomUUID(),owner]);
  }
- const {rows}=await tx.query('SELECT id,"userId",balance,"accountType",currency FROM "LedgerAccount" WHERE ("userId"=ANY($1::uuid[]) AND "accountType"=\'USER\' AND currency=\'USD\') OR id=ANY($2::uuid[]) ORDER BY id FOR UPDATE',[owners,pools]);
+ const {rows}=await tx.query('SELECT id,"userId",balance,"accountType",currency FROM "LedgerAccount" WHERE ("userId"=ANY($1::uuid[]) AND "accountType"=\'USER\' AND currency=\'USD\') OR id=ANY($2::uuid[]) ORDER BY id FOR NO KEY UPDATE',[owners,pools]);
  const owned=new Map(rows.filter(r=>r.userId).map(r=>[String(r.userId),r]));
  if(owned.size!==owners.length)throw Error('ACCOUNT_UNAVAILABLE');
  if(pools.some(pool=>!rows.some(r=>r.id===pool&&r.accountType==='MASTER_POOL'&&!r.userId&&r.currency==='USD')))throw Error('INVALID_SETTLEMENT_ACCOUNT');

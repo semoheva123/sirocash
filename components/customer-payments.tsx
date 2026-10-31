@@ -1,0 +1,42 @@
+'use client';
+import Link from 'next/link';
+import {useEffect,useState} from 'react';
+import {authorizePayment} from '@/lib/authorize-payment';
+type Prepared={kind:'TRANSFER'|'WITHDRAWAL';path:string;id?:string;payload:Record<string,string>;expiresAt?:string};
+type Status={enabled:boolean;userId:string;balance?:{posted:string;held:string};operations?:{id:string;kind:string;amount:string;feeAmount:string;state:string;createdAt:string}[]};
+async function call(path:string,body?:unknown,token?:string){const r=await fetch(path,{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json',...(token?{'x-siro-approval':token}:{})}:undefined,body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error??'تعذّر تأكيد نتيجة الطلب.');return data}
+export function CustomerPayments(){
+ const [ar,setAr]=useState(true),[status,setStatus]=useState<Status|null>(null),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[kind,setKind]=useState<'TRANSFER'|'WITHDRAWAL'>('TRANSFER'),[recipient,setRecipient]=useState(''),[amount,setAmount]=useState(''),[chain,setChain]=useState('TRC20'),[prepared,setPrepared]=useState<Prepared|null>(null),[submitted,setSubmitted]=useState<unknown>(null),[requestKey,setRequestKey]=useState('');
+ const t=(a:string,e:string)=>ar?a:e;
+ const refresh=async()=>setStatus(await call('/api/financial/status'));
+ useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());void refresh().catch(()=>setNotice('تعذّر تحميل الحالة المالية. لا يمكن تنفيذ طلب.'))},[]);
+ function edit(){setPrepared(null);setSubmitted(null);setRequestKey('customer:'+crypto.randomUUID())}
+ const input={kind,recipient,amount,requestKey,...(kind==='WITHDRAWAL'?{chain,asset:'USDT'}:{})};
+ async function prepare(e:React.FormEvent){e.preventDefault();setBusy(true);setNotice('');try{setPrepared(await call('/api/financial/prepare',input))}catch(e){setNotice(e instanceof Error?e.message:'تعذّر إنشاء العرض.')}finally{setBusy(false)}}
+ async function submit(){if(!prepared)return;setBusy(true);setNotice('');try{
+  const token=await authorizePayment(prepared.path,prepared.payload);
+  const result=await call(prepared.kind==='TRANSFER'?'/api/financial/transfer':'/api/financial/withdraw',prepared.kind==='TRANSFER'?input:{quoteId:prepared.id},token);
+  setSubmitted(result);setNotice(prepared.kind==='TRANSFER'?t('اكتمل التحويل الداخلي.','Internal transfer completed.'):t('حُجز مبلغ السحب. لا يعني ذلك تأكيد التحويل على الشبكة.','Withdrawal reserved; this is not an on-chain confirmation.'));await refresh();
+ }catch(e){setNotice(e instanceof Error?e.message:'تعذّر تأكيد النتيجة.');/* Preserve exact request/quote for retry. Never generate a second command after an unknown result. */}finally{setBusy(false)}}
+ return <main className="section-width app-main" dir={ar?'rtl':'ltr'} lang={ar?'ar':'en'}>
+  <Link href="/dashboard">{t('العودة إلى المحفظة','Back to wallet')}</Link><h1>{t('الطلبات المالية','Financial commands')}</h1>
+  <p>{t('كل طلب مرتبط بحسابك وتفويض جهازك. لا تُدخل مفاتيح محافظ أو عبارة استرداد.','Every command is bound to your account and device approval. Never enter wallet keys or recovery phrases.')}</p>
+  {notice&&<p role="status">{notice}</p>}
+  {!status?<p>{t('جارٍ التحقق من توفر الخدمة…','Checking availability…')}</p>:!status.enabled?<section className="card"><h2>{t('التنفيذ المالي غير مفعّل','Financial execution is disabled')}</h2><p>{t('هذه الواجهة جاهزة برمجيًا، لكنها لا تتجاوز إعدادات التشغيل أو حدود المصاريف. لم تُنفّذ أي عملية.','This interface does not bypass deployment gates or spending limits. No command has executed.')}</p></section>:<>
+   <section className="card"><h2>{t('بيانات الحساب','Account')}</h2><p>{t('معرّف الاستلام','Receiving ID')}: <code dir="ltr">{status.userId}</code></p><p>{t('الرصيد الدفتري / المحجوز بالدولار','Posted / held USD')}: <span dir="ltr">{status.balance?.posted} / {status.balance?.held}</span></p></section>
+   <form className="card" onSubmit={prepare}><h2>{t('إنشاء طلب','Prepare command')}</h2><fieldset disabled={busy||!!prepared}>
+    <label>{t('نوع الطلب','Command type')}<select value={kind} onChange={e=>setKind(e.target.value as typeof kind)}><option value="TRANSFER">{t('تحويل داخلي · عمولة 1% على المرسل','Internal transfer · 1% sender fee')}</option><option value="WITHDRAWAL">{t('سحب USDT','USDT withdrawal')}</option></select></label>
+    {kind==='WITHDRAWAL'&&<label>{t('الشبكة','Network')}<select value={chain} onChange={e=>setChain(e.target.value)}><option>TRC20</option><option>BEP20</option></select></label>}
+    <label>{kind==='TRANSFER'?t('معرّف حساب المستفيد','Recipient account ID'):t('عنوان المحفظة المستفيدة','Destination wallet address')}<input required dir="ltr" value={recipient} onChange={e=>setRecipient(e.target.value)} autoComplete="off"/></label>
+    <label>{kind==='TRANSFER'?t('المبلغ بالدولار، قبل العمولة','USD amount before fee'):t('مبلغ USDT الإجمالي، شاملاً رسم السحب','Gross USDT including withdrawal fee')}<input required dir="ltr" inputMode="decimal" pattern="[0-9]+([.][0-9]{1,6})?" value={amount} onChange={e=>setAmount(e.target.value)}/></label>
+   </fieldset><button className="button" disabled={busy||!!prepared} type="submit">{t('عرض التفاصيل قبل التفويض','Review before approval')}</button></form>
+   {prepared&&<section className="card"><h2>{t('راجع تفاصيل الطلب','Review command')}</h2><dl>{Object.entries(prepared.payload).filter(([key])=>['recipient','amount','fee','netAmount','totalDebit','grossUsd','feeUsd','netUsd','chain','asset'].includes(key)).map(([key,value])=><div key={key}><dt>{({recipient:t('المستفيد','Recipient'),amount:t('المبلغ','Amount'),fee:t('الرسم','Fee'),netAmount:t('صافي المستلم','Recipient net'),totalDebit:t('إجمالي الخصم','Total debit'),grossUsd:t('الخصم بالدولار','USD debit'),feeUsd:t('الرسم بالدولار','USD fee'),netUsd:t('الصافي بالدولار','USD net'),chain:t('الشبكة','Network'),asset:t('العملة','Asset')} as Record<string,string>)[key]}</dt><dd dir="ltr">{value}</dd></div>)}</dl>
+    {prepared.expiresAt&&<p>{t('انتهاء العرض','Quote expiry')}: <time>{new Date(prepared.expiresAt).toLocaleString(ar?'ar':'en')}</time></p>}
+    <p>{t('يُستخدم سعر صرف مرصود ومحفوظ، وليس افتراض تعادل USDT مع الدولار.','The stored observed exchange rate is used; USDT is not assumed equal to USD.')}</p>
+    <button className="button" disabled={busy||!!submitted} onClick={()=>void submit()}>{busy?t('جارٍ التحقق…','Verifying…'):t('تفويض الجهاز وتأكيد الطلب','Approve with device and confirm')}</button>
+    <button className="button secondary" disabled={busy} onClick={edit}>{submitted?t('طلب جديد','New command'):t('تعديل العرض','Edit quote')}</button>
+   </section>}
+   <section className="card"><h2>{t('آخر طلبات حسابك','Recent account commands')}</h2><ul>{status.operations?.map(o=><li key={o.id}><code>{o.id}</code> · {o.kind} · {o.amount} USD · {o.state}</li>)}</ul></section>
+  </>}
+ </main>;
+}

@@ -69,3 +69,40 @@ jobs:
               print('PASS: GitHub secret accepted by Vercel; unauthenticated request denied. GET only; no financial execution.')
           except Exception:
               sys.exit('Credential probe connection failed; no request headers or secret values printed.')
+  postgres-concurrency-and-restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '17']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: isolated-fixture-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Independent-session financial races and actual backup/restore
+        run: npm run test:postgres-financial
+        env:
+          SIRO_ALLOW_ISOLATED_POSTGRES_TESTS: 'true'
+          SIRO_TEST_POSTGRES_URL: postgresql://postgres:isolated-fixture-only@127.0.0.1:5432/postgres
+          SIRO_TEST_RESTORE_DRILL: 'true'
+          SIRO_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          SIRO_TEST_PG_DUMP: ./tests/bin/pg-dump-fixture.sh
+          SIRO_TEST_PG_RESTORE: ./tests/bin/pg-restore-fixture.sh
