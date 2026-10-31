@@ -203,6 +203,7 @@ model SecurityNotification {
 }
 
 model WalletOperation {
+ signedWithdrawal SignedWithdrawalOutbox?
  usdtWithdrawalQuote UsdtWithdrawalQuote?
  depositValuation ApprovedDepositValuation?
  energyRentalIntent EnergyRentalIntent?
@@ -371,6 +372,7 @@ model ApprovedDepositValuation {
 }
 
 model UsdtWithdrawalQuote {
+ signedWithdrawal SignedWithdrawalOutbox?
  id String @id @db.Uuid
  ownerId String @db.Uuid
  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
@@ -395,4 +397,27 @@ model UsdtWithdrawalQuote {
  operationId String? @unique @db.Uuid
  operation WalletOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
  @@unique([ownerId,requestKey])
+}
+
+model WithdrawalSigningGuard {
+ network String @id
+ payouts SignedWithdrawalOutbox[]
+}
+model SignedWithdrawalOutbox {
+ id String @id @db.Uuid
+ quoteId String @unique @db.Uuid
+ quote UsdtWithdrawalQuote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+ operationId String @unique @db.Uuid
+ operation WalletOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+ network String
+ guard WithdrawalSigningGuard @relation(fields: [network], references: [network])
+ sender String
+ recipient String
+ amountBaseUnits Decimal @db.Decimal(78,0)
+ fingerprint String
+ txId String @unique
+ signedPayload String
+ senderNonce BigInt?
+ state String @default("SIGNED")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
 }

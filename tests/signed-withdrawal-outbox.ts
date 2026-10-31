@@ -1,0 +1,91 @@
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {PGlite} from '@electric-sql/pglite';
+import {readFile,readdir} from 'node:fs/promises';
+import {Wallet,Transaction,Interface} from 'ethers';
+import {TronWeb,utils} from 'tronweb';
+import {prepareSignedWithdrawal} from '../lib/signed-withdrawal-outbox';
+import {createUsdtWithdrawalQuote,reserveQuotedUsdtWithdrawal,settleQuotedUsdtWithdrawal} from '../lib/quoted-usdt-withdrawal';
+import {creditConfirmedDeposit,walletBalances,type WalletDb} from '../lib/wallet-engine';
+const token=new Interface(['function transfer(address to,uint256 amount) returns (bool)']);
+async function main(){
+ const pg=new PGlite();try{
+  await pg.exec('CREATE ROLE anon;CREATE ROLE authenticated');
+  for(const dir of (await readdir('prisma/migrations')).sort())if(!dir.endsWith('.toml'))await pg.exec(await readFile(`prisma/migrations/${dir}/migration.sql`,'utf8'));
+  const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows as Record<string,unknown>[]})}))};
+  const owner='00000000-0000-0000-0000-000000000001',pool='00000000-0000-0000-0000-000000000002',fees='00000000-0000-0000-0000-000000000003';
+  await pg.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES ($1,\'outbox@example.test\',now())',[owner]);
+  await pg.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[pool,fees]);
+  await creditConfirmedDeposit(db,{ownerId:owner,requestKey:'fixture:fund:001',amount:'200',providerReference:'fixture:funding:event1',settlementAccountId:pool});
+  await pg.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt") VALUES (\'fixture-session\',$1,now()+interval \'1 day\')',[owner]);
+  await pg.query('INSERT INTO "DurablePasskeyCredential" (id,"userId","rpId","publicKey",counter) VALUES (\'fixture-key\',$1,\'wallet.example.test\',\'AQID\',0)',[owner]);
+  const context={userId:owner,sessionHash:'fixture-session',rpID:'wallet.example.test',origin:'https://wallet.example.test'};
+  const approvalToken='ab'.repeat(32),approvalHash=createHash('sha256').update(approvalToken).digest('hex');
+  // Public deterministic private-key fixtures only. NEVER FUND. Not platform operating keys.
+  const evmKey='01'.padStart(64,'0'),tronKey='02'.padStart(64,'0');
+  const evmSender=new Wallet('0x'+evmKey).address,tronSender=TronWeb.address.fromPrivateKey(tronKey) as string;
+  let loads=0;const loadKeys=(network:'TRC20'|'BEP20')=>{loads++;return {key:network==='BEP20'?evmKey:tronKey,policy:{expectedSender:network==='BEP20'?evmSender:tronSender,maxAmountBaseUnits:100n*10n**18n,maxNetworkFeeBaseUnits:10000000000000000n}}};
+  const options={loadKeys,now:1700000000000};
+  const makeQuote=async(network:'TRC20'|'BEP20',requestKey:string)=>{
+   const quote=await createUsdtWithdrawalQuote(db,{ownerId:owner,requestKey,network,recipient:network==='BEP20'?'0x0000000000000000000000000000000000000002':TronWeb.address.fromPrivateKey('03'.padStart(64,'0')) as string,grossTokens:'20',rateUsdMicrosPerToken:980000n,rateReference:'reviewed:fixture:rate001',expiresAt:new Date(Date.now()+90000).toISOString(),settlementAccountId:pool,feeAccountId:fees});
+   return quote;
+  };
+  const reserve=async(quote:Awaited<ReturnType<typeof makeQuote>>)=>{
+   await pg.query('INSERT INTO "DurablePaymentApproval" ("tokenHash","sessionHash","credentialId",digest,"expiresAt") VALUES ($1,\'fixture-session\',\'fixture-key\',$2,now()+interval \'1 minute\') ON CONFLICT ("tokenHash") DO UPDATE SET digest=EXCLUDED.digest,"consumedAt"=NULL',[approvalHash,quote.digest]);
+   return reserveQuotedUsdtWithdrawal(db,context,{quoteId:quote.id,approvalToken});
+  };
+  const bep=await makeQuote('BEP20','payout:test:bep01');
+  const command={quoteId:bep.id,network:'BEP20' as const,transaction:{nonce:7,gasLimit:100000n,gasPrice:1000000000n}};
+  await assert.rejects(()=>prepareSignedWithdrawal(db,command,options),/NOT_RESERVED/);assert.equal(loads,0);
+  const held=await reserve(bep);
+  await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,transaction:{...command.transaction,destination:evmSender}} as typeof command,options),/UNEXPECTED_PAYOUT_TRANSACTION_FIELD/);
+  await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,recipient:evmSender} as typeof command,options),/UNEXPECTED_PAYOUT_COMMAND_FIELD/);
+  await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,network:'TRC20'} as never,options),/TRANSACTION_FIELD/);
+  const disabled=process.env.SIRO_SIGNER_ENABLED;delete process.env.SIRO_SIGNER_ENABLED;
+  await assert.rejects(()=>prepareSignedWithdrawal(db,command),/LIVE_SIGNING_DISABLED/);
+  if(disabled!==undefined)process.env.SIRO_SIGNER_ENABLED=disabled;
+  await assert.rejects(()=>prepareSignedWithdrawal(db,command,{...options,loadKeys:n=>{const keys=loadKeys(n);return {...keys,policy:{...keys.policy,maxNetworkFeeBaseUnits:1n}}}}),/NETWORK_FEE_POLICY/);
+  await assert.rejects(()=>prepareSignedWithdrawal(db,command,{...options,loadKeys:n=>{const keys=loadKeys(n);return {...keys,policy:{...keys.policy,expectedSender:'0x0000000000000000000000000000000000000002'}}}}),/OWNERSHIP_MISMATCH/);
+  const broken:WalletDb={transaction:run=>db.transaction(tx=>run({query:async(sql,params)=>{if(sql.startsWith('UPDATE "WalletOperation"'))throw Error('injected after signing');return tx.query(sql,params)}}))};
+  await assert.rejects(()=>prepareSignedWithdrawal(broken,command,options),/injected after signing/);
+  assert.equal((await pg.query('SELECT * FROM "SignedWithdrawalOutbox"')).rows.length,0);
+  assert.equal((await pg.query<{state:string}>('SELECT state FROM "WalletOperation" WHERE id=$1',[held.operation.id])).rows[0].state,'RESERVED');
+  const signed=await prepareSignedWithdrawal(db,command,options),priorLoads=loads;
+  assert.equal(signed.state,'SIGNED');assert.deepEqual(await prepareSignedWithdrawal(db,command,options),signed);assert.equal(loads,priorLoads);
+  const {rows:[saved]}=await pg.query<{signedPayload:string;amountBaseUnits:string}>('SELECT "signedPayload","amountBaseUnits" FROM "SignedWithdrawalOutbox" WHERE id=$1',[signed.id]);
+  const parsed=Transaction.from(saved.signedPayload),decoded=token.decodeFunctionData('transfer',parsed.data);
+  assert.equal(parsed.hash,signed.txId);assert.equal(parsed.from,evmSender);assert.equal(parsed.chainId,56n);
+  assert.equal(decoded[0],bep.payload.recipient);assert.equal(decoded[1],18n*10n**18n);assert.equal(saved.amountBaseUnits,(18n*10n**18n).toString());
+  assert.ok(!JSON.stringify(signed).includes(saved.signedPayload));
+  await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,transaction:{...command.transaction,nonce:8}},options),/IDEMPOTENCY_CONFLICT/);assert.equal(loads,priorLoads);
+  await pg.query('UPDATE "SignedWithdrawalOutbox" SET state=\'BROADCAST_UNKNOWN\' WHERE id=$1',[signed.id]);
+  assert.equal((await prepareSignedWithdrawal(db,command,options)).state,'BROADCAST_UNKNOWN');assert.equal(loads,priorLoads);
+  await assert.rejects(()=>pg.query('UPDATE "SignedWithdrawalOutbox" SET "signedPayload"=\'poisoned\' WHERE id=$1',[signed.id]),/IMMUTABLE_SIGNED_WITHDRAWAL/);
+  await assert.rejects(()=>settleQuotedUsdtWithdrawal(db,bep.id,{outcome:'rejected',providerReference:'timeout:not-definitive'}),/SIGNED_PAYOUT_RECONCILIATION_REQUIRED/);
+  await assert.rejects(()=>settleQuotedUsdtWithdrawal(db,bep.id,{outcome:'confirmed',providerReference:'arbitrary:provider:flag'}),/SIGNED_PAYOUT_RECONCILIATION_REQUIRED/);
+  const second=await makeQuote('BEP20','payout:test:bep02');await reserve(second);
+  await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,nonce:8}},options),/NETWORK_RECONCILIATION_REQUIRED/);assert.equal(loads,priorLoads);
+  // Separate network can prepare independently; TRON uses six decimals, not eighteen.
+  const tron=await makeQuote('TRC20','payout:test:tron01');await reserve(tron);
+  const tronCommand={quoteId:tron.id,network:'TRC20' as const,transaction:{refBlockBytes:'1234',refBlockHash:'ab'.repeat(8),timestamp:options.now,expiration:options.now+60000,feeLimitSun:4000000}};
+  const tronSigned=await prepareSignedWithdrawal(db,tronCommand,options);
+  const {rows:[tronSaved]}=await pg.query<{signedPayload:string;amountBaseUnits:string}>('SELECT "signedPayload","amountBaseUnits" FROM "SignedWithdrawalOutbox" WHERE id=$1',[tronSigned.id]);
+  const tronTx=JSON.parse(tronSaved.signedPayload);
+  assert.equal(tronSaved.amountBaseUnits,'15000000');assert.ok(utils.transaction.txCheck(tronTx));
+  assert.equal(utils.crypto.ecRecover(tronSigned.txId,tronTx.signature[0]).toLowerCase(),TronWeb.address.toHex(tronSender).toLowerCase());
+  const data=tronTx.raw_data.contract[0].parameter.value.data;
+  assert.equal(data,'a9059cbb'+TronWeb.address.toHex(tron.payload.recipient).slice(2).toLowerCase().padStart(64,'0')+(15000000n).toString(16).padStart(64,'0'));
+  const tronLoads=loads;
+  assert.deepEqual(await prepareSignedWithdrawal(db,tronCommand,{...options,now:options.now+999999}),tronSigned);assert.equal(loads,tronLoads);
+  // An expired signature remains the SAME pending authorization, never a new transaction.
+  await assert.rejects(()=>prepareSignedWithdrawal(db,{...tronCommand,transaction:{...tronCommand.transaction,timestamp:options.now+999999,expiration:options.now+1059999}},options),/IDEMPOTENCY_CONFLICT/);
+  assert.equal((await walletBalances(db,owner)).held,'58.800000');
+  // Direct fixture final status only to exercise retained nonce uniqueness, NOT chain verification.
+  await pg.query('UPDATE "SignedWithdrawalOutbox" SET state=\'CONFIRMED\' WHERE id=$1',[signed.id]);
+  await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,gasPrice:1000000001n}},options),/payout_sender_nonce/);
+  assert.equal((await pg.query('SELECT * FROM "SignedWithdrawalOutbox"')).rows.length,2);
+  await pg.exec('SET ROLE sirocash_app');for(const table of ['WithdrawalSigningGuard','SignedWithdrawalOutbox'])await assert.rejects(()=>pg.exec(`SELECT * FROM "${table}"`),/permission denied/);
+  console.log('Signed payout outbox passed: real offline TRON/BSC signatures, exact DB quote net/recipient, durable bytes/hash plus SUBMITTED hold, rollback, no-key retries, extra-field/conflict rejection, unresolved network/nonce guards, immutable payload and unsafe settlement rejection. No broadcast; fixture final status is not verified chain evidence.');
+ }finally{await pg.close()}
+}
+main().catch(error=>{console.error(error);process.exitCode=1});
