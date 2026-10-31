@@ -20,6 +20,8 @@
 
 - Private fresh-resource-evidence gate and native payout expense reservation: disabled-by-default per-network policy, per-payout/UTC daily caps, unresolved prior-day carryover, atomic signature-bound dispatch approval, and conservative settled expense attribution. Observations simulated; no live observer or pre-purchase rental budget.
 
+- Unified pre-sign TRON rental intents for both customer deposit sweeps and operating payouts, DB-bound transfer identities and shared unresolved-sender exclusion. Planner handles both; no paid order/delegation or live sweep resource dispatch gate.
+
 ## NOT implemented/deployed as live services
 - Vercel signer production provisioning, recovery/backup, secure secret ingestion and runtime authorization; offline operating and fixed-destination HD sweep signing primitives exist. Vercel is not an isolated HSM.
 - Authenticated mainnet RPC watcher, inclusion verification, replay/checkpoints and reorg reconciliation.

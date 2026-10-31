@@ -233,8 +233,12 @@ model WalletOperation {
 // Private staging table; no runtime financial privileges or provider dispatch.
 model EnergyRentalIntent {
  id String @id @db.Uuid
- withdrawalId String @unique @db.Uuid
- withdrawal WalletOperation @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+ withdrawalId String? @unique @db.Uuid
+ withdrawal WalletOperation? @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+ sweepAddressId String? @db.Uuid
+ sweepAddress UserDepositAddress? @relation(fields: [sweepAddressId], references: [id], onDelete: Restrict)
+ recipientAddress String?
+ amountBaseUnits Decimal? @db.Decimal(78,0)
  senderAddress String
  requestKey String @unique
  fingerprint String
@@ -259,6 +263,7 @@ model DepositAddressVault {
  @@unique([id,network], map: "deposit_vault_network")
 }
 model UserDepositAddress {
+ energyIntents EnergyRentalIntent[]
  signedSweeps SignedSweepOutbox[]
  deposits ChainDepositInbox[]
  id String @id @db.Uuid
