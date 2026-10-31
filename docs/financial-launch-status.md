@@ -9,6 +9,7 @@
 - Successful live TronZap authentication/balance and energy-cost read probe (no purchase).
 - Synthetic TRON/BEP20 receipt validation and durable deduplicated inbox tied to assigned ownership; BEP20 finality/confirmation checks and network-bound replay protection.
 - Energy estimation/quote/preparation and treasury refill policy functions.
+- Private bounded read-only BSC HTTPS/JSON-RPC transport with request/body deadlines, streaming size cap, strict method/response validation and a disabled-by-default production gate. Integrated HTTP-adapter/observer fixtures pass; no live endpoint provisioned.
 
 ## NOT implemented/deployed as live services
 - Vercel signer production provisioning, recovery/backup, secure secret ingestion and runtime authorization; offline operating and fixed-destination HD sweep signing primitives exist. Vercel is not an isolated HSM.
@@ -18,7 +19,7 @@
 - Persisted withdrawal tariff and balanced net/revenue settlement.
 - Paid energy dispatch, enforced provider price cap and independent delivery reconciliation.
 - Sweep/payout/refill workers with atomic budgets, durable signed transaction identities and crash recovery.
-- Production BEP20 RPC transport, observer scheduling/checkpoints and replay/reorg handling. A private read-only injected-transport receipt observer exists and has mock tests, not a live provider test.
+- Production BEP20 endpoint/auth provisioning and provider testing, observer scheduling/checkpoints and replay/reorg handling. Bounded transport and receipt observer exist with mock integration tests, not a live provider test.
 
 ## Production gates
 No prepared migration may be assumed applied. Need narrow database privileges, real PostgreSQL independent-session tests, custody/provider credentials in a reviewed secret store, signer/address matching, complete funded failure drills, and explicit operator approval. Never request recovery phrases in chat or place them in the web app. Existing finance guards remain unchanged. A build or synthetic test success is not proof of safe financial activation.

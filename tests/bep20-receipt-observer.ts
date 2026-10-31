@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createBep20ReadRpc} from '../lib/bep20-rpc';
 import {observeBep20UsdtReceipt,type Bep20Rpc} from '../lib/bep20-receipt-observer';
 import {bep20UsdtContract} from '../lib/bep20-deposit-verification';
 const txId='0x'+'ab'.repeat(32),blockHash='0x'+'cd'.repeat(32),other='0x'+'ef'.repeat(32);
@@ -15,6 +16,16 @@ function transport(change:(method:string,params:unknown[],value:unknown,call:num
 const input={txId,logIndex:7,assignedAddress:'0x0000000000000000000000000000000000000002',maxAmountBaseUnits:100n*10n**18n,minimumConfirmations:15};
 async function main(){
  const observed=await observeBep20UsdtReceipt(transport(),input);assert.equal(observed.event.amountBaseUnits,(20n*10n**18n).toString());
+ // Exercise the real bounded HTTP/JSON-RPC adapter + observer together, without outbound access.
+ const methods:string[]=[];const underlying=transport();
+ const httpFetch=(async(_url,init)=>{
+  const body=JSON.parse(String(init!.body));methods.push(body.method);
+  return new Response(JSON.stringify({jsonrpc:'2.0',id:body.id,result:await underlying(body.method,body.params)}),{headers:{'content-type':'application/json'}});
+ }) as typeof fetch;
+ const integrated=await observeBep20UsdtReceipt(createBep20ReadRpc({endpoint:'https://rpc.example.invalid',fetch:httpFetch}),input);
+ assert.deepEqual(integrated,observed);
+ assert.deepEqual(methods,['eth_chainId','eth_getTransactionReceipt','eth_getBlockByNumber','eth_getBlockByNumber','eth_blockNumber','eth_getBlockByNumber']);
+
  for(const alter of [
   (m:string,p:unknown[],v:unknown)=>m==='eth_chainId'?'0x1':v,
   (m:string,p:unknown[],v:unknown)=>m==='eth_getTransactionReceipt'?null:v,
