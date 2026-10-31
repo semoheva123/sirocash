@@ -34,7 +34,14 @@ async function main(){
     if(analysis&&analysis.state!=='processing')break;
     await new Promise(resolve=>setTimeout(resolve,1000));
    }
-   if(analysis?.state!=='resubmit'||!analysis.reasons?.includes('document_type'))throw Error('synthetic image must not pass');
+   if(analysis?.state!=='resubmit'||!analysis.reasons?.includes('document_type')){
+    // Allowlisted diagnostics of this synthetic fixture only; never dump provider bodies,
+    // document contents, arbitrary reason strings or credentials, and never relax the gate.
+    const state=['processing','unavailable','inconclusive','preliminary_pass','resubmit'].includes(analysis?.state)?analysis.state:'missing-or-invalid';
+    const cause=analysis?.reasons?.includes('daily_limit')?'local-daily-limit':analysis?.reasons?.includes('service_unavailable')?'provider-unavailable':'unexpected-synthetic-result';
+    console.error('Identity synthetic AI preflight: '+state+' / '+cause);
+    throw Error('synthetic image must not pass');
+   }
    console.log('Identity deployment preflight: live Workers AI recognized the synthetic non-document; no identity approval issued.');
   }
   phase='owner-isolation';const isolated=await identityGateway(other,'/requests');requireStatus(isolated,200);if((await isolated.json()).request!==null)throw Error('isolation');
