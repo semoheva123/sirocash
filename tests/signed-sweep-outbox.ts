@@ -3,6 +3,7 @@ import {HDKey} from '@scure/bip32';
 import {PGlite} from '@electric-sql/pglite';
 import {readFile} from 'node:fs/promises';
 import {Transaction,Interface} from 'ethers';
+import {createFinancialExecution} from '../lib/financial-execution';
 import {authorizeSweepDispatch,dispatchSavedSweep} from '../lib/sweep-dispatch';
 import {processSweepObservation} from '../lib/sweep-network-observer';
 import {confirmBep20Sweep,confirmTronSweep} from '../lib/sweep-confirmation';
@@ -59,7 +60,10 @@ async function main(){
   await pg.exec(`INSERT INTO "PayoutExpenseReservation" VALUES('BEP20',200000000000000,'HELD',NULL)`);
   await assert.rejects(()=>authorizeSweepDispatch(db,signed.id,resource),/DAILY_EXPENSE/);
   await pg.exec('DELETE FROM "PayoutExpenseReservation"');
-  assert.equal((await authorizeSweepDispatch(db,signed.id,resource)).state,'RESERVED');
+  let observedResources=0;const execution=createFinancialExecution(db,{purchaseEnabled:false,resources:async()=>{observedResources++;return resource}});
+  const queued={kind:'SWEEP' as const,id:signed.id,createdAt:new Date().toISOString()};
+  assert.equal((await execution.authorize(queued,new AbortController().signal)).state,'RESERVED');
+  assert.equal((await execution.authorize(queued,new AbortController().signal)).state,'EXISTING');assert.equal(observedResources,1);
   assert.equal((await authorizeSweepDispatch(db,signed.id,resource)).state,'ALREADY_RESERVED');
   let sends=0;const send=async(input:{signedPayload:string})=>{
    sends++;assert.equal(input.signedPayload,saved.signedPayload);
@@ -112,7 +116,7 @@ async function main(){
   await assert.rejects(()=>confirmTron({...tronEvidence,block:{...tronEvidence.block,solidHeight:99}}),/NOT_CANONICAL_AND_FINAL/);
   await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,txId:'ef'.repeat(32)}}),/IDENTITY_MISMATCH/);
   await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,logs:[{...tronReceipt.logs[0],data:(21000000n).toString(16).padStart(64,'0')}]}}),/EXECUTION_MISMATCH/);
-  const tronResource={network:'TRC20' as const,txId:tronSigned.txId,sender:tronAddress,...evidenceNow(),tokenBalance:1000000000n,nativeBalance:5000000n,resourceCost:0n,accountActive:true,requiredEnergy:65000,availableEnergy:65000,requiredBandwidth:400,availableBandwidth:400};
+  const tronResource={network:'TRC20' as const,txId:tronSigned.txId,sender:tronAddress,...evidenceNow(),tokenBalance:1000000000n,nativeBalance:0n,resourceCost:0n,accountActive:true,requiredEnergy:65000,availableEnergy:65000,requiredBandwidth:400,availableBandwidth:400};
   await assert.rejects(()=>authorizeSweepDispatch(db,tronSigned.id,{...tronResource,availableEnergy:1}),/UNDELIVERED/);
   assert.equal((await authorizeSweepDispatch(db,tronSigned.id,tronResource)).state,'RESERVED');
   assert.equal((await dispatchSavedSweep(db,tronSigned.id,{enabled:true,send:async input=>({txId:input.txId})})).state,'ACKNOWLEDGED');

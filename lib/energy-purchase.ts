@@ -43,7 +43,7 @@ export async function purchaseIntentEnergy(db:WalletDb,intentId:string,quote:Quo
   const {rows:[fresh]}=await tx.query('SELECT to_timestamp($1 / 1000.0)>clock_timestamp() AND to_timestamp($1 / 1000.0)<=clock_timestamp()+interval \'60 seconds\' AS ok',[quote.expiresAt]);
   if(fresh?.ok!==true)throw new Error('ENERGY_QUOTE_STALE');
   if(quote.costSun>BigInt(String(intent.maxRentalSun))||quote.costSun>BigInt(String(policy.perOrderSun)))throw new Error('ENERGY_ORDER_BUDGET_EXCEEDED');
-  const {rows:[held]}=await tx.query('SELECT COALESCE(sum("costSun"),0)::text AS total FROM "EnergyPurchaseAttempt"');
+  const {rows:[held]}=await tx.query('SELECT COALESCE(sum(GREATEST("costSun",COALESCE("actualCostSun",0))),0)::text AS total FROM "EnergyPurchaseAttempt"');
   if(BigInt(String(held.total))+quote.costSun>BigInt(String(policy.totalHeldSun)))throw new Error('ENERGY_TOTAL_BUDGET_EXCEEDED');
   const claimId=randomUUID();
   await tx.query('INSERT INTO "EnergyPurchaseAttempt" ("intentId","claimId","intentFingerprint","senderAddress","energyAmount","costSun","quoteExpiresAt") VALUES ($1,$2,$3,$4,$5,$6,to_timestamp($7 / 1000.0))',[intentId,claimId,intent.fingerprint,intent.senderAddress,intent.energyAmount,quote.costSun.toString(),quote.expiresAt]);

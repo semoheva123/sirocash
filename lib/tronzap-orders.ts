@@ -32,15 +32,23 @@ export function tronZapOrderClient(options:{credentials:{token:string;secret:str
   const actualCostSun=sun(r.amount);
   return {orderId:r.id,status:r.status,actualCostSun,priceExceeded:actualCostSun>o.maxCostSun,delegationTxId:r.hash||undefined};
  }
+ async function quote(o:TronZapOrder){
+  validate(o);const expiresAt=Date.now()+25000;
+  try{
+   const q=z.object({address:z.string(),type:z.literal('energy'),amount:z.number().int(),duration:z.literal(1),price:decimal,activation_fee:decimal,total:decimal}).parse(await call('/v1/calculate',{address:o.sender,amount:o.energyAmount,duration:1},o.signal));
+   if(q.address!==o.sender||q.amount!==o.energyAmount||sun(q.price)+sun(q.activation_fee)!==sun(q.total)||sun(q.total)<=0n||sun(q.total)>o.maxCostSun||Date.now()>=expiresAt)throw new Error();
+   return {costSun:sun(q.total),activateAddress:sun(q.activation_fee)>0n,expiresAt};
+  }catch{throw new Error('PROVIDER_QUOTE_UNVERIFIED')}
+ }
  return {
+  quote,
   async send(o:TronZapOrder){
    if(options.purchaseEnabled!==true||options.acceptVariableProviderPrice!==true)throw new Error('PROVIDER_PURCHASE_NOT_AUTHORIZED');
    validate(o);
    try{
     // Reprice BEFORE the only paid request. This is not an atomic price lock.
-    const quote=z.object({address:z.string(),type:z.literal('energy'),amount:z.number().int(),duration:z.literal(1),price:decimal,activation_fee:decimal,total:decimal}).parse(await call('/v1/calculate',{address:o.sender,amount:o.energyAmount,duration:1},o.signal));
-    if(quote.address!==o.sender||quote.amount!==o.energyAmount||sun(quote.price)+sun(quote.activation_fee)!==sun(quote.total)||sun(quote.total)>o.maxCostSun)throw new Error();
-    const r=receipt(await call('/v1/transaction/new',{service:'energy',params:{address:o.sender,amounts:{energy:o.energyAmount},duration:1},external_id:o.requestKey},o.signal),o);
+    const q=await quote(o);
+    const r=receipt(await call('/v1/transaction/new',{service:'energy',params:{address:o.sender,amounts:{energy:o.energyAmount},duration:1,...(q.activateAddress?{activate_address:true}:{})},external_id:o.requestKey},o.signal),o);
     if(r.priceExceeded)throw new Error();
     return {orderId:r.orderId}; // ACK only. Never signals delivery or settlement.
    }catch{throw new Error('PROVIDER_ORDER_UNCERTAIN')}

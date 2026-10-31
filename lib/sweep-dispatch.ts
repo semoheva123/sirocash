@@ -51,7 +51,7 @@ export async function authorizeSweepDispatch(db:WalletDb,id:string,e:SweepResour
   const {rows:[fresh]}=await tx.query(`SELECT $1::timestamptz<=clock_timestamp() AND $1::timestamptz>=clock_timestamp()-interval '30 seconds' AND $2::timestamptz>clock_timestamp() AND $2::timestamptz<=$1::timestamptz+interval '30 seconds' AS ok`,[e.observedAt,e.expiresAt]);
   if(fresh?.ok!==true)throw new Error('SWEEP_RESOURCE_STALE');
   const {amount,fee}=validate(sweep,String(source.address));
-  if(e.tokenBalance<amount||e.nativeBalance<fee)throw new Error('SWEEP_BALANCE_INSUFFICIENT');
+  if(e.tokenBalance<amount||(e.network==='BEP20'&&e.nativeBalance<fee))throw new Error('SWEEP_BALANCE_INSUFFICIENT');
   if(e.network==='BEP20'){
    const signed=Transaction.from(String(sweep.signedPayload));
    if(e.resourceCost!==0n||e.pendingNonce!==signed.nonce||typeof e.estimatedGas!=='bigint'||e.estimatedGas<21000n||e.estimatedGas>signed.gasLimit)throw new Error('SWEEP_NONCE_OR_GAS');

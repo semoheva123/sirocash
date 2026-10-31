@@ -50,7 +50,8 @@ export function createOutboxResourceObserver(options:{bep20:ChainHttpOptions;tro
    const available=(limit:unknown,used:unknown)=>Math.max(0,integer(limit??0)-integer(used??0));
    const bandwidth=available(r.NetLimit,r.NetUsed)+available(r.freeNetLimit,r.freeNetUsed);
    if(!Number.isSafeInteger(bandwidth))throw new Error();
-   return {network:'TRC20',txId:input.txId,sender:TronWeb.address.fromHex(v.owner_address),observedAt,expiresAt,tokenBalance:BigInt('0x'+balance.constant_result[0]),nativeBalance:BigInt(integer(account.balance??0)),resourceCost:input.resourceCost,accountActive:true,requiredEnergy:integer(estimate.energy_required),availableEnergy:available(r.EnergyLimit,r.EnergyUsed),requiredBandwidth:Buffer.byteLength(input.signedPayload,'utf8')+256,availableBandwidth:bandwidth};
+   const pb=utils.transaction.txJsonToPb(t);pb.addSignature(Buffer.from(t.signature[0],'hex'));
+   return {network:'TRC20',txId:input.txId,sender:TronWeb.address.fromHex(v.owner_address),observedAt,expiresAt,tokenBalance:BigInt('0x'+balance.constant_result[0]),nativeBalance:BigInt(integer(account.balance??0)),resourceCost:input.resourceCost,accountActive:true,requiredEnergy:integer(estimate.energy_required),availableEnergy:available(r.EnergyLimit,r.EnergyUsed),requiredBandwidth:pb.serializeBinary().length+64,availableBandwidth:bandwidth};
   }catch{throw new Error('OUTBOX_RESOURCES_UNVERIFIED')}
  };
 }

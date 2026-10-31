@@ -11,7 +11,7 @@ async function main(){
   assert.equal(headers.get('Authorization'),'Bearer '+credentials.token);assert.equal(headers.get('X-Signature'),createHash('sha256').update(body+credentials.secret).digest('hex'));
   if(fail)return new Response(JSON.stringify({code:20}),{headers:{'content-type':'application/json'}});
   const result=path.endsWith('calculate')?{address:order.sender,type:'energy',amount:65000,duration:1,price:overPrice?'5':'2.45',activation_fee:'1.4',total:overPrice?'6.4':'3.85'}:{id:'provider-fixture',external_id:wrongBinding?'wrong':order.requestKey,service:'energy',params:{address:order.sender,duration:1,amounts:{energy:65000}},status:'success',amount:overPrice?'5':'3.85',hash:'ab'.repeat(32)};
-  if(path.endsWith('/new'))assert.deepEqual(p,{service:'energy',params:{address:order.sender,amounts:{energy:65000},duration:1},external_id:order.requestKey});
+  if(path.endsWith('/new'))assert.deepEqual(p,{service:'energy',params:{address:order.sender,amounts:{energy:65000},duration:1,activate_address:true},external_id:order.requestKey});
   if(path.endsWith('/check'))assert.deepEqual(p,{external_id:order.requestKey});
   return new Response(JSON.stringify({code:0,result}),{headers:{'content-type':'application/json'}});
  }) as typeof fetch;

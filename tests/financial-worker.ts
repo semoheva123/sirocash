@@ -25,6 +25,8 @@ async function main(){const pg=new PGlite();try{
  assert.equal((await runFinancialWorkerBatch(db,{enabled:true,limit:1,process})).processed,1);
  await pg.exec('UPDATE "FinancialWorkerLease" SET "cursorTime"=NULL,"cursorId"=NULL,"cursorKind"=NULL');
  const timeout=await runFinancialWorkerBatch(db,{enabled:true,limit:1,jobTimeoutMs:100,process:async(_job,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true}))});assert.equal(timeout.held,1);
+ await pg.exec(`ALTER TABLE "EnergyRentalIntent" RENAME TO "FixtureEnergyIntents"; CREATE TABLE "EnergyRentalIntent"(id UUID,state TEXT,"createdAt" TIMESTAMP(3)); INSERT INTO "EnergyRentalIntent" VALUES('00000000-0000-0000-0000-000000000003','UNCERTAIN','2027-01-01')`);
+ const kinds:string[]=[];await runFinancialWorkerBatch(db,{enabled:true,process:async job=>{kinds.push(job.kind);return {state:'HELD'}}});assert.ok(kinds.includes('ENERGY'));
  // Lease theft/expiry fences cursor writes and cleanup must not release another worker's lease.
  await assert.rejects(()=>runFinancialWorkerBatch(db,{enabled:true,limit:1,process:async()=>{await pg.exec(`UPDATE "FinancialWorkerLease" SET "claimId"='00000000-0000-0000-0000-000000000098'`)}}),/LEASE_LOST/);
  assert.ok((await pg.query<{claimId:string}>('SELECT "claimId" FROM "FinancialWorkerLease"')).rows[0].claimId.endsWith('98'));

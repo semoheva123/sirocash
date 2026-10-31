@@ -26,7 +26,7 @@ export async function authorizePayoutDispatch(db:WalletDb,payoutId:string,e:Evid
   const {rows:[fresh]}=await tx.query(`SELECT $1::timestamptz<=clock_timestamp() AND $1::timestamptz>=clock_timestamp()-INTERVAL '30 seconds' AND $2::timestamptz>clock_timestamp() AND $2::timestamptz<=$1::timestamptz+INTERVAL '30 seconds' AS valid`,[e.observedAt,e.expiresAt]);
   if(fresh?.valid!==true)throw new Error('PAYOUT_RESOURCE_EVIDENCE_STALE');
   const maxFee=validateSavedPayout(payout,quote);
-  if(e.tokenBalanceBaseUnits<BigInt(String(payout.amountBaseUnits))||e.nativeBalanceBaseUnits<maxFee)throw new Error('PAYOUT_CHAIN_BALANCE_INSUFFICIENT');
+  if(e.tokenBalanceBaseUnits<BigInt(String(payout.amountBaseUnits))||(e.network==='BEP20'&&e.nativeBalanceBaseUnits<maxFee))throw new Error('PAYOUT_CHAIN_BALANCE_INSUFFICIENT');
   if(e.network==='BEP20'){
    const signed=Transaction.from(String(payout.signedPayload));
    if(!Number.isSafeInteger(e.pendingNonce)||e.pendingNonce!==signed.nonce||typeof e.estimatedGas!=='bigint'||e.estimatedGas<21000n||e.estimatedGas>signed.gasLimit||e.resourceCostBaseUnits!==0n)throw new Error('PAYOUT_GAS_OR_NONCE_UNAVAILABLE');
