@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "npm run db:verify && next build --webpack",
+    "build": "npm run db:verify && npm run identity:deployment-check && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",
@@ -30,7 +30,8 @@
     "test:reconciliation": "tsx tests/reconciliation.ts",
     "test:atelier": "tsx tests/atelier-design.tsx",
     "test:modern": "tsx tests/modern-fintech.tsx",
-    "test:identity": "node tests/identity-gateway-readiness.mjs && tsx tests/identity.tsx"
+    "test:identity": "node tests/identity-gateway-readiness.mjs && tsx tests/identity.tsx",
+    "identity:deployment-check": "node --conditions=react-server --import tsx scripts/check-identity-deployment.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
@@ -48,6 +49,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "resend": "^6.35.0",
+    "server-only": "0.0.1",
     "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0",
     "zod": "^4.6.7"
