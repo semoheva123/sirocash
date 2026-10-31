@@ -56,7 +56,8 @@
     "test:payout-outbox": "node --conditions=react-server --import tsx tests/signed-withdrawal-outbox.ts",
     "test:security-boundaries": "node --conditions=react-server --import tsx tests/security-boundaries.ts",
     "custody:check": "node --conditions=react-server --import tsx scripts/check-custody.ts",
-    "test:http-hardening": "tsx tests/http-hardening.ts"
+    "test:http-hardening": "tsx tests/http-hardening.ts",
+    "custody:check:bep20": "node --conditions=react-server --import tsx scripts/check-bep20-custody.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

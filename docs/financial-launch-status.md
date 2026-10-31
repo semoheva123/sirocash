@@ -36,12 +36,16 @@
 No prepared migration may be assumed applied. Need narrow database privileges, real PostgreSQL independent-session tests, custody/provider credentials in a reviewed secret store, signer/address matching, complete funded failure drills, and explicit operator approval. Never request recovery phrases in chat or place them in the web app. Existing finance guards remain unchanged. A build or synthetic test success is not proof of safe financial activation.
 
 ## Confirmed decisions and remaining operator gates
-Both TRC20 and BEP20; fixed public operating/reserve addresses; Vercel-only signing accepted with hot-custody risk. Owner funds operating liquidity and the energy-provider account manually; no reserve auto-refill. Withdrawal limits are 100/1000 USD by identity, 10,000 USD platform/day. The agreed $3 TRON cycle expense is an estimate, not a proven/enforced cap or customer fee.
+Both TRC20 and BEP20; fixed public operating addresses; the entire former reserve wallet is now the deposit wallet on both networks, and the new reserve is unconfigured/excluded; Vercel-only signing accepted with hot-custody risk. Owner funds operating liquidity and the energy-provider account manually; no reserve auto-refill. Withdrawal limits are 100/1000 USD by identity, 10,000 USD platform/day. The agreed $3 TRON cycle expense is an estimate, not a proven/enforced cap or customer fee.
 
-Still needed before live activation: independent production deposit wallets, verified backup/recovery and secure secret provisioning (never through chat), approved enforceable provider-spend policy, trusted mainnet RPC access, full failure drills and explicit approval of a limited funded test. Public addresses and matched test derivation alone cannot authorize production custody.
+Still needed before live activation: verified production deposit account bindings (owner chose one deposit seed with separate TRON/BSC hardened accounts), verified backup/recovery and secure secret provisioning (never through chat), approved enforceable provider-spend policy, trusted mainnet RPC access, full failure drills and explicit approval of a limited funded test. Public addresses and matched test derivation alone cannot authorize production custody.
 
 ## Security review follow-up — 2026-10-31
 Patched Axios dependency resolution with zero known audit findings at review, strict production origin and sanitized HTTP errors, conservative browser/API headers, removed the reassigned TRON reserve mapping, and added fixture-tested private no-signature custody preflight plus offline CI. See `security-remediation.md`. These are local tested safeguards, not proof of production key binding or a live financial launch approval. Signing remains disabled; no remote migrations/deployment or paid requests were made.
 
 ## Deep review follow-up — 2026-10-31
 Prepared migration 20261031180000 requires matching final evidence before terminal payout confirmation/settlement and blocks unsupported signed-payout rejection. Dispatch rechecks approval expiry after durable claim; resource/approval SQL freshness uses the current clock and TRON account activation is strictly boolean. Regression tests exercise genuine synthetic final confirmation instead of directly marking a payout confirmed. Full local tests/build/audit pass. See `deep-security-review.md`; no new production check/deployment/migration occurred.
+
+
+## Verified production check — 2026-10-31
+See `launch-verification.md`: production remains ed96a6ff, signer flag false, migration history stops at 20261030100000, and six core financial tables are confirmed absent by read-only catalog queries. Financial launch is NO-GO. BEP20 private deposit-key preflight is now fixture-tested but actual production binding remains untested.

@@ -6,6 +6,7 @@ for(const role of ['operating','reserve'] as const){
  if(role==='operating')assert.ok(validTronAddress(treasuryAddresses.TRC20[role]));
  else assert.equal(treasuryAddresses.TRC20[role],null);
  const address=treasuryAddresses.BEP20[role];
+ if(address===null){assert.equal(role,'reserve');continue}
  assert.match(address,/^0x[a-fA-F0-9]{40}$/);
  // EIP-55 is evaluated locally; never silently repair a supplied address.
  const lower=address.slice(2).toLowerCase();
@@ -16,8 +17,7 @@ for(const role of ['operating','reserve'] as const){
 assert.equal(treasuryDestination('TRC20','operating'),'TFMUACLuYyFcw9YzrAgESnQ9a6pvEiY1bL');
 assert.equal(treasuryAddresses.BEP20.chainId,56);
 for(const network of ['TRC20','BEP20'] as const){
- if(network==='BEP20')assert.notEqual(treasuryDestination(network,'operating'),treasuryDestination(network,'reserve'));
- else assert.throws(()=>treasuryDestination(network,'reserve'),/NOT_CONFIGURED/);
+ assert.throws(()=>treasuryDestination(network,'reserve'),/NOT_CONFIGURED/);
  assert.ok(Object.isFrozen(treasuryAddresses[network]));
 }
 assert.ok(Object.isFrozen(treasuryAddresses));

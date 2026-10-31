@@ -1,9 +1,10 @@
+import {deriveBep20DepositAddress} from '../lib/evm-deposit-addresses';
 import assert from 'node:assert/strict';
 import {HDKey} from '@scure/bip32';
 import {TronWeb} from 'tronweb';
 import {emailAuthError,requestCode} from '../lib/email-auth';
 import {apiError,sameOrigin,PublicApiError} from '../lib/api';
-import {runCustodyPreflight,verifyTronCustodyKeys} from '../lib/custody-preflight';
+import {runCustodyPreflight,verifyTronCustodyKeys,verifyBep20DepositKeys,runBep20DepositPreflight} from '../lib/custody-preflight';
 import {deriveTronDepositAddress} from '../lib/tron-addresses';
 async function main(){
  const secret='do-not-disclose-this-database-password';
@@ -34,6 +35,17 @@ async function main(){
    assert.equal(writes.some(sql=>sql.startsWith('DELETE FROM "EmailChallenge"')),!existing);
   }
  }finally{for(const [key,value] of Object.entries(configBefore)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+ const evm=HDKey.fromMasterSeed(new Uint8Array(32).fill(82)).derive("m/44'/60'/0'");
+ try{
+  const input={accountXprv:evm.privateExtendedKey,accountXpub:evm.publicExtendedKey,expectedFirstAddress:deriveBep20DepositAddress(evm.publicExtendedKey,0).address};
+  const result=verifyBep20DepositKeys(input);assert.equal(result.signingEnabled,false);assert.equal(result.chainId,56);
+  for(const value of [input.accountXprv,input.accountXpub])assert.ok(!JSON.stringify(result).includes(value));
+  for(const change of [{accountXpub:'invalid'},{accountXprv:evm.publicExtendedKey},{expectedFirstAddress:'0x'+'0'.repeat(40)}])assert.throws(()=>verifyBep20DepositKeys({...input,...change}),/CUSTODY_KEY_BINDING_CHECK_FAILED/);
+  assert.deepEqual(runBep20DepositPreflight({}),{status:'SKIPPED'});
+  assert.throws(()=>runBep20DepositPreflight({SIRO_BEP20_CUSTODY_PREFLIGHT:'true',VERCEL_ENV:'preview',SIRO_SIGNER_ENABLED:'false'}),/REQUIRES_DISABLED_PRODUCTION_SIGNER/);
+  assert.throws(()=>runBep20DepositPreflight({SIRO_BEP20_CUSTODY_PREFLIGHT:'true',VERCEL_ENV:'production',SIRO_SIGNER_ENABLED:'true'}),/REQUIRES_DISABLED_PRODUCTION_SIGNER/);
+  assert.throws(()=>runBep20DepositPreflight({SIRO_BEP20_CUSTODY_PREFLIGHT:'true',VERCEL_ENV:'production',SIRO_SIGNER_ENABLED:'false'}),/CONFIGURATION_MISSING/);
+ }finally{evm.wipePrivateData()}
  const account=HDKey.fromMasterSeed(new Uint8Array(32).fill(81)).derive("m/44'/195'/0'");
  const key='01'.padStart(64,'0');
  try{

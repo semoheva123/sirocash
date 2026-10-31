@@ -13,7 +13,8 @@ export const treasuryAddresses = Object.freeze({
   network: 'BNB_SMART_CHAIN_MAINNET',
   chainId: 56,
   operating: '0x31d88dEc98de331caEA32028ae9b6995B82e8Bdb',
-  reserve: '0x6CD3350E7E635079038b6348781934e4040aC99b',
+  // Entire former reserve wallet was reassigned to deposits on both networks.
+  reserve: null,
  }),
 });
 export function treasuryDestination(network: 'TRC20' | 'BEP20', role: 'operating' | 'reserve'): string {
