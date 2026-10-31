@@ -84,7 +84,8 @@ Production database migrations 33–36 were applied in order on 2026-10-31, with
 Prisma checksums recorded atomically with each migration. Catalog verification found all 26
 protected tables with RLS, nine enabled checked triggers and five valid unique safety indexes.
 The last migration is `20261031240000_autonomous_financial_execution`. Financial execution
-remains disabled and the production application has not been redeployed.
+remains disabled. The implementation was deployed successfully to production on 2026-10-31
+(commit `915947d`, deployment `dpl_6L61yUtJ6sj9PzhaEkZxHkv77uvx`, READY/PROMOTED).
 
 In addition to existing private configuration, reviewed activation needs:
 - `SIRO_AUTOMATIC_PREPARATION_ENABLED=true`;
@@ -105,3 +106,22 @@ Other platform launch requirements (authoritative customer command/valuation int
 real-device ceremonies, restore/concurrency drills and explicitly bounded funded acceptance)
 remain independent of closing these three execution-code gaps. This document does not claim
 those were all completed or that the site is ready to move customer funds.
+
+## Activation preparation follow-up
+
+`npm run financial:readiness -- --strict` checks configuration syntax/presence without I/O,
+key loading or returning values. Build output includes the non-strict diagnostic; missing
+activation prerequisites do not prevent deploying the disabled website. Configuration readiness
+is not authorization, chain/credential validation or live financial acceptance.
+
+Full test suite and build passed after adding the diagnostic. Deployment metadata confirms
+no financial database URL, worker scheduler secret, operator RPC endpoints, genesis pin or
+per-network preparation limits were supplied to the implementation deployment. Existing
+custody/provider secret names are present; they were not decrypted or changed.
+
+GitHub Actions secrets access returned HTTP 403 (Resource not accessible by integration).
+The GitHub connection needs permission attention/reconnection before scheduler secret
+provisioning can be completed. Do not substitute the identity CRON_SECRET, application DB
+credential, an administrative login or a chat-visible password. Worker login provisioning,
+shared scheduler credential, operator-reviewed monetary limits, RPC approval, policy activation
+and bounded paid acceptance remain open; this preparation does not claim full activation.
