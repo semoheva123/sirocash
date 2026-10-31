@@ -1,3 +1,4 @@
+import {verifyFinancialSchema} from '../lib/financial-schema';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {readFile,readdir} from 'node:fs/promises';
@@ -12,6 +13,19 @@ async function main(){
    assert.equal(row.rls,true,name);assert.equal(row.anon,false,name);assert.equal(row.authenticated,false,name);
    assert.equal(row.runtime,name.startsWith('Durable'),name);
   }
+  await db.exec('BEGIN; SET LOCAL ROLE sirocash_app;');
+  const verified=await verifyFinancialSchema(async(sql,params)=>({rows:(await db.query(sql,params)).rows as Record<string,unknown>[]}));
+  assert.equal(verified.status,'VERIFIED');assert.equal(verified.runtimeFinancialAccess,false);
+  await db.exec('ROLLBACK;');
+  await db.exec('BEGIN;');
+  await assert.rejects(()=>verifyFinancialSchema(async(sql,params)=>({rows:(await db.query(sql,params)).rows as Record<string,unknown>[]})),/UNSAFE_ROLE/);
+  await db.exec('ROLLBACK;');
+  await db.exec('GRANT SELECT ON \"WalletOperation\" TO sirocash_app; BEGIN; SET LOCAL ROLE sirocash_app;');
+  await assert.rejects(()=>verifyFinancialSchema(async(sql,params)=>({rows:(await db.query(sql,params)).rows as Record<string,unknown>[]})),/ISOLATION_FAILED/);
+  await db.exec('ROLLBACK;');
+  await db.exec('REVOKE SELECT ON \"WalletOperation\" FROM sirocash_app; DROP INDEX payout_network_unresolved; BEGIN; SET LOCAL ROLE sirocash_app;');
+  await assert.rejects(()=>verifyFinancialSchema(async(sql,params)=>({rows:(await db.query(sql,params)).rows as Record<string,unknown>[]})),/GUARDS_MISSING/);
+  await db.exec('ROLLBACK;');
   console.log('20 financial/auth tables: hosted-style default grants removed, RLS enabled, runtime limited to durable authentication storage.');
  }finally{await db.close()}
 }
