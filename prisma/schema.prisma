@@ -262,13 +262,15 @@ model UserDepositAddress {
  createdAt DateTime @default(now()) @db.Timestamptz(6)
  @@unique([ownerId,network])
  @@unique([vaultId,derivationIndex])
+ @@unique([id,network])
 }
 
 model ChainDepositInbox {
  id String @id @db.Uuid
  eventKey String @unique
  addressId String @db.Uuid
- address UserDepositAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+ network String
+ address UserDepositAddress @relation(fields: [addressId,network], references: [id,network], onDelete: Restrict)
  txId String
  logIndex Int
  blockNumber BigInt
@@ -277,7 +279,7 @@ model ChainDepositInbox {
  fingerprint String
  state String @default("AWAITING_VALUATION")
  createdAt DateTime @default(now()) @db.Timestamptz(6)
- @@unique([txId,logIndex])
+ @@unique([network,txId,logIndex])
 }
 
 model PlatformWithdrawalGuard {

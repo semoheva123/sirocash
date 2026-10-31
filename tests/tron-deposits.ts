@@ -35,7 +35,7 @@ async function persistence(){
  const pg=new PGlite();
  try{
   await pg.exec('CREATE TABLE "User" (id UUID PRIMARY KEY)');
-  for(const name of ['20261031030000_deposit_addresses','20261031040000_deposit_inbox'])await pg.exec(await readFile('prisma/migrations/'+name+'/migration.sql','utf8'));
+  for(const name of ['20261031030000_deposit_addresses','20261031040000_deposit_inbox','20261031060000_bep20_deposit_addresses','20261031080000_bep20_deposit_inbox'])await pg.exec(await readFile('prisma/migrations/'+name+'/migration.sql','utf8'));
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows as Record<string,unknown>[]})}))};
   await assert.rejects(()=>stageTronDeposit(db,input),/UNASSIGNED_DEPOSIT_ADDRESS/);
   await pg.exec(`INSERT INTO "User" VALUES ('00000000-0000-0000-0000-000000000001');
