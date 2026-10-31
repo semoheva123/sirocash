@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {Wallet} from 'ethers';
 import {TronWeb} from 'tronweb';
+import {createOutboxResourceObserver} from '../lib/outbox-resource-observer';
 import {productionOutboxNetworkWorkers} from '../lib/outbox-network-runtime';
+import {createBep20ReadRpc} from '../lib/bep20-rpc';
 import {chainJsonPost} from '../lib/chain-http';
 import {createChainBroadcaster,productionChainBroadcaster} from '../lib/chain-broadcast';
 import {createTronRead,observeTronUsdtReceipt,type TronRead} from '../lib/tron-receipt-observer';
@@ -42,12 +44,40 @@ async function main(){
   await assert.rejects(()=>createChainBroadcaster({...opts,enabled:true,bep20:{endpoint:opts.bep20.endpoint,fetch:failing}})(bscInput),/UNCERTAIN/);assert.equal(sends,result==='0x1'?0:1);
  }
  const now=Date.now();const tron=signTrc20Usdt(key,{expectedSender:from,maxAmountBaseUnits:20000000n,maxNetworkFeeBaseUnits:5000000n},{destination:to,amountBaseUnits:15000000n,refBlockBytes:'1234',refBlockHash:'ab'.repeat(8),timestamp:now,expiration:now+60000,feeLimitSun:4000000},now);
+ const resourceCalls:string[]=[];
+ const resourceFetch=(async(url,init)=>{
+  const p=JSON.parse(String(init?.body)),path=new URL(String(url)).pathname;resourceCalls.push(p.method??path);
+  const results:Record<string,unknown>={eth_chainId:'0x38',eth_getTransactionCount:'0x7',eth_getBalance:'0xde0b6b3a7640000',eth_call:'0x'+(10n**20n).toString(16).padStart(64,'0'),eth_estimateGas:'0x11170'};
+  const value=p.method?{jsonrpc:'2.0',id:p.id,result:results[p.method]}:path.endsWith('getblockbynum')?{blockID:genesis}:path.endsWith('getaccount')?{address:TronWeb.address.toHex(from),balance:5000000}:path.endsWith('getaccountresource')?{EnergyLimit:100000,EnergyUsed:1000,freeNetLimit:10000,freeNetUsed:20}:path.endsWith('estimateenergy')?{result:{result:true},energy_required:65000}:{result:{result:true},constant_result:[(20000000n).toString(16).padStart(64,'0')]};
+  return new Response(JSON.stringify(value),{headers:{'content-type':'application/json'}});
+ }) as typeof fetch;
+ const resources=createOutboxResourceObserver({...opts,bep20:{...opts.bep20,fetch:resourceFetch},tron:{...opts.tron,fetch:resourceFetch}});
+ const evmResources=await resources({...bscInput,resourceCost:0n});
+ assert.equal(evmResources.sender,evmFrom);assert.equal(evmResources.pendingNonce,7);assert.equal(evmResources.estimatedGas,70000n);assert.equal(evmResources.tokenBalance,10n**20n);
+ const trInput={network:'TRC20' as const,txId:tron.txId,signedPayload:JSON.stringify(tron.transaction),resourceCost:10n,signal:new AbortController().signal};
+ const trResources=await resources(trInput);assert.equal(trResources.sender,from);assert.equal(trResources.availableEnergy,99000);assert.equal(trResources.availableBandwidth,9980);assert.equal(trResources.requiredEnergy,65000);assert.equal(trResources.resourceCost,10n);assert.ok(trResources.requiredBandwidth!>256);
+ assert.ok(resourceCalls.every(c=>!c.includes('send')&&!c.includes('broadcast')));
+ await assert.rejects(()=>resources({...bscInput,resourceCost:1n}),/UNVERIFIED/);
+ await assert.rejects(()=>resources({...trInput,txId:'ef'.repeat(32)}),/UNVERIFIED/);
+ const stopped=new AbortController();stopped.abort();const before=resourceCalls.length;
+ await assert.rejects(()=>resources({...trInput,signal:stopped.signal}),/INPUT/);assert.equal(resourceCalls.length,before);
+ for(const corrupt of [(p:Record<string,unknown>)=>p.method?{jsonrpc:'2.0',id:p.id,result:'0x1'}:{},(p:Record<string,unknown>)=>p.method?{jsonrpc:'2.0',id:'wrong',result:'0x38'}:{blockID:genesis}]){
+  const bad=(async(_u,i)=>new Response(JSON.stringify(corrupt(JSON.parse(String(i?.body)))),{headers:{'content-type':'application/json'}})) as typeof fetch;
+  const observe=createOutboxResourceObserver({...opts,bep20:{...opts.bep20,fetch:bad},tron:{...opts.tron,fetch:bad}});
+  await assert.rejects(()=>observe({...bscInput,resourceCost:0n}),/UNVERIFIED/);await assert.rejects(()=>observe(trInput),/UNVERIFIED/);
+ }
  const tronPayload=JSON.stringify(tron.transaction);let tronBytes='';
  const tronFetch=(async(url,init)=>{if(String(url).endsWith('broadcasttransaction')){tronBytes=String(init!.body);return new Response(JSON.stringify({result:true,txid:tron.txId}),{headers:{'content-type':'application/json'}})}return new Response(JSON.stringify({blockID:genesis}),{headers:{'content-type':'application/json'}})}) as typeof fetch;
  assert.deepEqual(await createChainBroadcaster({...opts,enabled:true,tron:{endpoint:opts.tron.endpoint,fetch:tronFetch}})({network:'TRC20',txId:tron.txId,signedPayload:tronPayload,signal:new AbortController().signal}),{txId:tron.txId});assert.equal(tronBytes,tronPayload);
  const abort=new AbortController();abort.abort();await assert.rejects(()=>send({...bscInput,signal:abort.signal}),/UNCERTAIN/);
  const hanging=(async()=>new Promise(()=>{})) as typeof fetch;
  await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid',fetch:hanging,timeoutMs:100})('/','{}'),/FAILED/);
+ const cancelledRpc=new AbortController();let rpcFetches=0;
+ const abortRpc=createBep20ReadRpc({endpoint:'https://rpc.example.invalid',signal:cancelledRpc.signal,fetch:(async()=>{rpcFetches++;return new Promise(()=>{})}) as typeof fetch});
+ const pendingRpc=abortRpc('eth_chainId',[]);cancelledRpc.abort();await assert.rejects(()=>pendingRpc,/TIMEOUT/);
+ await assert.rejects(()=>abortRpc('eth_chainId',[]),/TIMEOUT/);assert.equal(rpcFetches,1);
+ const cancelledTron=new AbortController();const abortTron=createTronRead({endpoint:'https://rpc.example.invalid',signal:cancelledTron.signal,fetch:hanging});
+ const pendingTron=abortTron('/walletsolidity/getnowblock',{});cancelledTron.abort();await assert.rejects(()=>pendingTron,/FAILED/);
  const hangingBody=(async()=>new Response(new ReadableStream({pull:()=>new Promise(()=>{})}),{headers:{'content-type':'application/json'}})) as typeof fetch;
  await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid',fetch:hangingBody,timeoutMs:100})('/','{}'),/FAILED/);
  const oversized=(async()=>new Response('x'.repeat(257),{headers:{'content-type':'application/json'}})) as typeof fetch;

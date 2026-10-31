@@ -3,6 +3,7 @@ import {HDKey} from '@scure/bip32';
 import {PGlite} from '@electric-sql/pglite';
 import {readFile} from 'node:fs/promises';
 import {Transaction,Interface} from 'ethers';
+import {authorizeSweepDispatch,dispatchSavedSweep} from '../lib/sweep-dispatch';
 import {processSweepObservation} from '../lib/sweep-network-observer';
 import {confirmBep20Sweep,confirmTronSweep} from '../lib/sweep-confirmation';
 import type {Bep20ReceiptEvidence} from '../lib/bep20-deposit-verification';
@@ -17,7 +18,8 @@ import type {WalletDb} from '../lib/wallet-engine';
 async function main(){
  const pg=new PGlite();try{
   await pg.exec('CREATE TABLE "User" (id UUID PRIMARY KEY)');
-  for(const migration of ['20261031030000_deposit_addresses','20261031060000_bep20_deposit_addresses','20261031070000_signed_sweep_outbox','20261031090000_sweep_confirmation'])await pg.exec(await readFile(`prisma/migrations/${migration}/migration.sql`,'utf8'));
+  for(const migration of ['20261031030000_deposit_addresses','20261031060000_bep20_deposit_addresses','20261031070000_signed_sweep_outbox','20261031090000_sweep_confirmation','20261031210000_sweep_dispatch_worker'])await pg.exec(await readFile(`prisma/migrations/${migration}/migration.sql`,'utf8'));
+  await pg.exec(`CREATE TABLE "PayoutExpensePolicy"(network TEXT PRIMARY KEY,enabled BOOLEAN,"perPayoutCap" NUMERIC,"dailyCap" NUMERIC); CREATE TABLE "PayoutExpenseReservation"(network TEXT,"amountBaseUnits" NUMERIC,state TEXT,"settledAt" TIMESTAMPTZ); INSERT INTO "PayoutExpensePolicy" VALUES('BEP20',false,100000000000000,200000000000000),('TRC20',true,5000000,10000000);`);
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows as Record<string,unknown>[]})}))};
   const account=HDKey.fromMasterSeed(new Uint8Array(32).fill(11)).derive("m/44'/60'/0'");
   const owner='00000000-0000-0000-0000-000000000001',vault='00000000-0000-0000-0000-000000000002',addressId='00000000-0000-0000-0000-000000000003';
@@ -49,6 +51,26 @@ async function main(){
   await assert.rejects(()=>confirm({...evidence,receipt:{...receipt,execution:'FAILED'}}),/TRANSACTION_FAILED/);
   await assert.rejects(()=>confirm({...evidence,receipt:{...receipt,logs:[{...receipt.logs[0],data:'0x'+'0'.repeat(63)+'1'}]}}),/EXECUTION_MISMATCH/);
   assert.equal((await pg.query<{state:string}>('SELECT state FROM "SignedSweepOutbox" WHERE id=$1',[signed.id])).rows[0].state,'SIGNED');
+  const evidenceNow=()=>({observedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+25000).toISOString()});
+  const resource={network:'BEP20' as const,txId:signed.txId,sender:address,...evidenceNow(),tokenBalance:100n*10n**18n,nativeBalance:10n**18n,resourceCost:0n,pendingNonce:0,estimatedGas:70000n};
+  await assert.rejects(()=>authorizeSweepDispatch(db,signed.id,resource),/POLICY/);
+  await pg.exec('UPDATE "PayoutExpensePolicy" SET enabled=true');
+  await assert.rejects(()=>authorizeSweepDispatch(db,signed.id,{...resource,pendingNonce:1}),/NONCE_OR_GAS/);
+  await pg.exec(`INSERT INTO "PayoutExpenseReservation" VALUES('BEP20',200000000000000,'HELD',NULL)`);
+  await assert.rejects(()=>authorizeSweepDispatch(db,signed.id,resource),/DAILY_EXPENSE/);
+  await pg.exec('DELETE FROM "PayoutExpenseReservation"');
+  assert.equal((await authorizeSweepDispatch(db,signed.id,resource)).state,'RESERVED');
+  assert.equal((await authorizeSweepDispatch(db,signed.id,resource)).state,'ALREADY_RESERVED');
+  let sends=0;const send=async(input:{signedPayload:string})=>{
+   sends++;assert.equal(input.signedPayload,saved.signedPayload);
+   assert.ok((await pg.query<{claimId:string}>('SELECT "claimId" FROM "SweepDispatchAuthorization" WHERE "sweepId"=$1',[signed.id])).rows[0].claimId);
+   throw new Error('lost response');
+  };
+  await assert.rejects(()=>dispatchSavedSweep(db,signed.id,{send}),/DISABLED/);
+  assert.equal((await dispatchSavedSweep(db,signed.id,{enabled:true,send})).state,'UNKNOWN');
+  assert.equal((await dispatchSavedSweep(db,signed.id,{enabled:true,send})).state,'UNKNOWN');assert.equal(sends,1);
+  await assert.rejects(()=>pg.query('UPDATE "SweepDispatchAuthorization" SET expense=1 WHERE "sweepId"=$1',[signed.id]));
+  await assert.rejects(()=>pg.query('UPDATE "SweepDispatchAuthorization" SET state=\'SETTLED\',"settledAt"=now() WHERE "sweepId"=$1',[signed.id]),/FINAL_EVIDENCE/);
   await pg.query('UPDATE "SignedSweepOutbox" SET state=\'BROADCAST_UNKNOWN\' WHERE id=$1',[signed.id]);
   const networkOptions={enabled:true,minimumBep20Confirmations:15,tronGenesisId:'0'.repeat(16)+'aa'.repeat(24),tron:async()=>{throw new Error('unused TRON RPC')},bep20:async(method:string,params:unknown[])=>{
    if(method==='eth_chainId')return '0x38';if(method==='eth_blockNumber')return '0x78';
@@ -74,7 +96,7 @@ async function main(){
   const tronAddress=deriveTronDepositAddress(tronAccount.publicExtendedKey,0).address;
   await pg.query('INSERT INTO "DepositAddressVault" (id,network,"accountXpub",enabled,"originVerified") VALUES ($1,\'TRC20\',$2,true,true)',[tronVault,tronAccount.publicExtendedKey]);
   await pg.query('INSERT INTO "UserDepositAddress" (id,"ownerId","vaultId",network,address,"derivationIndex") VALUES ($1,$2,$3,\'TRC20\',$4,0)',[tronId,owner,tronVault,tronAddress]);
-  const now=1700000000000;
+  const now=Date.now();
   const tronOptions={now,loadKeys:()=>({accountXpub:tronAccount.publicExtendedKey,accountXprv:tronAccount.privateExtendedKey})};
   const tronCommand={network:'TRC20' as const,addressId:tronId,requestKey:'tron:sweep:001',maxAmountBaseUnits:1000000000n,maxNetworkFeeBaseUnits:5000000n,transaction:{amountBaseUnits:20000000n,refBlockBytes:'1234',refBlockHash:'ab'.repeat(8),timestamp:now,expiration:now+60000,feeLimitSun:4000000}};
   const tronSigned=await prepareSignedSweep(db,tronCommand,tronOptions);
@@ -90,6 +112,11 @@ async function main(){
   await assert.rejects(()=>confirmTron({...tronEvidence,block:{...tronEvidence.block,solidHeight:99}}),/NOT_CANONICAL_AND_FINAL/);
   await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,txId:'ef'.repeat(32)}}),/IDENTITY_MISMATCH/);
   await assert.rejects(()=>confirmTron({...tronEvidence,receipt:{...tronReceipt,logs:[{...tronReceipt.logs[0],data:(21000000n).toString(16).padStart(64,'0')}]}}),/EXECUTION_MISMATCH/);
+  const tronResource={network:'TRC20' as const,txId:tronSigned.txId,sender:tronAddress,...evidenceNow(),tokenBalance:1000000000n,nativeBalance:5000000n,resourceCost:0n,accountActive:true,requiredEnergy:65000,availableEnergy:65000,requiredBandwidth:400,availableBandwidth:400};
+  await assert.rejects(()=>authorizeSweepDispatch(db,tronSigned.id,{...tronResource,availableEnergy:1}),/UNDELIVERED/);
+  assert.equal((await authorizeSweepDispatch(db,tronSigned.id,tronResource)).state,'RESERVED');
+  assert.equal((await dispatchSavedSweep(db,tronSigned.id,{enabled:true,send:async input=>({txId:input.txId})})).state,'ACKNOWLEDGED');
+  assert.equal((await dispatchSavedSweep(db,tronSigned.id,{enabled:true,send:async()=>{throw new Error('must not resend')}})).state,'ACKNOWLEDGED');
   const originalPayload=(await pg.query<{signedPayload:string}>('SELECT "signedPayload" FROM "SignedSweepOutbox" WHERE id=$1',[tronSigned.id])).rows[0].signedPayload;
   const corrupted=JSON.parse(originalPayload);corrupted.signature[0]='00'.repeat(65);
   await pg.query('UPDATE "SignedSweepOutbox" SET "signedPayload"=$2 WHERE id=$1',[tronSigned.id,JSON.stringify(corrupted)]);

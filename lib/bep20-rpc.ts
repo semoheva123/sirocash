@@ -2,7 +2,7 @@ import 'server-only';
 import {randomUUID} from 'node:crypto';
 import type {Bep20Rpc} from './bep20-receipt-observer';
 
-type Options={endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
+type Options={signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
 function validateCall(method:string,params:unknown[]){
  if(!Array.isArray(params))throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
  const empty=(method==='eth_chainId'||method==='eth_blockNumber')&&params.length===0;
@@ -21,10 +21,13 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
    (options.authorization!==undefined&&(!options.authorization||options.authorization.length>8192||/[\r\n]/.test(options.authorization))))throw new Error('RPC_CONFIGURATION_INVALID');
  const request=options.fetch??fetch;
  return async(method,params)=>{
+  if(options.signal?.aborted)throw new Error('RPC_TIMEOUT');
   validateCall(method,params);
   const id=randomUUID(),abort=new AbortController();
   let onTimeout:()=>void=()=>{};
   const expired=new Promise<never>((_,reject)=>{onTimeout=()=>reject(new Error('RPC_TIMEOUT'));abort.signal.addEventListener('abort',onTimeout,{once:true})});
+  const externalAbort=()=>abort.abort();
+  options.signal?.addEventListener('abort',externalAbort,{once:true});
   const timer=setTimeout(()=>abort.abort(),timeoutMs);
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
   try{
@@ -54,13 +57,13 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
    if(error instanceof Error&&safe.has(error.message))throw new Error(error.message);
    throw new Error('RPC_TRANSPORT_FAILURE');
   }finally{
-   clearTimeout(timer);abort.signal.removeEventListener('abort',onTimeout);abort.abort();if(reader)void reader.cancel().catch(()=>{});
+   clearTimeout(timer);options.signal?.removeEventListener('abort',externalAbort);abort.signal.removeEventListener('abort',onTimeout);abort.abort();if(reader)void reader.cancel().catch(()=>{});
   }
  };
 }
 /** Independent read-only production gate: does not enable signing or financial writes. */
-export function productionBep20ReadRpc():Bep20Rpc{
+export function productionBep20ReadRpc(signal?:AbortSignal):Bep20Rpc{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
  const endpoint=process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
- return createBep20ReadRpc({endpoint,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION});
+ return createBep20ReadRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION});
 }

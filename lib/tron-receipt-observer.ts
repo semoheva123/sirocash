@@ -6,7 +6,7 @@ function object(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Ar
 function hash(v:unknown){if(typeof v!=='string'||! /^[a-f0-9]{64}$/.test(v))throw new Error('TRON_INVALID_HASH');return v}
 function height(v:unknown){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<0)throw new Error('TRON_INVALID_HEIGHT');return v}
 function block(v:unknown){const b=object(v),raw=object(object(b.block_header).raw_data),n=height(raw.number??0),id=hash(b.blockID);if(id.slice(0,16)!==n.toString(16).padStart(16,'0'))throw new Error('TRON_BLOCK_ID_HEIGHT');return {raw:b,height:n,id}}
-export function createTronRead(options:ChainHttpOptions):TronRead{
+export function createTronRead(options:ChainHttpOptions&{signal?:AbortSignal}):TronRead{
  const post=chainJsonPost(options);
  return async(path,body)=>{
   const keys=Object.keys(body);
@@ -14,7 +14,7 @@ export function createTronRead(options:ChainHttpOptions):TronRead{
   else if(path==='/walletsolidity/getnowblock'){if(keys.length)throw new Error('TRON_READ_NOT_ALLOWED')}
   else if(path==='/walletsolidity/gettransactioninfobyid'){if(keys.length!==1||keys[0]!=='value')throw new Error('TRON_READ_NOT_ALLOWED');hash(body.value)}
   else throw new Error('TRON_READ_NOT_ALLOWED');
-  return post(path,JSON.stringify(body));
+  return post(path,JSON.stringify(body),options.signal);
  };
 }
 /** Solidified node only: no latest fallback, no credit/posting, no customer receipts.
@@ -43,8 +43,8 @@ export async function observeTronUsdtReceipt(read:TronRead,input:{txId:string;lo
  if(recheck.height!==n||recheck.id!==included.id)throw new Error('TRON_OBSERVATION_REORG');
  return {event,evidence};
 }
-export function productionTronRead(){
+export function productionTronRead(signal?:AbortSignal){
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
  const endpoint=process.env.SIRO_TRON_RPC_URL;if(!endpoint)throw new Error('TRON_RPC_CONFIGURATION');
- return createTronRead({endpoint,apiKey:process.env.SIRO_TRON_RPC_API_KEY});
+ return createTronRead({endpoint,signal,apiKey:process.env.SIRO_TRON_RPC_API_KEY});
 }

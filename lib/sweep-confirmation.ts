@@ -64,6 +64,7 @@ async function confirmVerifiedSweep(db:WalletDb,sweepId:string,event:VerifiedEve
   if(row.state!=='SIGNED'&&row.state!=='BROADCAST_UNKNOWN')throw new Error('SWEEP_STATE_CONFLICT');
   await tx.query('INSERT INTO "SweepConfirmation" ("sweepId",fingerprint,evidence) VALUES ($1,$2,$3::jsonb)',[row.id,fingerprint,JSON.stringify(event)]);
   await tx.query('UPDATE "SignedSweepOutbox" SET state=\'CONFIRMED\' WHERE id=$1',[row.id]);
+  await tx.query('UPDATE "SweepDispatchAuthorization" SET state=\'SETTLED\',"settledAt"=statement_timestamp() WHERE "sweepId"=$1 AND state=\'HELD\'',[row.id]);
   return {id:String(row.id),txId:String(row.txId),state:'CONFIRMED' as const};
  });
 }
