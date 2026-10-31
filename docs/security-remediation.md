@@ -11,7 +11,7 @@
 - Reconciled local Git tracking to the fetched authorized branch using a mixed reset AFTER verifying every one of its 258 tracked files matched local file hashes; no application file was overwritten or deleted. New work and the prior review document were preserved.
 
 ## Validation
-Full `npm test`, `npm run build`, targeted security boundary/treasury-role tests and `git diff --check` passed locally after remediation. Operating/deposit secrets were NOT decrypted, requested through chat or embedded in source. The production preflight was NOT executed. New CI configuration is prepared; local success does not claim a GitHub job has completed.
+Full `npm test`, `npm run build`, targeted security boundary/treasury-role tests and `git diff --check` passed locally after remediation. Operating/deposit secrets were NOT decrypted, requested through chat or embedded in source. The production preflight was NOT executed. GitHub Actions run 41221001091 also PASSED clean install/audit/full tests/build. The workflow was then refreshed to SHA-pinned v6 actions (Node24 action runtime) and Ubuntu24.04 to remove obsolete-action/runtime warnings; the application remains Node22.
 
 ## NOT a production launch approval
 Live paid energy ordering, enforceable pre-purchase shared budget, resource/provider delivery/recovery, authenticated complete TRON/BSC observers, unified operating nonce consumers, real-device enrollment/recovery, approved valuation/pricing authority, independent PostgreSQL concurrency and funded crash/deep-reorg/failure drills remain launch blockers. Prepared migrations are not assumed deployed; runtime financial services remain blocked.
