@@ -44,7 +44,8 @@ jobs:
               throw new Error('Cloudflare returned an unexpected verification response.');
             }
             if (!response.ok || body.success !== true || body.result?.status !== 'active') {
-              throw new Error('Cloudflare did not confirm an active token. Check token expiry, revocation and any source-IP restrictions.');
+              const codes = (Array.isArray(body.errors) ? body.errors : []).map(item => item.code).filter(Number.isInteger).join(',');
+              throw new Error(`Cloudflare did not confirm an active token (HTTP ${response.status}; error codes: ${codes || 'none'}). Check expiry, revocation and source-IP restrictions.`);
             }
             console.log('Cloudflare token is present and active. Its value was not displayed.');
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
@@ -54,5 +55,5 @@ jobs:
               '- No R2 bucket, D1 database or Worker was created or changed.\n' +
               '- Resource-specific permissions and application integration remain to be verified.\n');
           }
-          main().catch(error => { console.error(error.message); process.exitCode = 1; });
+          main().catch(error => { console.error(`::error::${error.message}`); process.exitCode = 1; });
           NODE
