@@ -400,10 +400,12 @@ model UsdtWithdrawalQuote {
 }
 
 model WithdrawalSigningGuard {
+ expensePolicy PayoutExpensePolicy?
  network String @id
  payouts SignedWithdrawalOutbox[]
 }
 model SignedWithdrawalOutbox {
+ expenseReservation PayoutExpenseReservation?
  confirmation PayoutConfirmation?
  dispatchApproval PayoutDispatchApproval?
  id String @id @db.Uuid
@@ -451,4 +453,26 @@ model PayoutConfirmation {
  fingerprint String
  evidence Json
  createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model PayoutExpensePolicy {
+ network String @id
+ guard WithdrawalSigningGuard @relation(fields: [network], references: [network])
+ enabled Boolean @default(false)
+ perPayoutCap Decimal @default(0) @db.Decimal(78,0)
+ dailyCap Decimal @default(0) @db.Decimal(78,0)
+ reservations PayoutExpenseReservation[]
+}
+model PayoutExpenseReservation {
+ payoutId String @id @db.Uuid
+ payout SignedWithdrawalOutbox @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+ network String
+ policy PayoutExpensePolicy @relation(fields: [network], references: [network])
+ amountBaseUnits Decimal @db.Decimal(78,0)
+ evidenceHash String
+ evidence Json
+ state String @default("HELD")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ settledAt DateTime? @db.Timestamptz(6)
+ @@index([network,state],map: "payout_expense_network_state")
 }

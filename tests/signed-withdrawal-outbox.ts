@@ -4,6 +4,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFile,readdir} from 'node:fs/promises';
 import {Wallet,Transaction,Interface} from 'ethers';
 import {TronWeb,utils} from 'tronweb';
+import {authorizePayoutDispatch} from '../lib/payout-resource-authorization';
 import {confirmPayout} from '../lib/payout-confirmation';
 import {bep20UsdtContract,type Bep20ReceiptEvidence} from '../lib/bep20-deposit-verification';
 import {tronUsdtContract,type TronReceiptEvidence} from '../lib/tron-deposit-verification';
@@ -109,7 +110,26 @@ async function main(){
   await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,gasPrice:1000000001n}},options),/payout_sender_nonce/);
   const fresh=await prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,nonce:8}},options);
   const payload=(await pg.query<{signedPayload:string}>('SELECT "signedPayload" FROM "SignedWithdrawalOutbox" WHERE id=$1',[fresh.id])).rows[0].signedPayload;
-  await approveDispatch(fresh.id,fresh.txId,payload,'10000000000000000');
+  const observedAt=new Date().toISOString();
+  const resourceEvidence={network:'BEP20' as const,txId:fresh.txId,sender:evmSender,observerReference:'fixture:observer:budget:fresh',observedAt,expiresAt:new Date(Date.now()+20000).toISOString(),tokenBalanceBaseUnits:100n*10n**18n,nativeBalanceBaseUnits:10n**18n,resourceCostBaseUnits:0n,pendingNonce:8,estimatedGas:70000n};
+  await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,resourceEvidence),/POLICY_DISABLED/);
+  await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,tokenBalanceBaseUnits:1n}),/BALANCE_INSUFFICIENT/);
+  await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,pendingNonce:9}),/GAS_OR_NONCE_UNAVAILABLE/);
+  await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,observedAt:new Date(Date.now()-60000).toISOString()}),/EVIDENCE_STALE/);
+  await pg.exec(`UPDATE "PayoutExpensePolicy" SET enabled=true,"perPayoutCap"=1,"dailyCap"=1 WHERE network='BEP20'`);
+  await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,resourceEvidence),/EXPENSE_CAP_EXCEEDED/);
+  await pg.exec(`UPDATE "PayoutExpensePolicy" SET "perPayoutCap"=100000000000000,"dailyCap"=100000000000000 WHERE network='BEP20'`);
+  // Older unresolved claims carry into today's budget; never free them on a new UTC day.
+  await pg.query(`INSERT INTO "PayoutExpenseReservation" ("payoutId",network,"amountBaseUnits","evidenceHash",evidence,"createdAt") VALUES ($1,'BEP20',100000000000000,repeat('ab',32),'{}',now()-interval '2 days')`,[signed.id]);
+  await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,resourceEvidence),/DAILY_EXPENSE_CAP_EXCEEDED/);
+  await pg.exec(`UPDATE "PayoutExpensePolicy" SET "dailyCap"=200000000000000 WHERE network='BEP20'`);
+  const brokenAuthority:WalletDb={transaction:run=>db.transaction(tx=>run({query:async(sql,params)=>{if(sql.startsWith('INSERT INTO "PayoutDispatchApproval"'))throw Error('injected authority persistence failure');return tx.query(sql,params)}}))};
+  await assert.rejects(()=>authorizePayoutDispatch(brokenAuthority,fresh.id,resourceEvidence),/injected authority persistence failure/);
+  assert.equal((await pg.query('SELECT * FROM "PayoutExpenseReservation" WHERE "payoutId"=$1',[fresh.id])).rows.length,0);
+  assert.equal((await authorizePayoutDispatch(db,fresh.id,resourceEvidence)).state,'RESERVED');
+  assert.equal((await authorizePayoutDispatch(db,fresh.id,resourceEvidence)).state,'ALREADY_RESERVED');
+  await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,nativeBalanceBaseUnits:2n*10n**18n}),/EVIDENCE_CONFLICT/);
+
   const timed=await dispatchSavedPayout(db,fresh.id,{enabled:true,timeoutMs:100,send:async()=>{sends++;return new Promise(()=>{})}});
   assert.equal(timed.state,'UNKNOWN');
   assert.equal((await dispatchSavedPayout(db,fresh.id,{enabled:true,send})).state,'UNKNOWN');assert.equal(sends,2);
@@ -133,6 +153,7 @@ async function main(){
   assert.equal((await walletBalances(db,owner)).held,'58.800000');
   assert.equal((await pg.query<{state:string}>('SELECT state FROM "SignedWithdrawalOutbox" WHERE id=$1',[fresh.id])).rows[0].state,'BROADCAST_UNKNOWN');
   const final=await confirmPayout(db,confirmation);assert.equal(final.state,'COMPLETED');
+  assert.equal((await pg.query<{state:string}>('SELECT state FROM "PayoutExpenseReservation" WHERE "payoutId"=$1',[fresh.id])).rows[0].state,'SETTLED');
   assert.deepEqual(await confirmPayout(db,confirmation),final);
   assert.deepEqual(await confirmPayout(db,{...confirmation,evidence:{...bepEvidence,block:{...bepEvidence.block,headHeight:130}}}),final);
   await assert.rejects(()=>confirmPayout(db,{...confirmation,evidence:{...bepEvidence,receipt:{...bepReceipt,blockHash:'0x'+'ef'.repeat(32)},block:{...bepEvidence.block,hash:'0x'+'ef'.repeat(32)}}}),/CONFIRMATION_CONFLICT/);
@@ -153,8 +174,19 @@ async function main(){
   assert.equal((await pg.query<{balance:string}>('SELECT balance FROM "LedgerAccount" WHERE id=$1',[fees])).rows[0].balance,'6.860000');
   assert.equal(sends,2);
   assert.equal(Number((await pg.query<{total:string}>('SELECT sum(amount)::text AS total FROM "LedgerEntry"')).rows[0].total),0);
+  const tronResourceQuote=await makeQuote('TRC20','payout:resource:tron02');await reserve(tronResourceQuote);
+  const liveFixtureNow=Date.now();
+  const tronResourcePayout=await prepareSignedWithdrawal(db,{...tronCommand,quoteId:tronResourceQuote.id,transaction:{...tronCommand.transaction,timestamp:liveFixtureNow,expiration:liveFixtureNow+60000}},{...options,now:liveFixtureNow});
+  const tronResourceEvidence={network:'TRC20' as const,txId:tronResourcePayout.txId,sender:tronSender,observerReference:'fixture:tron:resource:observer',observedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+20000).toISOString(),tokenBalanceBaseUnits:100000000n,nativeBalanceBaseUnits:10000000n,resourceCostBaseUnits:2000000n,accountActive:true,requiredEnergy:65000,availableEnergy:65000,requiredBandwidth:350,availableBandwidth:350};
+  await assert.rejects(()=>authorizePayoutDispatch(db,tronResourcePayout.id,{...tronResourceEvidence,availableEnergy:0}),/RESOURCES_UNDELIVERED/);
+  await assert.rejects(()=>authorizePayoutDispatch(db,tronResourcePayout.id,{...tronResourceEvidence,availableBandwidth:0}),/RESOURCES_UNDELIVERED/);
+  await assert.rejects(()=>authorizePayoutDispatch(db,tronResourcePayout.id,{...tronResourceEvidence,accountActive:false}),/RESOURCES_UNDELIVERED/);
+  await pg.exec(`UPDATE "PayoutExpensePolicy" SET enabled=true,"perPayoutCap"=6000000,"dailyCap"=6000000 WHERE network='TRC20'`);
+  assert.equal((await authorizePayoutDispatch(db,tronResourcePayout.id,tronResourceEvidence)).state,'RESERVED');
+  assert.equal((await pg.query<{amountBaseUnits:string}>('SELECT "amountBaseUnits" FROM "PayoutExpenseReservation" WHERE "payoutId"=$1',[tronResourcePayout.id])).rows[0].amountBaseUnits,'6000000');
+  console.log('Payout resource budgets: fail-closed policy, fresh identity/nonce/balances, delivered TRON energy+bandwidth, conservative native cap, prior-day unresolved usage, atomic approval rollback and final expense settlement passed. Trusted observations simulated.');
   console.log('Payout finality: TRON/BSC exact execution evidence, unknown-to-confirmed recovery without resend, immutable audit, atomic journal rollback, replay/reorg conflicts and balanced net/revenue settlement passed. Synthetic receipts only.');
-  await pg.exec('SET ROLE sirocash_app');for(const table of ['WithdrawalSigningGuard','SignedWithdrawalOutbox','PayoutConfirmation'])await assert.rejects(()=>pg.exec(`SELECT * FROM "${table}"`),/permission denied/);
+  await pg.exec('SET ROLE sirocash_app');for(const table of ['WithdrawalSigningGuard','SignedWithdrawalOutbox','PayoutConfirmation','PayoutExpensePolicy','PayoutExpenseReservation'])await assert.rejects(()=>pg.exec(`SELECT * FROM "${table}"`),/permission denied/);
   console.log('Signed payout outbox passed: real offline TRON/BSC signatures, exact DB quote net/recipient, durable bytes/hash plus SUBMITTED hold, rollback, no-key retries, extra-field/conflict rejection, unresolved network/nonce guards, immutable payload and unsafe settlement rejection. No broadcast; fixture final status is not verified chain evidence.');
  }finally{await pg.close()}
 }

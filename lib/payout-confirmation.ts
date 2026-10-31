@@ -35,6 +35,8 @@ export async function confirmPayout(db:WalletDb,c:Command){
   if(!['SIGNED','BROADCAST_UNKNOWN'].includes(String(payout.state))||operation.state!=='SUBMITTED')throw new Error('PAYOUT_CONFIRMATION_STATE_CONFLICT');
   await tx.query('INSERT INTO "PayoutConfirmation" ("payoutId",fingerprint,evidence) VALUES ($1,$2,$3::jsonb)',[payout.id,fingerprint,JSON.stringify(event)]);
   await tx.query('UPDATE "SignedWithdrawalOutbox" SET state=\'CONFIRMED\' WHERE id=$1',[payout.id]);
-  return settleQuotedUsdtWithdrawalInTransaction(tx,String(quote.id),{outcome:'confirmed',providerReference});
+  const result=await settleQuotedUsdtWithdrawalInTransaction(tx,String(quote.id),{outcome:'confirmed',providerReference});
+  await tx.query('UPDATE "PayoutExpenseReservation" SET state=\'SETTLED\',"settledAt"=statement_timestamp() WHERE "payoutId"=$1 AND state=\'HELD\'',[payout.id]);
+  return result;
  });
 }

@@ -18,6 +18,8 @@
 
 - Private successful payout finality-to-journal composition on TRON/BSC: saved signature and exact receipt matching, immutable audit, atomic outbox+net/revenue settlement, rollback/replay and unknown-result recovery tested with synthetic receipts. No live finality observer configured.
 
+- Private fresh-resource-evidence gate and native payout expense reservation: disabled-by-default per-network policy, per-payout/UTC daily caps, unresolved prior-day carryover, atomic signature-bound dispatch approval, and conservative settled expense attribution. Observations simulated; no live observer or pre-purchase rental budget.
+
 ## NOT implemented/deployed as live services
 - Vercel signer production provisioning, recovery/backup, secure secret ingestion and runtime authorization; offline operating and fixed-destination HD sweep signing primitives exist. Vercel is not an isolated HSM.
 - Authenticated mainnet RPC watcher, inclusion verification, replay/checkpoints and reorg reconciliation.
