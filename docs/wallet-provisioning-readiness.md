@@ -1,3 +1,5 @@
+> **Provider cutover (2026-11-01): CatFee is the sole selected provider.** See [current integration and launch restrictions](catfee.md). References to the former provider below are historical implementation/observation records, not active configuration. Do not restore its keys or roll back to its adapter.
+
 # Production wallet provisioning readiness
 
 Status: **NOT cleared for funded production use.** Local financial preparation and fixture tests do not close the live launch gates.

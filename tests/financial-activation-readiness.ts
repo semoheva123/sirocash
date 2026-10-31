@@ -4,12 +4,15 @@ const empty=financialActivationReadiness({});
 assert.equal(empty.configurationReady,false);
 const env:Record<string,string>={};
 for(const key of empty.blockers)env[key]='fixture-secret-never-production';
-for(const key of empty.blockers.filter(k=>k.endsWith('_ENABLED')||k==='SIRO_ACCEPT_VARIABLE_ENERGY_PRICE'))env[key]='true';
-env.VERCEL_ENV='production';env.FINANCIAL_DATABASE_URL='postgresql://sirocash_financial_worker.project:fixture@pool.example.com:6543/postgres';
+for(const key of empty.blockers.filter(k=>k.endsWith('_ENABLED')))env[key]='true';
+env.SIRO_ENERGY_PROVIDER='catfee';env.VERCEL_ENV='production';env.FINANCIAL_DATABASE_URL='postgresql://sirocash_financial_worker.project:fixture@pool.example.com:6543/postgres';
 env.SIRO_FINANCIAL_WORKER_SECRET='f'.repeat(64);
 env.SIRO_TRON_RPC_URL='https://rpc.example.com';env.SIRO_TRON_GENESIS_ID='0'.repeat(64);env.SIRO_BEP20_MIN_CONFIRMATIONS='15';
 for(const network of ['TRC20','BEP20']){env[`SIRO_${network}_RPC_URL`]='https://rpc.example.com';for(const suffix of ['MAX_TOKEN_BASE_UNITS','MAX_FEE_BASE_UNITS','MIN_SWEEP_BASE_UNITS'])env[`SIRO_${network}_${suffix}`]='1'}
 assert.equal(financialActivationReadiness(env).configurationReady,true);
+assert(financialActivationReadiness({...env,SIRO_ENERGY_PROVIDER:'other'}).blockers.includes('SIRO_ENERGY_PROVIDER'));
+assert(financialActivationReadiness({...env,CATFEE_API_KEY:undefined}).blockers.includes('CATFEE_API_KEY'));
+assert(financialActivationReadiness(env).externalChecksRequired.includes('CATFEE_CAPPED_ENERGY_AND_BANDWIDTH_EXECUTION'));
 for(const role of ['postgres','sirocash_app'])assert(financialActivationReadiness({...env,FINANCIAL_DATABASE_URL:`postgresql://${role}:fixture@db.example.com/postgres`}).blockers.includes('FINANCIAL_DATABASE_URL'));
 assert(financialActivationReadiness({...env,SIRO_BEP20_RPC_URL:'http://localhost'}).blockers.includes('SIRO_BEP20_RPC_URL'));
 assert(financialActivationReadiness({...env,SIRO_BEP20_MIN_CONFIRMATIONS:'1'}).blockers.includes('SIRO_BEP20_MIN_CONFIRMATIONS'));

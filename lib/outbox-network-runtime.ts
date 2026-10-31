@@ -10,8 +10,8 @@ import type {FinancialJob} from './financial-worker';
 import {createFinancialExecution} from './financial-execution';
 import {createOutboxResourceObserver} from './outbox-resource-observer';
 import {createEnergyDeliveryObserver} from './energy-delivery-observer';
-import {tronZapOrderClient} from './tronzap-orders';
-import {tronZapCredentials} from './tronzap';
+import {catFeeOrderClient} from './catfee-orders';
+import {catFeeCredentials} from './catfee';
 import {runFinancialWorkerBatch} from './financial-worker';
 import type {WalletDb} from './wallet-engine';
 import {productionBep20ReadRpc} from './bep20-rpc';
@@ -33,9 +33,10 @@ export function productionOutboxNetworkWorkers(db:WalletDb){
  const send=dispatchEnabled?productionChainBroadcaster():undefined;
  const authorizeEnabled=process.env.SIRO_RESOURCE_AUTHORIZATION_ENABLED==='true',energyEnabled=process.env.SIRO_ENERGY_WORKER_ENABLED==='true';
  const tron={endpoint:process.env.SIRO_TRON_RPC_URL!,apiKey:process.env.SIRO_TRON_RPC_API_KEY};
- const client=energyEnabled?tronZapOrderClient({credentials:tronZapCredentials(),purchaseEnabled:process.env.SIRO_ENERGY_PURCHASE_ENABLED==='true',acceptVariableProviderPrice:process.env.SIRO_ACCEPT_VARIABLE_ENERGY_PRICE==='true'}):undefined;
+ if(energyEnabled&&process.env.SIRO_ENERGY_PROVIDER!=='catfee')throw Error('CATFEE_PROVIDER_REQUIRED');
+ const client=energyEnabled?catFeeOrderClient({credentials:catFeeCredentials()}):undefined;
  const execution=(authorizeEnabled||energyEnabled)?createFinancialExecution(db,{
-  purchaseEnabled:energyEnabled&&process.env.SIRO_ENERGY_PURCHASE_ENABLED==='true'&&process.env.SIRO_ACCEPT_VARIABLE_ENERGY_PRICE==='true',
+  purchaseEnabled:energyEnabled&&process.env.SIRO_ENERGY_PURCHASE_ENABLED==='true',
   client,
   delivery:energyEnabled?createEnergyDeliveryObserver({...tron,genesisId:genesis}):undefined,
   resources:createOutboxResourceObserver({bep20:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},tron,tronGenesisId:genesis}),
@@ -45,10 +46,10 @@ export function productionOutboxNetworkWorkers(db:WalletDb){
  const preparationEnabled=process.env.SIRO_AUTOMATIC_PREPARATION_ENABLED==='true';
  const preparation=preparationEnabled&&execution?createFinancialPreparation(db,{
   enabled:true,gas,energy:execution.energy,bandwidthPackage:client?.bandwidthPackage,
-  preflight:createFinancialPreflight({bep20:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},tron,genesisId:genesis,tronReadOwner:treasuryDestination('TRC20','operating'),estimateEnergy:client?.estimateEnergy}),
+  preflight:createFinancialPreflight({bep20:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},tron,genesisId:genesis,tronReadOwner:treasuryDestination('TRC20','operating')}),
   limits:(network,kind)=>{const read=(suffix:string)=>{const v=process.env[`SIRO_${network}_${suffix}`];if(!v||! /^[1-9]\d{0,77}$/.test(v))throw new Error('PREPARATION_LIMIT_MISSING');return BigInt(v)};return {maxAmount:read('MAX_TOKEN_BASE_UNITS'),maxFee:read('MAX_FEE_BASE_UNITS'),minimumSweep:kind==='PREPARE_SWEEP'?read('MIN_SWEEP_BASE_UNITS'):1n}}
  }):undefined;
- const renew=preparationEnabled?createUnsentTronRenewal(db,{preflight:createFinancialPreflight({bep20:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},tron,genesisId:genesis,tronReadOwner:treasuryDestination('TRC20','operating'),estimateEnergy:client?.estimateEnergy})}):undefined;
+ const renew=preparationEnabled?createUnsentTronRenewal(db,{preflight:createFinancialPreflight({bep20:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},tron,genesisId:genesis,tronReadOwner:treasuryDestination('TRC20','operating')})}):undefined;
  async function processSaved(job:FinancialJob,signal:AbortSignal){
    if(signal.aborted)throw new Error('WORKER_ABORTED');
    if(renew&&(job.kind==='SWEEP'||job.kind==='PAYOUT')){try{await renew({id:job.id,kind:job.kind},signal)}catch{/* No renewal is allowed for a consumed/unknown signature. */}}

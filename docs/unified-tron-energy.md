@@ -1,3 +1,5 @@
+> **Provider cutover (2026-11-01): CatFee is the sole selected provider.** See [current integration and launch restrictions](catfee.md). References to the former provider below are historical implementation/observation records, not active configuration. Do not restore its keys or roll back to its adapter.
+
 # Unified TRON energy scope — preparation, not live delegation
 
 Requirement: every energy-consuming TRON operation must obtain/verify resources for its **sender**. Current transfer scope includes (1) customer deposit-address USDT sweeps to the operating wallet and (2) operating-wallet USDT withdrawals to the approved recipient. The recipient does not need delegated energy merely to receive. BEP20 uses BNB gas, not TRON energy. This service must not rent again when existing sender resources suffice.

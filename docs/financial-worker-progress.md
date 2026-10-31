@@ -1,3 +1,5 @@
+> **Provider cutover (2026-11-01): CatFee is the sole selected provider.** See [current integration and launch restrictions](catfee.md). References to the former provider below are historical implementation/observation records, not active configuration. Do not restore its keys or roll back to its adapter.
+
 # Financial execution implementation — 2026-10-31
 
 This is implementation progress, **not a completed launch or a production activation**.

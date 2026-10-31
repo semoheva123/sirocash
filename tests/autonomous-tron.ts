@@ -8,7 +8,7 @@ import {createFinancialPreflight} from '../lib/financial-preflight';
 import {createFinancialExecution} from '../lib/financial-execution';
 import {createOutboxResourceObserver} from '../lib/outbox-resource-observer';
 import {createEnergyDeliveryObserver} from '../lib/energy-delivery-observer';
-import {tronZapOrderClient} from '../lib/tronzap-orders';
+import type {ResourceProvider} from '../lib/resource-provider';
 import {createUnsentTronRenewal} from '../lib/unsent-tron-renewal';
 import {prepareSignedSweep} from '../lib/signed-sweep-outbox';
 import {deriveTronDepositAddress} from '../lib/tron-addresses';
@@ -31,14 +31,6 @@ async function scenario(bundle:boolean){const pg=new PGlite();try{
  const genesis='0'.repeat(16)+'cd'.repeat(24),delegation='ab'.repeat(32),blockId='0000000000000064'+'cd'.repeat(24);
  let delivered=false,created=0,broadcasts=0,claim='',payload:Record<string,unknown>|undefined;
  const result=(v:unknown)=>new Response(JSON.stringify(v),{headers:{'content-type':'application/json'}});
- const provider=(async(url,init)=>{
-  const path=new URL(String(url)).pathname,p=JSON.parse(String(init?.body));
-  if(path.endsWith('/services'))return result({code:0,result:{bandwidth:[{duration:1,min_amount:1000,max_amount:10000,price:'1'}]}});
-  if(path.endsWith('calculate'))return result({code:0,result:{address:source,type:'energy',amount:65000,duration:1,price:'3.85',activation_fee:'0',total:'3.85'}});
-  if(path.endsWith('/new')){created++;claim=p.external_id;assert.equal(p.params.address,source);assert.equal(p.params.amounts.energy,65000);assert.equal(p.service,bundle?'resource_bundle':'energy');assert.equal(p.params.amounts.bandwidth,bundle?1000:undefined)}
-  if(path.endsWith('/check'))assert.equal(p.external_id,claim);
-  return result({code:0,result:{id:'fixture-energy',external_id:claim,service:bundle?'resource_bundle':'energy',params:{address:source,duration:1,amounts:{energy:65000,...(bundle?{bandwidth:1000}:{})}},status:delivered?'success':'pending',amount:bundle?'4.85':'3.85',hash:delivered?delegation:''}});
- }) as typeof fetch;
  const topicAddress=(a:string)=>TronWeb.address.toHex(a).slice(2).padStart(64,'0');
  const log={address:TronWeb.address.toHex(tronUsdtContract).slice(2),topics:['ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',topicAddress(source),topicAddress(to)],data:(100000000n).toString(16).padStart(64,'0')};
  const chain=(async(url,init)=>{
@@ -58,7 +50,13 @@ async function scenario(bundle:boolean){const pg=new PGlite();try{
   throw Error('Unexpected fixture path '+path);
  }) as typeof fetch;
  const tron={endpoint:'https://tron.example.invalid',fetch:chain},bep20={endpoint:'https://bsc.example.invalid',fetch:chain};
- const client=tronZapOrderClient({credentials:{token:'fixture-token',secret:'fixture-secret'},purchaseEnabled:true,acceptVariableProviderPrice:true,fetch:provider});
+ // Provider-neutral domain fixture. This is NOT a live CatFee integration/price guarantee.
+ const client:ResourceProvider={
+  quote:async()=>({costSun:bundle?4850000n:3850000n,expiresAt:Date.now()+25000}),
+  bandwidthPackage:async()=>1000,
+  send:async o=>{created++;claim=o.requestKey;assert.equal(o.sender,source);assert.equal(o.energyAmount,65000);assert.equal(o.bandwidthAmount??0,bundle?1000:0);return {orderId:'fixture-energy'}},
+  check:async o=>{assert.equal(o.requestKey,claim);return {orderId:'fixture-energy',status:delivered?'success':'pending',actualCostSun:bundle?4850000n:3850000n,priceExceeded:false,delegationTxId:delivered?delegation:undefined}},
+ };
  const execution=createFinancialExecution(db,{purchaseEnabled:true,client,delivery:createEnergyDeliveryObserver({...tron,genesisId:genesis}),resources:createOutboxResourceObserver({bep20,tron,tronGenesisId:genesis})});
  const preparation=createFinancialPreparation(db,{enabled:true,bandwidthPackage:client.bandwidthPackage,preflight:createFinancialPreflight({bep20,tron,genesisId:genesis,tronReadOwner:to}),gas:{prepare:async()=>{throw Error('No BNB')},process:async()=>{throw Error('No BNB')}},energy:execution.energy,limits:()=>({maxAmount:1000000000n,maxFee:4000000n,minimumSweep:1000000n}),signSweep:(d,c)=>prepareSignedSweep(d,c,{loadKeys:()=>({accountXpub:account.publicExtendedKey,accountXprv:account.privateExtendedKey})})});
  const signal=new AbortController().signal,job={kind:'PREPARE_SWEEP' as const,id};
@@ -83,7 +81,7 @@ async function scenario(bundle:boolean){const pg=new PGlite();try{
  assert.equal((await pg.query('SELECT id FROM "DispatchApprovalHistory" WHERE "outboxId"=$1',[expired.id])).rows.length,1);
  assert.equal(created,1);assert.equal(broadcasts,1);
  assert.equal((await pg.query<{bandwidthAmount:number}>('SELECT "bandwidthAmount" FROM "EnergyRentalIntent"')).rows[0].bandwidthAmount,bundle?1000:0);
- console.log((bundle?'Bundled energy + bandwidth: ':'Energy-only: ')+ 'Autonomous TRON fixture cycle: unsigned simulation -> exact resource intent -> one paid-order fixture -> pending recovery without repurchase -> solid ENERGY delivery -> fresh HD signing -> resource/cost authorization with zero native prefund -> broadcast -> final exact Transfer/replay passed. No real paid calls.');
+ console.log((bundle?'Bundled energy + bandwidth: ':'Energy-only: ')+ 'Provider-neutral TRON fixture cycle (not CatFee acceptance): unsigned simulation -> exact resource intent -> one paid-order fixture -> pending recovery without repurchase -> solid ENERGY delivery -> fresh HD signing -> resource/cost authorization with zero native prefund -> broadcast -> final exact Transfer/replay passed. No real paid calls.');
 }finally{await pg.close()}}
 async function main(){await scenario(false);await scenario(true)}
 main().catch(e=>{console.error(e);process.exitCode=1});

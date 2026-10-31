@@ -8,9 +8,9 @@ import {purchaseIntentEnergy} from './energy-purchase';
 import {recoverIntentEnergy} from './energy-recovery';
 import {authorizeSweepDispatch,type SweepResources} from './sweep-dispatch';
 import {authorizePayoutDispatch} from './payout-resource-authorization';
-import type {tronZapOrderClient} from './tronzap-orders';
+import type {ResourceProvider} from './resource-provider';
 import type {createEnergyDeliveryObserver} from './energy-delivery-observer';
-type Client=ReturnType<typeof tronZapOrderClient>;
+type Client=ResourceProvider;
 export function createFinancialExecution(db:WalletDb,options:{purchaseEnabled:boolean;client?:Client;delivery?:ReturnType<typeof createEnergyDeliveryObserver>;resources:(input:{network:'TRC20'|'BEP20';txId:string;signedPayload:string;resourceCost:bigint;signal:AbortSignal})=>Promise<SweepResources>}){
  async function energy(intentId:string,signal:AbortSignal){
   const client=options.client,delivery=options.delivery;
@@ -18,6 +18,7 @@ export function createFinancialExecution(db:WalletDb,options:{purchaseEnabled:bo
   const i=await db.transaction(async tx=>{const {rows:[r]}=await tx.query('SELECT * FROM "EnergyRentalIntent" WHERE id=$1',[intentId]);if(!r)throw new Error('ENERGY_INTENT_NOT_FOUND');return r});
   if(i.state==='PREPARED'){
    if(!options.purchaseEnabled)return {state:'HELD',reason:'PURCHASE_DISABLED'} as const;
+   const blocked=client.purchaseBlocker?.();if(blocked)return {state:'HELD',reason:blocked} as const;
    const q=await client.quote({requestKey:randomUUID(),sender:String(i.senderAddress),bandwidthAmount:Number(i.bandwidthAmount??0),energyAmount:Number(i.energyAmount),durationMinutes:60,maxCostSun:BigInt(String(i.maxRentalSun)),signal});
    if(signal.aborted)throw new Error('WORKER_ABORTED');
    await purchaseIntentEnergy(db,intentId,{sender:String(i.senderAddress),bandwidthAmount:Number(i.bandwidthAmount??0),energyAmount:Number(i.energyAmount),durationMinutes:60,costSun:q.costSun,expiresAt:q.expiresAt,intentFingerprint:String(i.fingerprint)},{enabled:true,send:order=>client.send({...order,signal:AbortSignal.any([signal,order.signal])})});

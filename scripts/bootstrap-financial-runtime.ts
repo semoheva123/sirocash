@@ -6,7 +6,7 @@ import {financialConnectionString} from '../lib/financial-connection';
 import {runCustodyPreflight,runBep20DepositPreflight} from '../lib/custody-preflight';
 import {treasuryDestination} from '../lib/treasury-addresses';
 import {probeNetworkReadiness} from '../lib/network-readiness';
-import {tronZapReadClient,tronZapCredentials} from '../lib/tronzap';
+import {catFeeReadClient,catFeeCredentials} from '../lib/catfee';
 import {observeUsdtUsdPrice} from '../lib/financial-price';
 import {financialBscRpc} from '../lib/financial-rpc';
 import {chainJsonPost} from '../lib/chain-http';
@@ -32,7 +32,7 @@ async function main(){
  try{const {rows:[r]}=await worker.query(`SELECT current_user='sirocash_financial_worker' AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreaterole AND NOT rolcreatedb AND NOT has_column_privilege(current_user,'public."User"','passwordHash','SELECT') AND NOT has_table_privilege(current_user,'public."AuthSession"','SELECT') AS safe FROM pg_roles WHERE rolname=current_user`);if(r?.safe!==true)throw Error('BOOTSTRAP_ROLE_UNSAFE');console.log('BOOTSTRAP_CONNECTION:VERIFIED_TLS_RESTRICTED_WORKER')}finally{await worker.end()}
  for(const row of await probeNetworkReadiness(process.env))console.log('BOOTSTRAP_NETWORK:'+JSON.stringify(row));
  try{const price=await observeUsdtUsdPrice();console.log('BOOTSTRAP_PRICE:'+JSON.stringify({status:'OBSERVED',rateUsdMicros:price.rate.toString(),observedAt:price.observedAt}))}catch{console.log('BOOTSTRAP_PRICE:UNAVAILABLE')}
- try{const balance=await tronZapReadClient(tronZapCredentials()).balance();console.log('BOOTSTRAP_PROVIDER:'+JSON.stringify({balanceTrx:balance.balance,paidCalls:0}))}catch{console.log('BOOTSTRAP_PROVIDER:READ_FAILED')}
+ try{const balance=await catFeeReadClient(catFeeCredentials()).balance();console.log('BOOTSTRAP_PROVIDER:'+JSON.stringify({balanceSun:balance.balanceSun.toString(),paidCalls:0}))}catch{console.log('BOOTSTRAP_PROVIDER:READ_FAILED')}
  const signal=AbortSignal.timeout(20000);
  try{
   const rpc=financialBscRpc({endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION}),abi=new Interface(['function balanceOf(address) view returns(uint256)']);

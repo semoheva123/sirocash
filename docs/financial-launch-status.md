@@ -1,3 +1,5 @@
+> **Provider cutover (2026-11-01): CatFee is the sole selected provider.** See [current integration and launch restrictions](catfee.md). References to the former provider below are historical implementation/observation records, not active configuration. Do not restore its keys or roll back to its adapter.
+
 # Financial launch status
 
 > أحدث إضافة برمجية 2026-10-31: أُغلقت نواقص إنشاء الطلبات والتواقيع من السجلات المحفوظة، وتمويل غاز عناوين BEP20 من التشغيل بحدود مصاريف، وتجديد الموافقات وتواقيع TRON المنتهية التي لم تبدأ أي محاولة إرسال. رُبطت هذه المسارات بعامل التنفيذ واجتازت دورات محاكاة مترابطة للشبكتين. طُبّقت الترحيلات 33–36 على قاعدة الإنتاج وتحققت بصماتها وعزل 26 جدولًا وتسعة حواجز حماية. نُشرت نسخة التنفيذ الجديدة (`915947d`) بنجاح؛ الإنتاج المالي غير مفعّل. هذه ليست شهادة جاهزية إطلاق المنصة كلها أو إثباتًا ماليًا حيًا. راجع [نطاق التنفيذ وأدلته وحدود القبول](autonomous-financial-execution.md). التفاصيل القديمة أدناه تاريخية.

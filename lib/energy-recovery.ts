@@ -1,13 +1,13 @@
 import 'server-only';
 import type {WalletDb} from './wallet-engine';
-import type {TronZapOrder} from './tronzap-orders';
+import type {ResourceOrder} from './resource-provider';
 import type {EnergyDelivery} from './energy-delivery-observer';
 type Receipt={orderId:string;status:'new'|'pending'|'success'|'failed';actualCostSun:bigint;priceExceeded:boolean;delegationTxId?:string};
 /** Durable external-ID recovery. No create, retry, cancellation or refund capability.
  * Final charges are immutable, retained in the provider budget for its lifetime.
  * Failed/not-found orders never release the sender or authorize another purchase.
  */
-export async function recoverIntentEnergy(db:WalletDb,intentId:string,options:{check:(order:TronZapOrder)=>Promise<Receipt>;observe:(input:{sender:string;delegationTxId:string;energyAmount:number;bandwidthAmount?:number;signal:AbortSignal})=>Promise<EnergyDelivery>;signal:AbortSignal}){
+export async function recoverIntentEnergy(db:WalletDb,intentId:string,options:{check:(order:ResourceOrder)=>Promise<Receipt>;observe:(input:{sender:string;delegationTxId:string;energyAmount:number;bandwidthAmount?:number;signal:AbortSignal})=>Promise<EnergyDelivery>;signal:AbortSignal}){
  if(!/^[a-f0-9-]{36}$/i.test(intentId)||options.signal.aborted)throw new Error('ENERGY_RECOVERY_INPUT');
  const snapshot=await db.transaction(async tx=>{
   const {rows:[r]}=await tx.query('SELECT a.*,i.fingerprint,i."maxRentalSun",i."senderAddress" AS "intentSender",i."energyAmount" AS "intentEnergy",i."bandwidthAmount" AS "intentBandwidth" FROM "EnergyPurchaseAttempt" a JOIN "EnergyRentalIntent" i ON i.id=a."intentId" WHERE a."intentId"=$1',[intentId]);
