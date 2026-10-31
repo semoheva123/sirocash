@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {HDKey} from '@scure/bip32';
 import {TronWeb} from 'tronweb';
-import {emailAuthError} from '../lib/email-auth';
+import {emailAuthError,requestCode} from '../lib/email-auth';
 import {apiError,sameOrigin,PublicApiError} from '../lib/api';
 import {runCustodyPreflight,verifyTronCustodyKeys} from '../lib/custody-preflight';
 import {deriveTronDepositAddress} from '../lib/tron-addresses';
@@ -20,6 +20,20 @@ async function main(){
   for(const r of [req(),req('https://evil.test'),req('https://evil.test',{host:'evil.test','x-forwarded-host':'evil.test'}),req('http://wallet.example.test'),req('https://wallet.example.test',{ 'sec-fetch-site':'cross-site'}),req('null')])assert.throws(()=>sameOrigin(r));
   delete process.env.WEBAUTHN_ORIGIN;assert.throws(()=>sameOrigin(req('https://wallet.example.test')));
  }finally{for(const [key,value] of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+ // Identical signup responses/delivery; an existing user's real challenge is never replaced.
+ const configBefore={WEBAUTHN_ORIGIN:process.env.WEBAUTHN_ORIGIN,AUTH_SECRET:process.env.AUTH_SECRET,RESEND_API_KEY:process.env.RESEND_API_KEY,RESEND_FROM_EMAIL:process.env.RESEND_FROM_EMAIL};
+ try{
+  Object.assign(process.env,{WEBAUTHN_ORIGIN:'https://wallet.example.test',AUTH_SECRET:'x'.repeat(32),RESEND_API_KEY:'fixture-not-a-key',RESEND_FROM_EMAIL:'test@example.test'});
+  for(const existing of [false,true]){
+   const writes:string[]=[];let delivered=0;
+   const query=async(sql:string)=>{writes.push(sql);return {rows:sql.includes('SELECT * FROM "EmailRateLimit"')?[{lastSentAt:0,windowStart:0,count:0}]:sql.includes('SELECT id,"passwordHash"')&&existing?[{id:'existing',passwordHash:'unchanged'}]:[]}};
+   const response=await requestCode(new Request('https://wallet.example.test/api/auth/request',{method:'POST',headers:{origin:'https://wallet.example.test'},body:JSON.stringify({email:'test@example.test',password:'a long fixture password',mode:'signup'})}),{pool:()=>({query}),transaction:async(run:Function)=>run({query}),sendEmail:async()=>{delivered++}} as any);
+   assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+   const body=await response.json();assert.deepEqual(Object.keys(body),['challengeId','expiresIn','resendAfter']);assert.match(body.challengeId,/^[a-f0-9]{48}$/);assert.equal(delivered,1);
+   assert.equal(writes.some(sql=>sql.startsWith('INSERT INTO "EmailChallenge"')),!existing);
+   assert.equal(writes.some(sql=>sql.startsWith('DELETE FROM "EmailChallenge"')),!existing);
+  }
+ }finally{for(const [key,value] of Object.entries(configBefore)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
  const account=HDKey.fromMasterSeed(new Uint8Array(32).fill(81)).derive("m/44'/195'/0'");
  const key='01'.padStart(64,'0');
  try{

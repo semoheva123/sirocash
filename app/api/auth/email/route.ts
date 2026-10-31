@@ -1,3 +1,4 @@
+import {readJson} from '@/lib/request-body';
 import {NextResponse} from 'next/server';
 import {Resend} from 'resend';
 import {sameOrigin} from '@/lib/api';
@@ -12,7 +13,7 @@ export const dynamic='force-dynamic';
 export async function POST(request:Request){
  try{sameOrigin(request)}catch{return securityFailure('الطلب غير مسموح من هذا المصدر.',403)}
  try{
-  const body=await request.json(),confirming=body?.challengeId!==undefined;
+  const body=await readJson(request),confirming=body?.challengeId!==undefined;
   const input=confirming?emailChangeConfirmSchema.parse(body):emailChangeRequestSchema.parse(body);
   const user=await currentUser(request),tokenHash=sessionTokenHash(request);
   if(!user||!tokenHash)return securityFailure('يُرجى تسجيل الدخول مجدداً.',401);

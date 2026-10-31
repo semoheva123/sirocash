@@ -1,3 +1,4 @@
+import {readJson} from '@/lib/request-body';
 import {NextResponse} from 'next/server';
 import {sameOrigin} from '@/lib/api';
 import {currentUser,sessionTokenHash} from '@/lib/email-auth';
@@ -18,7 +19,7 @@ export async function GET(request:Request){
 export async function DELETE(request:Request){
  try{sameOrigin(request)}catch{return securityFailure('الطلب غير مسموح من هذا المصدر.',403)}
  try{
-  const input=revokeSessionsSchema.parse(await request.json());
+  const input=revokeSessionsSchema.parse(await readJson(request));
   const user=await currentUser(request),tokenHash=sessionTokenHash(request);
   if(!user||!tokenHash)return securityFailure('يُرجى تسجيل الدخول مجدداً.',401);
   const result=await revokeSessions(user.id,tokenHash,input,databaseTransaction);

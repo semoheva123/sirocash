@@ -1,3 +1,4 @@
+import {readJson} from '@/lib/request-body';
 import {NextResponse} from 'next/server';
 import {randomBytes} from 'node:crypto';
 import {setTimeout as pause} from 'node:timers/promises';
@@ -13,7 +14,7 @@ export const dynamic='force-dynamic';
 export async function POST(request:Request){
  try{sameOrigin(request)}catch{return securityFailure('الطلب غير مسموح من هذا المصدر.',403)}
  try{
-  const body=await request.json(),secret=process.env.AUTH_SECRET||'';
+  const body=await readJson(request),secret=process.env.AUTH_SECRET||'';
   if(body?.challengeId!==undefined){
    const result=await confirmRecovery(recoveryConfirmSchema.parse(body),databaseTransaction,secret);
    if(result!=='changed')return securityFailure(result==='unchanged_password'?'يجب اختيار كلمة مرور جديدة تختلف عن السابقة.':'رمز التحقق غير صحيح أو منتهي الصلاحية، أو تم استنفاد المحاولات.',400);

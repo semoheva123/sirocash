@@ -1,3 +1,4 @@
+import {readJson} from './request-body';
 import 'server-only';
 import {recordSecurityEvent} from './security-events';
 import {deviceLabel} from './account-security';
@@ -17,9 +18,14 @@ function cookieToken(request:Request){return request.headers.get('cookie')?.spli
 export function sessionTokenHash(request:Request){const token=cookieToken(request);return token?hash(token):null}
 export async function currentUser(request:Request){const token=cookieToken(request);if(!token)return null;const {rows}=await pool().query('SELECT u.id,u.email,u."emailVerifiedAt" FROM "AuthSession" s JOIN "User" u ON u.id=s."userId" WHERE s."tokenHash"=$1 AND s."expiresAt">NOW()',[hash(token)]);return rows[0] as {id:string;email:string;emailVerifiedAt:string}|undefined??null}
 export async function requireUser(request:Request){let user;try{user=await currentUser(request)}catch{throw new PublicApiError('خدمة الحسابات غير متاحة مؤقتاً.')}if(!user)throw new PublicApiError('يتطلّب هذا الإجراء تسجيل الدخول والتحقق من البريد الإلكتروني.');return user}
-export async function requestCode(request:Request){
+const emailRequestServices={pool,transaction,sendEmail:async(to:string,code:string,mode:'signup'|'login')=>{
+ const {error}=await new Resend(process.env.RESEND_API_KEY).emails.send({from:process.env.RESEND_FROM_EMAIL!,to,...verificationEmail(code,mode)});
+ if(error)throw Error('delivery');
+}};
+export async function requestCode(request:Request,services=emailRequestServices){
+ const {pool,transaction,sendEmail}=services;
  sameOrigin(request);
- const {email,password,mode}=z.object({email:z.string().trim().email('أدخل بريداً إلكترونياً صحيحاً.').max(254).transform(v=>v.toLowerCase()),password:passwordSchema,mode:z.enum(['signup','login'])}).parse(await request.json());
+ const {email,password,mode}=z.object({email:z.string().trim().email('أدخل بريداً إلكترونياً صحيحاً.').max(254).transform(v=>v.toLowerCase()),password:passwordSchema,mode:z.enum(['signup','login'])}).parse(await readJson(request));
  if(!process.env.RESEND_API_KEY||!process.env.RESEND_FROM_EMAIL)throw new PublicApiError('خدمة إرسال البريد غير متاحة حالياً. يرجى المحاولة لاحقاً.');
  const id=randomBytes(24).toString('hex'),code=String(randomInt(100000,1000000)),codeHash=otpHash(id,code);
  // Durable per-email cooldown and hourly quota. Infrastructure must also enforce IP/global quotas.
@@ -39,7 +45,7 @@ export async function requestCode(request:Request){
  const {rows:[existing]}=await pool().query('SELECT id,"passwordHash" FROM "User" WHERE email=$1',[email]);
  let passwordHash:string;
  if(mode==='signup'){
-  if(existing)return NextResponse.json({error:'تعذّر إنشاء الحساب بالبيانات المقدّمة. يُرجى استخدام واجهة تسجيل الدخول أو التواصل مع الدعم.'},{status:400});
+  // Equal password work and response shape whether or not an account exists.
   passwordHash=await hashPassword(password);
  }else{
   // Perform a real scrypt even for unknown/legacy accounts to reduce timing disclosure.
@@ -48,19 +54,18 @@ export async function requestCode(request:Request){
   if(!valid||!existing?.passwordHash)return NextResponse.json({error:'البريد الإلكتروني أو كلمة المرور غير صحيحة.'},{status:400});
   passwordHash=existing.passwordHash;
  }
- await transaction(async c=>{
+ // Existing signup receives the same delivery and opaque response, but no usable challenge.
+ if(!(mode==='signup'&&existing)) await transaction(async c=>{
   await c.query('DELETE FROM "EmailChallenge" WHERE email=$1 OR "expiresAt"<NOW()',[email]);
   await c.query('INSERT INTO "EmailChallenge" (id,email,"codeHash","expiresAt","passwordHash",purpose) VALUES ($1,$2,$3,NOW()+INTERVAL \'10 minutes\',$4,$5)',[id,email,codeHash,passwordHash,mode]);
  });
  try{
-  const message=verificationEmail(code,mode);
-  const {error}=await new Resend(process.env.RESEND_API_KEY).emails.send({from:process.env.RESEND_FROM_EMAIL,to:email,...message});
-  if(error)throw Error('delivery');
+  await sendEmail(email,code,mode);
  }catch{await pool().query('DELETE FROM "EmailChallenge" WHERE id=$1',[id]);throw new PublicApiError('تعذّر إرسال رمز التحقق. يرجى المحاولة لاحقاً.');}
  return NextResponse.json({challengeId:id,expiresIn:600,resendAfter:60},{headers:{'Cache-Control':'no-store'}});
 }
 export async function verifyCode(request:Request){
- sameOrigin(request);const {challengeId,code}=z.object({challengeId:z.string().regex(/^[a-f0-9]{48}$/),code:z.string().regex(/^\d{6}$/)}).parse(await request.json());
+ sameOrigin(request);const {challengeId,code}=z.object({challengeId:z.string().regex(/^[a-f0-9]{48}$/),code:z.string().regex(/^\d{6}$/)}).parse(await readJson(request));
  const token=randomBytes(32).toString('hex');
  const user=await transaction(async c=>{
   const {rows:[challenge]}=await c.query('SELECT * FROM "EmailChallenge" WHERE id=$1 FOR UPDATE',[challengeId]);

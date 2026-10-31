@@ -1,3 +1,4 @@
+import {readJson} from './request-body';
 import {NextResponse} from 'next/server';
 import {sameOrigin,PublicApiError} from './api';
 import {requireUser,sessionTokenHash} from './email-auth';
@@ -19,7 +20,7 @@ export async function handlePasskey(request:Request){
  if(process.env.SIRO_DURABLE_PASSKEY_ENABLED!=='true')throw Error('يجري تجهيز خدمة التحقق الدائم من الجهاز. لا يمكن اعتماد عمليات مالية حالياً.');
  const user=await requireUser(request),sessionHash=sessionTokenHash(request);
  if(!sessionHash)throw Error('يرجى تسجيل الدخول مجدداً.');
- const input=await request.json();
+ const input=await readJson(request,65536);
  if(!input||typeof input!=='object'||Array.isArray(input)||typeof input.action!=='string')throw Error('طلب غير صالح.');
  const db:WalletDb={transaction:run=>databaseTransaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows})}))};
  try{

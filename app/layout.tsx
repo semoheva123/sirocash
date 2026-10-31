@@ -1,3 +1,4 @@
+import {headers} from 'next/headers';
 import type { Metadata } from 'next';
 import '@fontsource-variable/manrope';
 import '@fontsource-variable/noto-sans-arabic';
@@ -8,4 +9,4 @@ import './atelier.css';
 import './fintech.css';
 import './world-class.css';
 export const metadata: Metadata = {title: 'SiroCash — كل ما تحتاجه. في محفظة واحدة.', description: 'مساحة موحّدة للحساب والمحفظة الرقمية وإعدادات الحماية. نسخة تجريبية؛ الخدمات المالية الفعلية غير مفعّلة. A considered account and wallet preview.'};
-export default function RootLayout({ children }: { children: React.ReactNode }) {return <html lang="ar" dir="rtl"><body><a className="atelier-skip" href="#main-content">تجاوز التنقّل / Skip navigation</a>{children}</body></html>}
+export default async function RootLayout({ children }: { children: React.ReactNode }) {await headers();return <html lang="ar" dir="rtl"><body><a className="atelier-skip" href="#main-content">تجاوز التنقّل / Skip navigation</a>{children}</body></html>}

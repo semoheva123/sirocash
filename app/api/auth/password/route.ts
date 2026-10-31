@@ -1,3 +1,4 @@
+import {readJson} from '@/lib/request-body';
 import {NextResponse} from 'next/server';
 import {sameOrigin} from '@/lib/api';
 import {currentUser,sessionTokenHash} from '@/lib/email-auth';
@@ -14,7 +15,7 @@ function failure(error:string,status:number,extra:Record<string,string>={}){retu
 export async function POST(request:Request){
  try{sameOrigin(request)}catch{return failure('الطلب غير مسموح من هذا المصدر.',403)}
  try{
-  const body=await request.json();
+  const body=await readJson(request);
   const confirming=body?.challengeId!==undefined;
   const input=confirming?passwordOtpSchema.parse(body):passwordChangeSchema.parse(body);
   const user=await currentUser(request),tokenHash=sessionTokenHash(request);
