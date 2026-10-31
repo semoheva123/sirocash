@@ -4,7 +4,7 @@
 - Double-entry wallet engine and reservations; 1% sender-added internal fee.
 - Private valuation-to-journal composition with explicit approved non-peg rate, inbox-evidence binding, atomic credit/audit state, rollback and replay tests; no pricing authority/runtime grants activated.
 - Gated PostgreSQL-backed passkey credentials/challenges, hashed single-use approvals and transaction-local consumption; legacy financial routes still deny. Persistence tests mock WebAuthn verification, not real-device ceremonies.
-- USDT withdrawal tariff quotes: 5 TRC20 / 2 BEP20 gross-deducted. Live settlement binding still absent.
+- Immutable USDT withdrawal quotes: 5 TRC20 / 2 BEP20 gross-deducted, explicit non-peg USD economics; digest approval+reservation composed atomically, identity/global checks reused, balanced net/revenue settlement and generic-settlement bypass guard tested privately. No live quote authority or payout evidence adapter.
 - Watch-only TRON/BEP20 address derivation and gated transactional assignment.
 - Offline HD child sweep signing and durable signed-sweep preparation outbox, with fixed operating destinations.
 - Private successful TRON/BEP20 sweep confirmation bound to persisted signed bytes and exact finalized Transfer evidence, with atomic audit/state and conservative pending retention. Not a dispatcher or live observer.
@@ -18,7 +18,7 @@
 - Authenticated mainnet RPC watcher, inclusion verification, replay/checkpoints and reorg reconciliation.
 - Reviewed live pricing authority/import/audit policy and restricted runtime posting privileges. Private approved-valuation-to-ledger composition now exists, but no authority is provisioned or live posting enabled.
 - Real-device passkey ceremonies, credential management/recovery and authoritative quote-bound command integration. Durable storage/consumption now exists behind a disabled deployment flag; financial use remains blocked.
-- Persisted withdrawal tariff and balanced net/revenue settlement.
+- Live authoritative withdrawal quote issuance/confirmation UX and chain-verified payout settlement. Private persisted tariff/approval/reservation/net-revenue settlement exists; no live payout adapter.
 - Paid energy dispatch, enforced provider price cap and independent delivery reconciliation.
 - Sweep/payout/refill workers with atomic budgets, durable signed transaction identities and crash recovery.
 - Production BEP20 endpoint/auth provisioning and provider testing, observer scheduling/checkpoints and replay/reorg handling. Bounded transport and receipt observer exist with mock integration tests, not a live provider test.

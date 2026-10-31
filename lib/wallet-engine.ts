@@ -31,20 +31,21 @@ async function begin(tx:WalletTx,c:Command,kind:string,other:string|null=null,de
  const {rows:[row]}=await tx.query('SELECT * FROM "WalletOperation" WHERE "ownerId"=$1 AND "requestKey"=$2 FOR UPDATE',[owner,c.requestKey]);
  if(!row||row.fingerprint!==fingerprint)throw Error('IDEMPOTENCY_CONFLICT');return row;
 }
-async function accounts(tx:WalletTx,users:string[],poolId?:string){
+export async function accounts(tx:WalletTx,users:string[],poolId?:string,extraPoolIds:string[]=[]){
+ const pools=[...new Set([...(poolId?[poolId]:[]),...extraPoolIds].map(id))];
  // Lock in deterministic UUID order. All balance-consuming operations use these same locks.
  const owners=[...new Set(users.map(id))].sort();
  for(const owner of owners){
   const {rows:[user]}=await tx.query('SELECT id FROM "User" WHERE id=$1 AND "emailVerifiedAt" IS NOT NULL',[owner]);if(!user)throw Error('ACCOUNT_UNAVAILABLE');
   await tx.query('INSERT INTO "LedgerAccount" (id,"userId","accountType",currency) VALUES ($1,$2,\'USER\',\'USD\') ON CONFLICT ("userId","accountType",currency) DO NOTHING',[randomUUID(),owner]);
  }
- const {rows}=await tx.query('SELECT id,"userId",balance,"accountType",currency FROM "LedgerAccount" WHERE ("userId"=ANY($1::uuid[]) AND "accountType"=\'USER\' AND currency=\'USD\') OR id=$2 ORDER BY id FOR UPDATE',[owners,poolId?id(poolId):null]);
+ const {rows}=await tx.query('SELECT id,"userId",balance,"accountType",currency FROM "LedgerAccount" WHERE ("userId"=ANY($1::uuid[]) AND "accountType"=\'USER\' AND currency=\'USD\') OR id=ANY($2::uuid[]) ORDER BY id FOR UPDATE',[owners,pools]);
  const owned=new Map(rows.filter(r=>r.userId).map(r=>[String(r.userId),r]));
  if(owned.size!==owners.length)throw Error('ACCOUNT_UNAVAILABLE');
- if(poolId&&!rows.some(r=>r.id===poolId.toLowerCase()&&r.accountType==='MASTER_POOL'&&!r.userId&&r.currency==='USD'))throw Error('INVALID_SETTLEMENT_ACCOUNT');
+ if(pools.some(pool=>!rows.some(r=>r.id===pool&&r.accountType==='MASTER_POOL'&&!r.userId&&r.currency==='USD')))throw Error('INVALID_SETTLEMENT_ACCOUNT');
  return owned;
 }
-async function available(tx:WalletTx,owner:string,balance:string,exclude:string|null=null){
+export async function available(tx:WalletTx,owner:string,balance:string,exclude:string|null=null){
  const {rows:[row]}=await tx.query('SELECT COALESCE(SUM(amount),0)::text AS held FROM "WalletOperation" WHERE "ownerId"=$1 AND kind=\'WITHDRAWAL\' AND state IN (\'RESERVED\',\'SUBMITTED\') AND ($2::uuid IS NULL OR id<>$2)',[owner,exclude]);
  const funds=moneyMicros(balance)-moneyMicros(String(row.held));if(funds<0n)throw Error('INCONSISTENT_RESERVATIONS');return funds;
 }
@@ -85,8 +86,11 @@ export async function creditConfirmedDepositInTransaction(tx:WalletTx,c:Command&
  return post(tx,row,'DEPOSIT',null,owner,id(c.settlementAccountId),String(a.get(owner)!.id));
 }
 export function reserveWithdrawal(db:WalletDb,c:Command&{destination:string}){
+ return transact(db,tx=>reserveWithdrawalInTransaction(tx,c));
+}
+/** Private composition: authorization and reservation must commit together. */
+export async function reserveWithdrawalInTransaction(tx:WalletTx,c:Command&{destination:string}){
  const destination=reference(c.destination),owner=id(c.ownerId);
- return transact(db,async tx=>{
   const row=await begin(tx,c,'WITHDRAWAL',null,destination);if(row.state!=='PENDING')return operation(row);
   const a=await accounts(tx,[owner]);
   const {rows:[identity]}=await tx.query('SELECT "kycStatus" FROM "User" WHERE id=$1',[owner]);
@@ -100,7 +104,6 @@ export function reserveWithdrawal(db:WalletDb,c:Command&{destination:string}){
       (state='COMPLETED' AND "updatedAt">=date_trunc('day',statement_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'))`);
   if(moneyMicros(String(usage.used))+moneyMicros(String(row.amount))>withdrawalLimits.platformDailyMicros)throw Error('PLATFORM_DAILY_WITHDRAWAL_LIMIT_EXCEEDED');
   const {rows:[reserved]}=await tx.query('UPDATE "WalletOperation" SET state=\'RESERVED\',"updatedAt"=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *',[row.id]);return operation(reserved);
- });
 }
 /** Mark BEFORE initiating a provider request, using operationId as provider idempotency key.
  * Crash/timeouts stay SUBMITTED and held until a reconciler obtains definitive evidence.
@@ -116,6 +119,7 @@ export function settleWithdrawal(db:WalletDb,operationId:string,evidence:{outcom
  const external=reference(evidence.providerReference);if(!['confirmed','rejected'].includes(evidence.outcome))throw Error('INVALID_OUTCOME');
  return transact(db,async tx=>{
   const {rows:[row]}=await tx.query('SELECT * FROM "WalletOperation" WHERE id=$1 AND kind=\'WITHDRAWAL\' FOR UPDATE',[id(operationId)]);if(!row)throw Error('OPERATION_UNAVAILABLE');
+  if(String(row.destination).startsWith('USDTQ:'))throw Error('QUOTED_WITHDRAWAL_SETTLEMENT_REQUIRED');
   if(['COMPLETED','FAILED'].includes(String(row.state))){if(row.externalReference!==external||(row.state==='COMPLETED')!==(evidence.outcome==='confirmed'))throw Error('SETTLEMENT_CONFLICT');return operation(row)}
   if(row.state!=='SUBMITTED')throw Error('WITHDRAWAL_NOT_SUBMITTED');
   const owner=String(row.ownerId),a=await accounts(tx,[owner],evidence.settlementAccountId);

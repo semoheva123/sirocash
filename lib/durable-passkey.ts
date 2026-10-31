@@ -12,7 +12,7 @@ function decode(row:Record<string,unknown>):WebAuthnCredential{
  const counter=Number(row.counter);if(!Number.isSafeInteger(counter)||counter<0)throw new Error('PASSKEY_COUNTER_INVALID');
  return {id:String(row.id),publicKey:new Uint8Array(Buffer.from(String(row.publicKey),'base64')),counter,transports:row.transports as WebAuthnCredential['transports']};
 }
-async function lockSession(tx:WalletTx,c:Context){
+export async function assertDurableSession(tx:WalletTx,c:Context){
  const {rows:[session]}=await tx.query('SELECT "userId" FROM "AuthSession" WHERE "tokenHash"=$1 AND "userId"=$2 AND "expiresAt">statement_timestamp() FOR UPDATE',[c.sessionHash,c.userId]);
  if(!session)throw new Error('PASSKEY_SESSION_EXPIRED');
 }
@@ -21,7 +21,7 @@ async function lockSession(tx:WalletTx,c:Context){
  */
 export async function durablePasskeyAction(db:WalletDb,c:Context,input:Input,verify=webauthn){
  const result=await db.transaction(async tx=>{
-  await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');await lockSession(tx,c);
+  await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');await assertDurableSession(tx,c);
   // Serialize registration across multiple auth sessions of the same account.
   const {rows:[user]}=await tx.query('SELECT id FROM "User" WHERE id=$1 AND "emailVerifiedAt" IS NOT NULL FOR UPDATE',[c.userId]);
   if(!user)throw new Error('PASSKEY_ACCOUNT_UNAVAILABLE');
@@ -65,7 +65,7 @@ export async function durablePasskeyAction(db:WalletDb,c:Context,input:Input,ver
 /** Must run INSIDE the same transaction as a future financial command. No standalone debit authorization. */
 export async function consumeDurableApproval(tx:WalletTx,c:Context,token:string,digest:string){
  if(!/^[a-f0-9]{64}$/.test(token)||!/^[a-f0-9]{64}$/.test(digest))throw new Error('PAYMENT_APPROVAL_REQUIRED');
- await lockSession(tx,c);
+ await assertDurableSession(tx,c);
  const {rows:[row]}=await tx.query(`UPDATE "DurablePaymentApproval" a SET "consumedAt"=statement_timestamp() FROM "DurablePasskeyCredential" k WHERE a."tokenHash"=$1 AND a."sessionHash"=$2 AND a.digest=$3 AND a."consumedAt" IS NULL AND a."expiresAt">statement_timestamp() AND k.id=a."credentialId" AND k."userId"=$4 AND k."rpId"=$5 RETURNING a."tokenHash"`,[hash(token),c.sessionHash,digest,c.userId,c.rpID]);
  if(!row)throw new Error('PAYMENT_APPROVAL_REQUIRED');
 }

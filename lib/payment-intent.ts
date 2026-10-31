@@ -4,5 +4,5 @@ export function paymentDigest(path:string,payload:unknown){
  if(!allowed.has(path)||!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('طلب غير صالح.');
  const p=payload as Record<string,unknown>;
  // Bind approval to exactly the financial operation; never retain the PIN.
- return createHash('sha256').update(JSON.stringify([path,...['recipient','phone','operator','amount','chain','asset','fee','netAmount','totalDebit','requestKey','quoteId','feePolicy'].map(k=>[k,p[k]??null])])).digest('hex');
+ return createHash('sha256').update(JSON.stringify([path,...['recipient','phone','operator','amount','chain','asset','fee','netAmount','totalDebit','requestKey','quoteId','feePolicy','grossUsd','feeUsd','netUsd','rateReference'].map(k=>[k,p[k]??null])])).digest('hex');
 }

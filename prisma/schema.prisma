@@ -40,6 +40,7 @@ enum CryptoAsset {
   USDC
 }
 model User {
+ usdtWithdrawalQuotes UsdtWithdrawalQuote[]
  durablePasskeys DurablePasskeyCredential[]
  depositAddresses UserDepositAddress[]
   walletOperations WalletOperation[] @relation("WalletOwner")
@@ -64,6 +65,8 @@ model User {
   depositAddresses DepositAddress[]
 }
 model LedgerAccount {
+ withdrawalSettlements UsdtWithdrawalQuote[] @relation("QuoteSettlement")
+ withdrawalRevenue UsdtWithdrawalQuote[] @relation("QuoteRevenue")
  depositValuations ApprovedDepositValuation[]
   feeOperations WalletOperation[] @relation("WalletFeeAccount")
   id String @id @default(uuid()) @db.Uuid
@@ -200,6 +203,7 @@ model SecurityNotification {
 }
 
 model WalletOperation {
+ usdtWithdrawalQuote UsdtWithdrawalQuote?
  depositValuation ApprovedDepositValuation?
  energyRentalIntent EnergyRentalIntent?
  feeAmount Decimal @default(0) @db.Decimal(20,6)
@@ -364,4 +368,31 @@ model ApprovedDepositValuation {
  expiresAt DateTime @db.Timestamptz(6)
  operationId String? @unique @db.Uuid
  operation WalletOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+}
+
+model UsdtWithdrawalQuote {
+ id String @id @db.Uuid
+ ownerId String @db.Uuid
+ owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+ requestKey String
+ fingerprint String
+ network String
+ recipient String
+ grossTokens Decimal @db.Decimal(20,6)
+ feeTokens Decimal @db.Decimal(20,6)
+ netTokens Decimal @db.Decimal(20,6)
+ grossUsd Decimal @db.Decimal(20,6)
+ feeUsd Decimal @db.Decimal(20,6)
+ netUsd Decimal @db.Decimal(20,6)
+ rateUsdMicrosPerToken Decimal @db.Decimal(30,0)
+ rateReference String
+ settlementAccountId String @db.Uuid
+ settlement LedgerAccount @relation("QuoteSettlement", fields: [settlementAccountId], references: [id], onDelete: Restrict)
+ feeAccountId String @db.Uuid
+ feeAccount LedgerAccount @relation("QuoteRevenue", fields: [feeAccountId], references: [id], onDelete: Restrict)
+ expiresAt DateTime @db.Timestamptz(6)
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ operationId String? @unique @db.Uuid
+ operation WalletOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+ @@unique([ownerId,requestKey])
 }
