@@ -7,14 +7,14 @@ type Receipt={orderId:string;status:'new'|'pending'|'success'|'failed';actualCos
  * Final charges are immutable, retained in the provider budget for its lifetime.
  * Failed/not-found orders never release the sender or authorize another purchase.
  */
-export async function recoverIntentEnergy(db:WalletDb,intentId:string,options:{check:(order:TronZapOrder)=>Promise<Receipt>;observe:(input:{sender:string;delegationTxId:string;energyAmount:number;signal:AbortSignal})=>Promise<EnergyDelivery>;signal:AbortSignal}){
+export async function recoverIntentEnergy(db:WalletDb,intentId:string,options:{check:(order:TronZapOrder)=>Promise<Receipt>;observe:(input:{sender:string;delegationTxId:string;energyAmount:number;bandwidthAmount?:number;signal:AbortSignal})=>Promise<EnergyDelivery>;signal:AbortSignal}){
  if(!/^[a-f0-9-]{36}$/i.test(intentId)||options.signal.aborted)throw new Error('ENERGY_RECOVERY_INPUT');
  const snapshot=await db.transaction(async tx=>{
-  const {rows:[r]}=await tx.query('SELECT a.*,i.fingerprint,i."maxRentalSun",i."senderAddress" AS "intentSender",i."energyAmount" AS "intentEnergy" FROM "EnergyPurchaseAttempt" a JOIN "EnergyRentalIntent" i ON i.id=a."intentId" WHERE a."intentId"=$1',[intentId]);
-  if(!r||r.intentFingerprint!==r.fingerprint||r.senderAddress!==r.intentSender||r.energyAmount!==r.intentEnergy)throw new Error('ENERGY_RECOVERY_BINDING');return r;
+  const {rows:[r]}=await tx.query('SELECT a.*,i.fingerprint,i."maxRentalSun",i."senderAddress" AS "intentSender",i."energyAmount" AS "intentEnergy",i."bandwidthAmount" AS "intentBandwidth" FROM "EnergyPurchaseAttempt" a JOIN "EnergyRentalIntent" i ON i.id=a."intentId" WHERE a."intentId"=$1',[intentId]);
+  if(!r||r.intentFingerprint!==r.fingerprint||r.senderAddress!==r.intentSender||r.energyAmount!==r.intentEnergy||Number(r.bandwidthAmount??0)!==Number(r.intentBandwidth??0))throw new Error('ENERGY_RECOVERY_BINDING');return r;
  });
  let receipt:Receipt;
- try{receipt=await options.check({requestKey:String(snapshot.claimId),sender:String(snapshot.senderAddress),energyAmount:Number(snapshot.energyAmount),durationMinutes:60,maxCostSun:BigInt(String(snapshot.costSun)),signal:options.signal})}catch{return {state:'HELD',reason:'PROVIDER_LOOKUP_UNVERIFIED'} as const}
+ try{receipt=await options.check({requestKey:String(snapshot.claimId),sender:String(snapshot.senderAddress),energyAmount:Number(snapshot.energyAmount),bandwidthAmount:Number(snapshot.bandwidthAmount??0),durationMinutes:60,maxCostSun:BigInt(String(snapshot.costSun)),signal:options.signal})}catch{return {state:'HELD',reason:'PROVIDER_LOOKUP_UNVERIFIED'} as const}
  if(!/^[A-Za-z0-9:_-]{1,128}$/.test(receipt.orderId)||typeof receipt.actualCostSun!=='bigint'||receipt.actualCostSun<0n||receipt.actualCostSun>9223372036854775807n||!['new','pending','success','failed'].includes(receipt.status)||(receipt.delegationTxId!==undefined&&!/^[a-f0-9]{64}$/.test(receipt.delegationTxId)))throw new Error('ENERGY_RECOVERY_RESPONSE');
  const final=receipt.status==='success'||receipt.status==='failed';
  // Learn the real charge even if native delivery proof subsequently fails.
@@ -35,8 +35,8 @@ export async function recoverIntentEnergy(db:WalletDb,intentId:string,options:{c
  if(breach)return {state:'HELD',reason:'PRICE_BREACH_PURCHASES_DISABLED'} as const;
  if(receipt.status!=='success'||!receipt.delegationTxId)return {state:'HELD',reason:'PROVIDER_NOT_DELIVERED'} as const;
  let proof:EnergyDelivery;
- try{proof=await options.observe({sender:String(snapshot.senderAddress),delegationTxId:receipt.delegationTxId,energyAmount:Number(snapshot.energyAmount),signal:options.signal})}catch{return {state:'HELD',reason:'CHAIN_DELIVERY_UNPROVEN'} as const}
- if(options.signal.aborted||proof.sender!==snapshot.senderAddress||proof.energyAmount!==snapshot.energyAmount||proof.delegationTxId!==receipt.delegationTxId)throw new Error('ENERGY_DELIVERY_BINDING');
+ try{proof=await options.observe({sender:String(snapshot.senderAddress),delegationTxId:receipt.delegationTxId,energyAmount:Number(snapshot.energyAmount),bandwidthAmount:Number(snapshot.bandwidthAmount??0),signal:options.signal})}catch{return {state:'HELD',reason:'CHAIN_DELIVERY_UNPROVEN'} as const}
+ if(options.signal.aborted||proof.sender!==snapshot.senderAddress||proof.energyAmount!==snapshot.energyAmount||Number(proof.bandwidthAmount??0)!==Number(snapshot.bandwidthAmount??0)||proof.delegationTxId!==receipt.delegationTxId)throw new Error('ENERGY_DELIVERY_BINDING');
  await db.transaction(async tx=>{
   const {rows:[a]}=await tx.query('SELECT * FROM "EnergyPurchaseAttempt" WHERE "intentId"=$1 FOR UPDATE',[intentId]);
   if(!a||a.claimId!==snapshot.claimId||a.providerFinalStatus!=='success'||a.delegationTxId!==proof.delegationTxId||BigInt(String(a.actualCostSun))!==receipt.actualCostSun)throw new Error('ENERGY_DELIVERY_CONFLICT');

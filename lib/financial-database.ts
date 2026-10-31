@@ -6,7 +6,7 @@ const cache=globalThis as unknown as {siroFinancialPool?:Pool};
 /** Separate credential only. Never SET ROLE from the public authentication connection. */
 export function financialDatabase():WalletDb{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_OUTBOX_WORKER_ENABLED!=='true'||!process.env.FINANCIAL_DATABASE_URL)throw new Error('FINANCIAL_DATABASE_DISABLED');
- const pool=cache.siroFinancialPool??(cache.siroFinancialPool=new Pool({...databaseOptions(process.env.FINANCIAL_DATABASE_URL,true,process.env.DATABASE_SSL_CA),options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000'}));
+ const pool=cache.siroFinancialPool??(cache.siroFinancialPool=new Pool({...databaseOptions(process.env.FINANCIAL_DATABASE_URL,true,process.env.DATABASE_SSL_CA),options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000 -c timezone=UTC'}));
  return {transaction:async run=>{
   const c=await pool.connect();
   try{

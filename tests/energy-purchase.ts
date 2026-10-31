@@ -15,6 +15,7 @@ async function main(){
  CREATE TABLE "DepositAddressVault"(id INTEGER PRIMARY KEY,enabled BOOLEAN,"originVerified" BOOLEAN);
  CREATE TABLE "SignedSweepOutbox"(id UUID,"addressId" UUID,state TEXT);`);
  for(const m of ['20261031020000_energy_intents','20261031170000_unified_tron_energy','20261031200000_energy_purchase_budget','20261031220000_energy_delivery_recovery'])await pg.exec(await readFile(`prisma/migrations/${m}/migration.sql`,'utf8'));
+ await pg.exec('ALTER TABLE "EnergyRentalIntent" ADD COLUMN "bandwidthAmount" INTEGER NOT NULL DEFAULT 0; ALTER TABLE "EnergyPurchaseAttempt" ADD COLUMN "bandwidthAmount" INTEGER NOT NULL DEFAULT 0;');
  const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows as Record<string,unknown>[]})}))};
  const id=(n:number)=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
  const sender=String(TronWeb.address.fromPrivateKey('1'.padStart(64,'0')));

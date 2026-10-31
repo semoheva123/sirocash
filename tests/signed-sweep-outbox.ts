@@ -21,6 +21,7 @@ async function main(){
   await pg.exec('CREATE TABLE "User" (id UUID PRIMARY KEY)');
   for(const migration of ['20261031030000_deposit_addresses','20261031060000_bep20_deposit_addresses','20261031070000_signed_sweep_outbox','20261031090000_sweep_confirmation','20261031210000_sweep_dispatch_worker'])await pg.exec(await readFile(`prisma/migrations/${migration}/migration.sql`,'utf8'));
   await pg.exec(`CREATE TABLE "PayoutExpensePolicy"(network TEXT PRIMARY KEY,enabled BOOLEAN,"perPayoutCap" NUMERIC,"dailyCap" NUMERIC); CREATE TABLE "PayoutExpenseReservation"(network TEXT,"amountBaseUnits" NUMERIC,state TEXT,"settledAt" TIMESTAMPTZ); INSERT INTO "PayoutExpensePolicy" VALUES('BEP20',false,100000000000000,200000000000000),('TRC20',true,5000000,10000000);`);
+  await pg.exec('CREATE TABLE "NativeGasOutbox"(expense NUMERIC,state TEXT,"confirmedAt" TIMESTAMPTZ)');
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows as Record<string,unknown>[]})}))};
   const account=HDKey.fromMasterSeed(new Uint8Array(32).fill(11)).derive("m/44'/60'/0'");
   const owner='00000000-0000-0000-0000-000000000001',vault='00000000-0000-0000-0000-000000000002',addressId='00000000-0000-0000-0000-000000000003';

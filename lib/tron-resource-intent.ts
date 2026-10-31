@@ -4,13 +4,14 @@ import {moneyMicros,type WalletDb} from './wallet-engine';
 import {validTronAddress} from './tron-addresses';
 import {treasuryDestination} from './treasury-addresses';
 type Target={kind:'PAYOUT';quoteId:string}|{kind:'SWEEP';addressId:string;requestKey:string;amountBaseUnits:bigint};
-type Command=Target&{energyAmount:number;durationMinutes:60;maxRentalSun:bigint};
+type Command=Target&{bandwidthAmount?:number;energyAmount:number;durationMinutes:60;maxRentalSun:bigint};
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 /** Unified PRIVATE pre-sign resource intent. Not a paid order, delegation or delivery proof.
  * A trusted planner must establish need, simulation, source spendability and budget first.
  * Payout/sweep senders and destinations are bound to DB/platform configuration, not customer input.
  */
 export async function prepareTronResourceIntent(db:WalletDb,c:Command){
+ if(!Number.isSafeInteger(c.bandwidthAmount??0)||(c.bandwidthAmount??0)<0||(c.bandwidthAmount??0)>10000000)throw new Error('INVALID_BANDWIDTH_INTENT');
  if(!Number.isSafeInteger(c.energyAmount)||c.energyAmount<=0||c.energyAmount>2147483647||c.durationMinutes!==60||typeof c.maxRentalSun!=='bigint'||c.maxRentalSun<=0n||c.maxRentalSun>9223372036854775807n)throw new Error('INVALID_TRON_RESOURCE_INTENT');
  if(c.kind==='PAYOUT'){if(!uuid.test(c.quoteId))throw new Error('INVALID_ENERGY_TARGET')}
  else if(c.kind==='SWEEP'){if(!uuid.test(c.addressId)||! /^[A-Za-z0-9:_-]{8,128}$/.test(c.requestKey)||typeof c.amountBaseUnits!=='bigint'||c.amountBaseUnits<=0n||c.amountBaseUnits>=2n**256n)throw new Error('INVALID_ENERGY_TARGET')}
@@ -33,12 +34,12 @@ export async function prepareTronResourceIntent(db:WalletDb,c:Command){
    sweepAddressId=String(source.id);sender=String(source.address);recipient=treasuryDestination('TRC20','operating');amount=c.amountBaseUnits;key='energy:sweep:'+createHash('sha256').update(sweepAddressId+':'+c.requestKey).digest('hex');
   }
   if(!validTronAddress(sender)||!validTronAddress(recipient)||sender===recipient)throw new Error('INVALID_ENERGY_SENDER_OR_DESTINATION');
-  const fingerprint=createHash('sha256').update(JSON.stringify([c.kind,key,sender,recipient,amount.toString(),c.energyAmount,c.durationMinutes,c.maxRentalSun.toString()])).digest('hex');
+  const fingerprint=createHash('sha256').update(JSON.stringify([c.kind,key,sender,recipient,amount.toString(),c.energyAmount,c.durationMinutes,c.maxRentalSun.toString(),c.bandwidthAmount??0])).digest('hex');
   // Legacy and new payout intents share withdrawal uniqueness and the same sender-pending index.
   const {rows:[prior]}=await tx.query('SELECT id,"requestKey",state,fingerprint FROM "EnergyRentalIntent" WHERE "requestKey"=$1 OR ("withdrawalId"=$2 AND $2::uuid IS NOT NULL) FOR UPDATE',[key,withdrawalId]);
   if(prior){if(prior.fingerprint!==fingerprint)throw new Error('ENERGY_IDEMPOTENCY_CONFLICT');return {id:String(prior.id),requestKey:String(prior.requestKey),state:String(prior.state),sender}}
   const id=randomUUID();
-  await tx.query('INSERT INTO "EnergyRentalIntent" (id,"withdrawalId","sweepAddressId","senderAddress","recipientAddress","amountBaseUnits","requestKey",fingerprint,"energyAmount","durationMinutes","maxRentalSun") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[id,withdrawalId,sweepAddressId,sender,recipient,amount.toString(),key,fingerprint,c.energyAmount,c.durationMinutes,c.maxRentalSun.toString()]);
+  await tx.query('INSERT INTO "EnergyRentalIntent" (id,"withdrawalId","sweepAddressId","senderAddress","recipientAddress","amountBaseUnits","requestKey",fingerprint,"energyAmount","durationMinutes","maxRentalSun","bandwidthAmount") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,withdrawalId,sweepAddressId,sender,recipient,amount.toString(),key,fingerprint,c.energyAmount,c.durationMinutes,c.maxRentalSun.toString(),c.bandwidthAmount??0]);
   return {id,requestKey:key,state:'PREPARED',sender};
  });
 }

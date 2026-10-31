@@ -3,7 +3,8 @@
 This is implementation progress, **not a completed launch or a production activation**.
 Migrations `20261031210000_sweep_dispatch_worker`,
 `20261031220000_energy_delivery_recovery` and `20261031230000_financial_worker_role`
-are staged, not applied. Production remains at migration 32.
+and `20261031240000_autonomous_financial_execution` are staged, not applied.
+Production remains at migration 32.
 No paid request, live signing, broadcast, financial permission or funding change was made.
 
 ## Implemented in this patch
@@ -59,7 +60,8 @@ Do not invent a provider max-price field or silently treat the $3 estimate as a 
   count toward provider exposure (`max(quote, actual)`), and atomically disable further
   purchases when individual or aggregate limits are breached. No automatic re-enable/refund.
 - `energy-delivery-observer.ts` requires pinned genesis, successful solid transaction inclusion,
-  native ENERGY delegation to the exact intended receiver, current usable energy, recent solid
+  native ENERGY delegation (or matching BANDWIDTH delegation for a resource bundle) to the
+  exact intended receiver, current usable energy and purchased bandwidth, recent solid
   head and a canonical block recheck. Unsupported proxy/bundled shapes stay HELD. A provider
   success response alone is never accepted as delivery. Proof expires within 25 seconds.
 - `financial-execution.ts` composes prepared-intent quote/purchase/recovery and both outbox
@@ -90,25 +92,21 @@ configuration. Do not put financial credentials in preview or browser variables.
 role requires separately secured credential provisioning; the migration intentionally creates
 no plaintext password or public-role membership. No flag or production value was changed.
 
-## Still required before claiming complete automation
+## Previously identified execution gaps — now implemented
 
-- Automatic initial operation planning: the worker now processes prepared energy intents and
-  saved outboxes, but does **not** yet scan deposits/reserved withdrawals, construct live
-  transaction fields, prepare new rental intents or call signing autonomously.
-- Automatic bounded BNB gas prefunding of derived deposit addresses; otherwise initially
-  unfunded BEP20 sources cannot sweep. No blind native transfer/prefund is implemented.
-- Durable audit/refresh of expired **unconsumed** dispatch approvals after a crash; current
-  expiry holds rather than weakening immutable evidence or automatically resending.
-- Live deposit watching/checkpointing/valuation authority and authoritative customer financial
-  command UX remain separate launch requirements. This patch does not implement those.
-- Apply staged schema, securely provision restricted worker credentials, configure trusted
-  RPC/genesis and bounded policies, merge/enable scheduler, then deploy/test.
-- Real PostgreSQL multi-connection concurrency tests and explicitly bounded paid/end-to-end
-  mainnet tests. Offline fixture signatures and mocked transports are not such proof.
+Automatic reserved-quote/deposit preparation and signing, bounded BEP20 native prefunding,
+and audited expired approval/unclaimed TRON signature recovery are now wired into the batch.
+See [implementation acceptance](autonomous-financial-execution.md) for the exact graph,
+conservative failure handling, configuration and fixture evidence. These are no longer absent
+functions. The schema gate now expects 26 protected tables and nine checked triggers.
+
+Production installation/configuration, real funded acceptance and the other platform launch
+requirements are not claimed complete. No production credential/flag or financial effect was
+changed. The linked acceptance document explicitly separates execution-code scope from launch.
 
 ## Verification
 
 Final combined verification: `npm test`, `npm run build` and `git diff --check` all
 passed, including worker fairness/leases, sweep dispatch, live-resource fixture transport,
 read cancellation, TronZap-order recovery/circuit breaker, solid ENERGY delivery,
-worker-role denial/row-locking and authenticated route tests. Tests make no paid provider call.
+worker-role denial/row-locking, authenticated route and dual-network autonomous-cycle tests. Tests make no paid provider call.

@@ -4,6 +4,8 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFile,readdir} from 'node:fs/promises';
 import {Wallet,Transaction,Interface} from 'ethers';
 import {TronWeb,utils} from 'tronweb';
+import {createFinancialPreparation} from '../lib/financial-preparation';
+import {createUnsentTronRenewal} from '../lib/unsent-tron-renewal';
 import {prepareTronResourceIntent} from '../lib/tron-resource-intent';
 import {authorizePayoutDispatch} from '../lib/payout-resource-authorization';
 import {createChainBroadcaster} from '../lib/chain-broadcast';
@@ -95,7 +97,11 @@ async function main(){
   const approveDispatch=async(id:string,txId:string,payload:string,cap:string)=>pg.query(`INSERT INTO "PayoutDispatchApproval" ("payoutId","txId","payloadHash","authorityReference","maxNativeFeeBaseUnits","approvedAt","expiresAt") VALUES ($1,$2,$3,$4,$5,now()-interval '1 minute',now()+interval '1 minute')`,[id,txId,createHash('sha256').update(payload).digest('hex'),'fixture:resource-budget:'+id,cap]);
   await approveDispatch(tronSigned.id,tronSigned.txId,tronSaved.signedPayload,'1');
   await assert.rejects(()=>dispatchSavedPayout(db,tronSigned.id,{send,enabled:true,now:options.now}),/APPROVED_FEE_EXCEEDED/);assert.equal(sends,0);
+  await assert.rejects(()=>pg.query('UPDATE "PayoutDispatchApproval" SET "maxNativeFeeBaseUnits"=4000000 WHERE "payoutId"=$1',[tronSigned.id]),/IMMUTABLE/);
+  // Superuser-only corrupt/repair fixture; production cannot rewrite an approval budget.
+  await pg.exec('ALTER TABLE "PayoutDispatchApproval" DISABLE TRIGGER immutable_payout_dispatch_approval');
   await pg.query('UPDATE "PayoutDispatchApproval" SET "maxNativeFeeBaseUnits"=4000000 WHERE "payoutId"=$1',[tronSigned.id]);
+  await pg.exec('ALTER TABLE "PayoutDispatchApproval" ENABLE TRIGGER immutable_payout_dispatch_approval');
   const ack=await dispatchSavedPayout(db,tronSigned.id,{enabled:true,now:options.now,send:async input=>{
    sends++;assert.equal(input.signedPayload,tronSaved.signedPayload);
    // Claim must be committed before the adapter sees the authorization.
@@ -115,10 +121,14 @@ async function main(){
   const initialReceipt:Bep20ReceiptEvidence={chainId:56,txId:signed.txId,blockNumber:100,blockHash:'0x'+'cd'.repeat(32),execution:'SUCCESS',logs:[{address:bep20UsdtContract,topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',topicFor(evmSender),topicFor(bep.payload.recipient)],data:'0x'+(18n*10n**18n).toString(16).padStart(64,'0'),logIndex:7,removed:false}]};
   await confirmPayout(db,{payoutId:signed.id,network:'BEP20',evidence:{receipt:initialReceipt,block:{chainId:56,height:100,hash:initialReceipt.blockHash,headHeight:120,finalizedHeight:115},logIndex:7,assignedAddress:bep.payload.recipient,maxAmountBaseUnits:100n*10n**18n,minimumConfirmations:15}});
   await assert.rejects(()=>prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,gasPrice:1000000001n}},options),/payout_sender_nonce/);
-  const fresh=await prepareSignedWithdrawal(db,{...command,quoteId:second.id,transaction:{...command.transaction,nonce:8}},options);
+  await pg.exec(`UPDATE "PayoutExpensePolicy" SET enabled=true,"perPayoutCap"=10000000000000000,"dailyCap"=10000000000000000 WHERE network='BEP20'`);
+  const automaticPayout=createFinancialPreparation(db,{enabled:true,preflight:async input=>({network:'BEP20',amount:input.amount!,nativeBalance:10n**18n,requiredNative:100000000000000n,transaction:{amountBaseUnits:input.amount!,nonce:8,gasLimit:100000n,gasPrice:1000000000n}}),gas:{prepare:async()=>{throw Error('unneeded gas')},process:async()=>{throw Error('unneeded gas')}},energy:async()=>{throw Error('unneeded energy')},limits:()=>({maxAmount:100n*10n**18n,maxFee:10000000000000000n,minimumSweep:1n}),signPayout:(d,c)=>prepareSignedWithdrawal(d,c,options)});
+  const automaticSaved=await automaticPayout({kind:'PREPARE_PAYOUT',id:second.id},new AbortController().signal);assert.equal(automaticSaved.state,'SAVED');
+  const freshRow=(await pg.query<{id:string;txId:string;state:string}>('SELECT id,"txId",state FROM "SignedWithdrawalOutbox" WHERE "quoteId"=$1',[second.id])).rows[0];const fresh={...freshRow};
+  await pg.exec(`UPDATE "PayoutExpensePolicy" SET enabled=false WHERE network='BEP20'`);
   const payload=(await pg.query<{signedPayload:string}>('SELECT "signedPayload" FROM "SignedWithdrawalOutbox" WHERE id=$1',[fresh.id])).rows[0].signedPayload;
   const observedAt=new Date().toISOString();
-  const resourceEvidence={network:'BEP20' as const,txId:fresh.txId,sender:evmSender,observerReference:'fixture:observer:budget:fresh',observedAt,expiresAt:new Date(Date.now()+20000).toISOString(),tokenBalanceBaseUnits:100n*10n**18n,nativeBalanceBaseUnits:10n**18n,resourceCostBaseUnits:0n,pendingNonce:8,estimatedGas:70000n};
+  const resourceEvidence={network:'BEP20' as const,txId:fresh.txId,sender:evmSender,observerReference:'fixture:observer:budget:fresh',observedAt,expiresAt:new Date(Date.now()+1500).toISOString(),tokenBalanceBaseUnits:100n*10n**18n,nativeBalanceBaseUnits:10n**18n,resourceCostBaseUnits:0n,pendingNonce:8,estimatedGas:70000n};
   await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,resourceEvidence),/POLICY_DISABLED/);
   await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,tokenBalanceBaseUnits:1n}),/BALANCE_INSUFFICIENT/);
   await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,pendingNonce:9}),/GAS_OR_NONCE_UNAVAILABLE/);
@@ -136,6 +146,12 @@ async function main(){
   assert.equal((await authorizePayoutDispatch(db,fresh.id,resourceEvidence)).state,'RESERVED');
   assert.equal((await authorizePayoutDispatch(db,fresh.id,resourceEvidence)).state,'ALREADY_RESERVED');
   await assert.rejects(()=>authorizePayoutDispatch(db,fresh.id,{...resourceEvidence,nativeBalanceBaseUnits:2n*10n**18n}),/EVIDENCE_CONFLICT/);
+  await new Promise(resolve=>setTimeout(resolve,Math.max(1,Date.parse(resourceEvidence.expiresAt)-Date.now()+20)));
+  const renewedEvidence={...resourceEvidence,observerReference:'fixture:observer:renewed',observedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+20000).toISOString()};
+  assert.equal((await authorizePayoutDispatch(db,fresh.id,renewedEvidence)).state,'REFRESHED');
+  assert.equal((await pg.query('SELECT id FROM "DispatchApprovalHistory" WHERE kind=\'PAYOUT\' AND "outboxId"=$1',[fresh.id])).rows.length,1);
+  assert.equal((await pg.query<{amountBaseUnits:string}>('SELECT "amountBaseUnits" FROM "PayoutExpenseReservation" WHERE "payoutId"=$1',[fresh.id])).rows[0].amountBaseUnits,'100000000000000');
+
 
   const liveShapeFetch=(async(_url,init)=>{
    const p=JSON.parse(String(init!.body));
@@ -226,18 +242,30 @@ async function main(){
   assert.equal((await prepareTronResourceIntent(db,sweepRentalCommand)).state,'UNCERTAIN');
   await assert.rejects(()=>prepareTronResourceIntent(db,{...sweepRentalCommand,requestKey:'sweep:resource:002'}),/energy_sender_pending/);
   console.log('Unified TRON energy preparation: DB-bound operating payout and customer deposit sweep senders, exact transfer identity, shared pending sender exclusion and uncertain-order idempotency passed. No paid order/delegation.');
-  const liveFixtureNow=Date.now();
-  const tronResourcePayout=await prepareSignedWithdrawal(db,{...tronCommand,quoteId:tronResourceQuote.id,transaction:{...tronCommand.transaction,timestamp:liveFixtureNow,expiration:liveFixtureNow+60000}},{...options,now:liveFixtureNow});
+  const liveFixtureNow=Date.now()-120000;
+  let tronResourcePayout=await prepareSignedWithdrawal(db,{...tronCommand,quoteId:tronResourceQuote.id,transaction:{...tronCommand.transaction,timestamp:liveFixtureNow,expiration:liveFixtureNow+60000}},{...options,now:liveFixtureNow});
+  const expiredPayload=(await pg.query<{signedPayload:string}>('SELECT "signedPayload" FROM "SignedWithdrawalOutbox" WHERE id=$1',[tronResourcePayout.id])).rows[0].signedPayload;
+  await pg.query(`INSERT INTO "PayoutDispatchApproval"("payoutId","txId","payloadHash","authorityReference","maxNativeFeeBaseUnits","approvedAt","expiresAt") VALUES($1,$2,$3,'fixture:expired:approval',4000000,now()-interval '3 minutes',now()-interval '2 minutes')`,[tronResourcePayout.id,tronResourcePayout.txId,createHash('sha256').update(expiredPayload).digest('hex')]);
+  await pg.query(`INSERT INTO "PayoutExpenseReservation"("payoutId",network,"amountBaseUnits","evidenceHash",evidence) VALUES($1,'TRC20',6000000,repeat('ab',32),'{}')`,[tronResourcePayout.id]);
+  const oldUnsentId=tronResourcePayout.txId;
+  const renew=createUnsentTronRenewal(db,{loadOperating:options.loadKeys,preflight:async input=>({network:'TRC20',amount:input.amount!,requiredEnergy:65000,availableEnergy:65000,availableBandwidth:600,transaction:{amountBaseUnits:input.amount!,refBlockBytes:'5678',refBlockHash:'cd'.repeat(8),timestamp:Date.now(),expiration:Date.now()+60000,feeLimitSun:4000000}})});
+  assert.equal((await renew({kind:'PAYOUT',id:tronResourcePayout.id},new AbortController().signal)).state,'RENEWED');
+  const refreshedTx=(await pg.query<{txId:string}>('SELECT "txId" FROM "SignedWithdrawalOutbox" WHERE id=$1',[tronResourcePayout.id])).rows[0].txId;
+  assert.notEqual(oldUnsentId,refreshedTx);tronResourcePayout={...tronResourcePayout,txId:refreshedTx};
+  assert.equal((await renew({kind:'PAYOUT',id:tronResourcePayout.id},new AbortController().signal)).state,'UNCHANGED');
   const tronResourceEvidence={network:'TRC20' as const,txId:tronResourcePayout.txId,sender:tronSender,observerReference:'fixture:tron:resource:observer',observedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+20000).toISOString(),tokenBalanceBaseUnits:100000000n,nativeBalanceBaseUnits:10000000n,resourceCostBaseUnits:2000000n,accountActive:true,requiredEnergy:65000,availableEnergy:65000,requiredBandwidth:350,availableBandwidth:350};
   await assert.rejects(()=>authorizePayoutDispatch(db,tronResourcePayout.id,{...tronResourceEvidence,availableEnergy:0}),/RESOURCES_UNDELIVERED/);
   await assert.rejects(()=>authorizePayoutDispatch(db,tronResourcePayout.id,{...tronResourceEvidence,availableBandwidth:0}),/RESOURCES_UNDELIVERED/);
   await assert.rejects(()=>authorizePayoutDispatch(db,tronResourcePayout.id,{...tronResourceEvidence,accountActive:false}),/RESOURCES_UNDELIVERED/);
   await assert.rejects(()=>authorizePayoutDispatch(db,tronResourcePayout.id,{...tronResourceEvidence,accountActive:'yes' as never}),/RESOURCES_UNDELIVERED/);
   await pg.exec(`UPDATE "PayoutExpensePolicy" SET enabled=true,"perPayoutCap"=6000000,"dailyCap"=6000000 WHERE network='TRC20'`);
-  assert.equal((await authorizePayoutDispatch(db,tronResourcePayout.id,tronResourceEvidence)).state,'RESERVED');
+  assert.equal((await authorizePayoutDispatch(db,tronResourcePayout.id,tronResourceEvidence)).state,'REFRESHED');
   assert.equal((await pg.query<{amountBaseUnits:string}>('SELECT "amountBaseUnits" FROM "PayoutExpenseReservation" WHERE "payoutId"=$1',[tronResourcePayout.id])).rows[0].amountBaseUnits,'6000000');
   // Approval expires AFTER claim but BEFORE network I/O: no adapter call is allowed.
+  // Superuser-only timing fixture for a commit that outlives its approval.
+  await pg.exec('ALTER TABLE "PayoutDispatchApproval" DISABLE TRIGGER immutable_payout_dispatch_approval');
   await pg.query('UPDATE "PayoutDispatchApproval" SET "expiresAt"=clock_timestamp()+interval \'100 milliseconds\' WHERE "payoutId"=$1',[tronResourcePayout.id]);
+  await pg.exec('ALTER TABLE "PayoutDispatchApproval" ENABLE TRIGGER immutable_payout_dispatch_approval');
   const delayedCommit:WalletDb={transaction:async run=>{const result=await db.transaction(run);await new Promise(resolve=>setTimeout(resolve,180));return result}};
   const sendsBeforeExpiry=sends;
   assert.equal((await dispatchSavedPayout(delayedCommit,tronResourcePayout.id,{enabled:true,send})).state,'UNKNOWN');

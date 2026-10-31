@@ -34,6 +34,7 @@ export async function prepareSignedWithdrawal(db:WalletDb,c:Command,options:{loa
   if(!guard)throw new Error('PAYOUT_SIGNING_GUARD_UNAVAILABLE');
   const {rows:pending}=await tx.query('SELECT id FROM "SignedWithdrawalOutbox" WHERE network=$1 AND state IN (\'SIGNED\',\'BROADCAST_UNKNOWN\')',[c.network]);
   if(pending.length)throw new Error('PAYOUT_NETWORK_RECONCILIATION_REQUIRED');
+  if(c.network==='BEP20'){const {rows:gas}=await tx.query('SELECT id FROM "NativeGasOutbox" WHERE state<>\'CONFIRMED\'');if(gas.length)throw new Error('PAYOUT_NETWORK_RECONCILIATION_REQUIRED')}
   const config=(options.loadKeys??vercelSignerConfiguration)(c.network);
   const sender=c.network==='BEP20'?getAddress(config.policy.expectedSender):config.policy.expectedSender;
   const recipient=String(quote.recipient);

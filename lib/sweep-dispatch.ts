@@ -45,8 +45,8 @@ export async function authorizeSweepDispatch(db:WalletDb,id:string,e:SweepResour
   await tx.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
   const {source,sweep}=await lockedSweep(tx,id);
   if(e.network!==sweep.network||e.sender!==source.address||e.txId!==sweep.txId)throw new Error('SWEEP_RESOURCE_BINDING');
-  const {rows:[prior]}=await tx.query('SELECT "evidenceHash" FROM "SweepDispatchAuthorization" WHERE "sweepId"=$1',[id]);
-  if(prior){if(prior.evidenceHash!==hash)throw new Error('SWEEP_RESOURCE_CONFLICT');return {state:'ALREADY_RESERVED'}}
+  const {rows:[prior]}=await tx.query('SELECT *,"expiresAt"<=clock_timestamp() AS stale FROM "SweepDispatchAuthorization" WHERE "sweepId"=$1',[id]);
+  if(prior){if(prior.evidenceHash===hash)return {state:'ALREADY_RESERVED'};if(prior.stale!==true||prior.claimId||prior.state!=='HELD')throw new Error('SWEEP_RESOURCE_CONFLICT')}
   if(sweep.state!=='SIGNED')throw new Error('SWEEP_NOT_AUTHORIZABLE');
   const {rows:[fresh]}=await tx.query(`SELECT $1::timestamptz<=clock_timestamp() AND $1::timestamptz>=clock_timestamp()-interval '30 seconds' AND $2::timestamptz>clock_timestamp() AND $2::timestamptz<=$1::timestamptz+interval '30 seconds' AS ok`,[e.observedAt,e.expiresAt]);
   if(fresh?.ok!==true)throw new Error('SWEEP_RESOURCE_STALE');
@@ -60,10 +60,16 @@ export async function authorizeSweepDispatch(db:WalletDb,id:string,e:SweepResour
    if(e.accountActive!==true||!q.every(v=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0)||!e.requiredEnergy||!e.requiredBandwidth||e.availableEnergy!<e.requiredEnergy||e.availableBandwidth!<e.requiredBandwidth)throw new Error('SWEEP_RESOURCES_UNDELIVERED');
   }
   const cost=fee+e.resourceCost;
+  if(prior&&BigInt(String(prior.expense))!==cost)throw new Error('SWEEP_REFRESH_BUDGET_CHANGED');
   const {rows:[policy]}=await tx.query('SELECT * FROM "PayoutExpensePolicy" WHERE network=$1 FOR UPDATE',[e.network]);
   if(!policy||policy.enabled!==true||cost>BigInt(String(policy.perPayoutCap)))throw new Error('SWEEP_EXPENSE_POLICY');
-  const {rows:[usage]}=await tx.query(`SELECT COALESCE(sum(n),0)::text AS used FROM (SELECT "amountBaseUnits" AS n FROM "PayoutExpenseReservation" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') UNION ALL SELECT expense AS n FROM "SweepDispatchAuthorization" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')) u`,[e.network]);
-  if(BigInt(String(usage.used))+cost>BigInt(String(policy.dailyCap)))throw new Error('SWEEP_DAILY_EXPENSE_CAP');
+  const {rows:[usage]}=await tx.query(`SELECT COALESCE(sum(n),0)::text AS used FROM (SELECT "amountBaseUnits" AS n FROM "PayoutExpenseReservation" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') UNION ALL SELECT expense AS n FROM "SweepDispatchAuthorization" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') UNION ALL SELECT expense AS n FROM "NativeGasOutbox" WHERE $1='BEP20' AND (state<>'CONFIRMED' OR "confirmedAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')) u`,[e.network]);
+  if(BigInt(String(usage.used))+(prior?0n:cost)>BigInt(String(policy.dailyCap)))throw new Error('SWEEP_DAILY_EXPENSE_CAP');
+  if(prior){
+   await tx.query('INSERT INTO "DispatchApprovalHistory"(id,kind,"outboxId",previous) SELECT $2,\'SWEEP\',"sweepId",to_jsonb(a) FROM "SweepDispatchAuthorization" a WHERE "sweepId"=$1',[id,randomUUID()]);
+   await tx.query('UPDATE "SweepDispatchAuthorization" SET "evidenceHash"=$2,evidence=$3::jsonb,"approvedAt"=$4,"expiresAt"=$5 WHERE "sweepId"=$1',[id,hash,json,e.observedAt,e.expiresAt]);
+   return {state:'REFRESHED'};
+  }
   await tx.query('INSERT INTO "SweepDispatchAuthorization" ("sweepId",network,"txId","payloadHash","maxFee",expense,"evidenceHash",evidence,"approvedAt","expiresAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)',[id,e.network,sweep.txId,createHash('sha256').update(String(sweep.signedPayload)).digest('hex'),fee.toString(),cost.toString(),hash,json,e.observedAt,e.expiresAt]);
   return {state:'RESERVED'};
  });
