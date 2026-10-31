@@ -58,7 +58,8 @@
     "custody:check": "node --conditions=react-server --import tsx scripts/check-custody.ts",
     "test:http-hardening": "tsx tests/http-hardening.ts",
     "custody:check:bep20": "node --conditions=react-server --import tsx scripts/check-bep20-custody.ts",
-    "test:financial-isolation": "tsx tests/financial-schema-isolation.ts"
+    "test:financial-isolation": "tsx tests/financial-schema-isolation.ts",
+    "custody:probe": "node --conditions=react-server --import tsx scripts/probe-production-custody.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
