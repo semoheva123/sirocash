@@ -6,7 +6,10 @@ import {normalizeIdentityImage,identityOcr} from '../lib/identity-image';
 import {GET as lifecycle} from '../app/api/internal/identity-lifecycle/route';
 import {database} from '../lib/database';
 async function main(){
- if(process.env.IDENTITY_DEPLOYMENT_CHECK!=='true'){console.log('Identity deployment preflight: skipped (not requested).');return}
+ if(process.env.IDENTITY_DEPLOYMENT_CHECK!=='true'){
+  if(process.env.IDENTITY_COLLECTION_ENABLED==='true'){console.error('Identity deployment preflight: collection requires the deployment check.');process.exitCode=1;return}
+  console.log('Identity deployment preflight: skipped (not requested).');return
+ }
  let phase='configuration',created=false;
  const subject='synthetic-preflight:'+randomUUID(),other='synthetic-reviewer:'+randomUUID();
  const requireStatus=(response:Response,status:number)=>{if(response.status!==status)throw Error('status')};
