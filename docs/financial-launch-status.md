@@ -42,3 +42,6 @@ Still needed before live activation: independent production deposit wallets, ver
 
 ## Security review follow-up — 2026-10-31
 Patched Axios dependency resolution with zero known audit findings at review, strict production origin and sanitized HTTP errors, conservative browser/API headers, removed the reassigned TRON reserve mapping, and added fixture-tested private no-signature custody preflight plus offline CI. See `security-remediation.md`. These are local tested safeguards, not proof of production key binding or a live financial launch approval. Signing remains disabled; no remote migrations/deployment or paid requests were made.
+
+## Deep review follow-up — 2026-10-31
+Prepared migration 20261031180000 requires matching final evidence before terminal payout confirmation/settlement and blocks unsupported signed-payout rejection. Dispatch rechecks approval expiry after durable claim; resource/approval SQL freshness uses the current clock and TRON account activation is strictly boolean. Regression tests exercise genuine synthetic final confirmation instead of directly marking a payout confirmed. Full local tests/build/audit pass. See `deep-security-review.md`; no new production check/deployment/migration occurred.

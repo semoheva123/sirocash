@@ -23,7 +23,7 @@ export async function authorizePayoutDispatch(db:WalletDb,payoutId:string,e:Evid
   const {rows:[prior]}=await tx.query('SELECT "evidenceHash" FROM "PayoutExpenseReservation" WHERE "payoutId"=$1',[payoutId]);
   if(prior){if(prior.evidenceHash!==evidenceHash)throw new Error('PAYOUT_RESOURCE_EVIDENCE_CONFLICT');return {payoutId,state:'ALREADY_RESERVED'}}
   if(payout.state!=='SIGNED'||operation.state!=='SUBMITTED')throw new Error('PAYOUT_NOT_AUTHORIZABLE');
-  const {rows:[fresh]}=await tx.query(`SELECT $1::timestamptz<=statement_timestamp() AND $1::timestamptz>=statement_timestamp()-INTERVAL '30 seconds' AND $2::timestamptz>statement_timestamp() AND $2::timestamptz<=$1::timestamptz+INTERVAL '30 seconds' AS valid`,[e.observedAt,e.expiresAt]);
+  const {rows:[fresh]}=await tx.query(`SELECT $1::timestamptz<=clock_timestamp() AND $1::timestamptz>=clock_timestamp()-INTERVAL '30 seconds' AND $2::timestamptz>clock_timestamp() AND $2::timestamptz<=$1::timestamptz+INTERVAL '30 seconds' AS valid`,[e.observedAt,e.expiresAt]);
   if(fresh?.valid!==true)throw new Error('PAYOUT_RESOURCE_EVIDENCE_STALE');
   const maxFee=validateSavedPayout(payout,quote);
   if(e.tokenBalanceBaseUnits<BigInt(String(payout.amountBaseUnits))||e.nativeBalanceBaseUnits<maxFee)throw new Error('PAYOUT_CHAIN_BALANCE_INSUFFICIENT');
@@ -32,13 +32,13 @@ export async function authorizePayoutDispatch(db:WalletDb,payoutId:string,e:Evid
    if(!Number.isSafeInteger(e.pendingNonce)||e.pendingNonce!==signed.nonce||typeof e.estimatedGas!=='bigint'||e.estimatedGas<21000n||e.estimatedGas>signed.gasLimit||e.resourceCostBaseUnits!==0n)throw new Error('PAYOUT_GAS_OR_NONCE_UNAVAILABLE');
   }else{
    const quantities=[e.requiredEnergy,e.availableEnergy,e.requiredBandwidth,e.availableBandwidth];
-   if(!quantities.every(v=>Number.isSafeInteger(v)&&v>=0)||!e.accountActive||e.requiredEnergy<=0||e.requiredBandwidth<=0||e.availableEnergy<e.requiredEnergy||e.availableBandwidth<e.requiredBandwidth)throw new Error('PAYOUT_TRON_RESOURCES_UNDELIVERED');
+   if(!quantities.every(v=>Number.isSafeInteger(v)&&v>=0)||e.accountActive!==true||e.requiredEnergy<=0||e.requiredBandwidth<=0||e.availableEnergy<e.requiredEnergy||e.availableBandwidth<e.requiredBandwidth)throw new Error('PAYOUT_TRON_RESOURCES_UNDELIVERED');
   }
   const cost=maxFee+e.resourceCostBaseUnits;
   const {rows:[policy]}=await tx.query('SELECT * FROM "PayoutExpensePolicy" WHERE network=$1 FOR UPDATE',[e.network]);
   if(!policy||policy.enabled!==true)throw new Error('PAYOUT_EXPENSE_POLICY_DISABLED');
   if(cost>BigInt(String(policy.perPayoutCap)))throw new Error('PAYOUT_EXPENSE_CAP_EXCEEDED');
-  const {rows:[usage]}=await tx.query(`SELECT COALESCE(sum("amountBaseUnits"),0)::text AS used FROM "PayoutExpenseReservation" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',statement_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`,[e.network]);
+  const {rows:[usage]}=await tx.query(`SELECT COALESCE(sum("amountBaseUnits"),0)::text AS used FROM "PayoutExpenseReservation" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`,[e.network]);
   if(BigInt(String(usage.used))+cost>BigInt(String(policy.dailyCap)))throw new Error('PAYOUT_DAILY_EXPENSE_CAP_EXCEEDED');
   await tx.query('INSERT INTO "PayoutExpenseReservation" ("payoutId",network,"amountBaseUnits","evidenceHash",evidence) VALUES ($1,$2,$3,$4,$5::jsonb)',[payoutId,e.network,cost.toString(),evidenceHash,json]);
   await tx.query('INSERT INTO "PayoutDispatchApproval" ("payoutId","txId","payloadHash","authorityReference","maxNativeFeeBaseUnits","approvedAt","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$7)',[payoutId,payout.txId,createHash('sha256').update(String(payout.signedPayload)).digest('hex'),e.observerReference,maxFee.toString(),e.observedAt,e.expiresAt]);

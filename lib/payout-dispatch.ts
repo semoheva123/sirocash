@@ -27,7 +27,7 @@ export async function dispatchSavedPayout(db:WalletDb,payoutId:string,options:{s
   const {rows:[prior]}=await tx.query('SELECT state FROM "PayoutDispatchAttempt" WHERE "payoutId"=$1',[payoutId]);
   if(prior)return {status:String(prior.state),txId:String(payout.txId)};
   if(operation.state!=='SUBMITTED'||payout.state!=='SIGNED')throw new Error('PAYOUT_NOT_DISPATCHABLE');
-  const {rows:[approval]}=await tx.query('SELECT *,"approvedAt"<=statement_timestamp() AND "expiresAt">statement_timestamp() AS fresh FROM "PayoutDispatchApproval" WHERE "payoutId"=$1 FOR UPDATE',[payoutId]);
+  const {rows:[approval]}=await tx.query('SELECT *,"approvedAt"<=clock_timestamp() AND "expiresAt">clock_timestamp() AS fresh FROM "PayoutDispatchApproval" WHERE "payoutId"=$1 FOR UPDATE',[payoutId]);
   if(!approval||approval.fresh!==true||approval.consumedAt||approval.txId!==payout.txId||approval.payloadHash!==createHash('sha256').update(String(payout.signedPayload)).digest('hex'))throw new Error('PAYOUT_DISPATCH_APPROVAL_REQUIRED');
   const maxFee=validateSavedPayout(payout,quote,{now:options.now});
   if(maxFee<=0n||maxFee>BigInt(String(approval.maxNativeFeeBaseUnits)))throw new Error('PAYOUT_APPROVED_FEE_EXCEEDED');
@@ -35,9 +35,12 @@ export async function dispatchSavedPayout(db:WalletDb,payoutId:string,options:{s
   await tx.query('UPDATE "PayoutDispatchApproval" SET "consumedAt"=statement_timestamp() WHERE "payoutId"=$1',[payoutId]);
   await tx.query('INSERT INTO "PayoutDispatchAttempt" ("payoutId","claimId") VALUES ($1,$2)',[payoutId,claimId]);
   await tx.query('UPDATE "SignedWithdrawalOutbox" SET state=\'BROADCAST_UNKNOWN\' WHERE id=$1',[payoutId]);
-  return {status:'CLAIMED',txId:String(payout.txId),claimId,network:payout.network as 'TRC20'|'BEP20',signedPayload:String(payout.signedPayload)};
+  const notAfter=approval.expiresAt instanceof Date?approval.expiresAt.getTime():Date.parse(String(approval.expiresAt));
+  return {status:'CLAIMED',txId:String(payout.txId),claimId,notAfter,network:payout.network as 'TRC20'|'BEP20',signedPayload:String(payout.signedPayload)};
  });
  if(!('signedPayload' in prepared))return {txId:prepared.txId,state:prepared.status};
+ // Approval can expire while a transaction waits/commits. Do not send with stale resources.
+ if(!Number.isFinite(prepared.notAfter)||Date.now()>=prepared.notAfter!)return {txId:prepared.txId,state:'UNKNOWN'};
  // Crash from this point onward is intentionally UNKNOWN, including crash before actual send.
  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
  try{
