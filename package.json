@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "npm run db:verify && npm run identity:deployment-check && next build --webpack",
+    "build": "npm run db:verify && npm run db:financial-check && npm run identity:deployment-check && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",
