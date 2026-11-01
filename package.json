@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run deposit:probe && next build --webpack",
+    "build": "npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run deposit:probe && npm run deposit:capacity && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",
@@ -84,7 +84,8 @@
     "test:financial-connection": "tsx tests/financial-connection.ts",
     "test:deposit-only": "node --conditions=react-server --import tsx tests/deposit-only.ts && npm run test:deposit-network",
     "deposit:probe": "node --conditions=react-server --import tsx scripts/probe-deposit-reception.ts",
-    "test:deposit-network": "node --conditions=react-server --import tsx tests/deposit-network-scanner.ts"
+    "test:deposit-network": "node --conditions=react-server --import tsx tests/deposit-network-scanner.ts",
+    "deposit:capacity": "node --conditions=react-server --import tsx scripts/benchmark-deposit-reads.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

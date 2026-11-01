@@ -19,7 +19,7 @@ async function main(){
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(q,p)=>({rows:(await tx.query(q,p)).rows as Record<string,unknown>[]})}))};
   const worker:WalletDb={transaction:run=>db.transaction(async tx=>{await tx.query('SET LOCAL ROLE sirocash_financial_worker');return run(tx)})};
   const signal=AbortSignal.timeout(110000);
-  const scan=createNetworkDepositScanner(worker,{bep20:createBep20ReadRpc({endpoint:process.env.SIRO_BEP20_RPC_URL!,signal}),tron:createTronRead({endpoint:process.env.SIRO_TRON_RPC_URL!,maxResponseBytes:8388608,signal}),genesisId:process.env.SIRO_TRON_GENESIS_ID!,minimumConfirmations:15,maxAmount:()=>2n**256n-1n,bep20Window:Number(process.env.SIRO_BEP20_SCAN_WINDOW??'100'),headCacheMs:5000});
+  const scan=createNetworkDepositScanner(worker,{bep20:createBep20ReadRpc({endpoint:process.env.SIRO_BEP20_RPC_URL!,signal}),tron:createTronRead({endpoint:process.env.SIRO_TRON_RPC_URL!,maxResponseBytes:8388608,signal}),genesisId:process.env.SIRO_TRON_GENESIS_ID!,minimumConfirmations:15,maxAmount:()=>2n**256n-1n,bep20QueryWindow:Number(process.env.SIRO_BEP20_SCAN_WINDOW??'100'),headCacheMs:5000});
   // Public deterministic TEST fixture only. Never fund or reuse these fixture keys/addresses.
   const root=HDKey.fromMasterSeed(new Uint8Array(32).fill(77));
   for(const network of ['BEP20','TRC20'] as const){
@@ -37,8 +37,9 @@ async function main(){
   const milliseconds=Date.now()-started,accepted=counts.BEP20>=target.BEP20&&counts.TRC20>=target.TRC20&&milliseconds<=85000;
   console.log('DEPOSIT_READ_BENCHMARK:'+JSON.stringify({accepted,milliseconds,blocks:counts,assignedFixtureAddresses:65,stagedFixtureEvents:staged,productionWrites:false,monetaryActions:false}));
   if(!accepted)process.exitCode=1;
- }catch{
-  console.log('DEPOSIT_READ_BENCHMARK:'+JSON.stringify({accepted:false,milliseconds:Date.now()-started,blocks:counts,reason:'READ_INCOMPLETE_OR_DEADLINE',productionWrites:false,monetaryActions:false}));process.exitCode=1;
+ }catch(error){
+  const reason=error instanceof Error&&/^[A-Z][A-Z0-9_]{1,79}$/.test(error.message)?error.message:'READ_INCOMPLETE_OR_DEADLINE';
+  console.log('DEPOSIT_READ_BENCHMARK:'+JSON.stringify({accepted:false,milliseconds:Date.now()-started,blocks:counts,reason,productionWrites:false,monetaryActions:false}));process.exitCode=1;
  }finally{await pg.close()}
 }
 main().catch(()=>{console.error('DEPOSIT_READ_BENCHMARK:WATCH_ONLY_CONFIGURATION_FAILED');process.exitCode=1});

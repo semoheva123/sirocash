@@ -9,7 +9,7 @@ import {stageBep20Deposit,stageTronDeposit} from './deposit-inbox';
 import {bep20UsdtContract} from './bep20-deposit-verification';
 import {tronUsdtContract} from './tron-deposit-verification';
 type Network='TRC20'|'BEP20';
-type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;maxEvents?:number;headCacheMs?:number};
+type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;bep20QueryWindow?:number;maxEvents?:number;headCacheMs?:number};
 type Address={id:string;address:string;next:number;offset:number;previous:string|null;partial:string|null};
 const transfer='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 function obj(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw Error('SCAN_INVALID_OBJECT');return v as Record<string,unknown>}
@@ -21,9 +21,9 @@ const tronHex=(address:string)=>Buffer.from(base58.decode(address)).subarray(1,2
  * Progress + inbox staging commit together; newly allocated addresses retain their own start.
  */
 export function createNetworkDepositScanner(db:WalletDb,o:Options){
- const window=o.bep20Window??1000,maxEvents=o.maxEvents??32,headCacheMs=o.headCacheMs??0;
+ const window=o.bep20Window??1000,maxEvents=o.maxEvents??32,queryWindow=o.bep20QueryWindow??1000,headCacheMs=o.headCacheMs??0;
  const heads=new Map<Network,{height:number;at:number}>();
- if(!Number.isSafeInteger(headCacheMs)||headCacheMs<0||headCacheMs>10000||!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
+ if(!Number.isSafeInteger(queryWindow)||queryWindow<1||queryWindow>1000||!Number.isSafeInteger(headCacheMs)||headCacheMs<0||headCacheMs>10000||!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
  async function block(network:Network,n:number){
   if(network==='BEP20'){
    const b=obj(await o.bep20('eth_getBlockByNumber',['0x'+n.toString(16),false]));
@@ -83,12 +83,21 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
    if(network==='BEP20'){
     // Server-controlled ranges/contract, OR-recipient groups <=64; never accept a client filter.
     const unique=new Map<string,Record<string,unknown>>();
+    const requests:{from:number;to:number;topics:string[]}[]=[];
     for(let i=0;i<selected.length;i+=64){
-     check();const group=selected.slice(i,i+64),topics=group.map(a=>'0x'+'0'.repeat(24)+a.address.slice(2).toLowerCase());
-     const raw=await o.bep20('eth_getLogs',[{fromBlock:'0x'+start.toString(16),toBlock:'0x'+end.toString(16),address:bep20UsdtContract,topics:['0x'+transfer,null,topics.length===1?topics[0]:topics]}]);
-     if(!Array.isArray(raw)||raw.length>10000)throw Error('SCAN_LOG_LIMIT');
-     for(const value of raw){const l=obj(value),key=hash(l.transactionHash)+':'+num(l.logIndex);if(unique.has(key))throw Error('DEPOSIT_EVIDENCE_CONFLICT');unique.set(key,l)}
+     const topics=selected.slice(i,i+64).map(a=>'0x'+'0'.repeat(24)+a.address.slice(2).toLowerCase());
+     for(let from=start;from<=end;from+=queryWindow)requests.push({from,to:Math.min(end,from+queryWindow-1),topics});
     }
+    let requestIndex=0,failed=false;
+    const workers=await Promise.allSettled(Array.from({length:Math.min(4,requests.length)},async()=>{
+     try{while(!failed&&requestIndex<requests.length){
+      check();const r=requests[requestIndex++];
+      const raw=await o.bep20('eth_getLogs',[{fromBlock:'0x'+r.from.toString(16),toBlock:'0x'+r.to.toString(16),address:bep20UsdtContract,topics:['0x'+transfer,null,r.topics.length===1?r.topics[0]:r.topics]}]);
+      if(!Array.isArray(raw)||raw.length>10000)throw Error('SCAN_LOG_LIMIT');
+      for(const value of raw){const l=obj(value),key=hash(l.transactionHash)+':'+num(l.logIndex);if(num(l.blockNumber)<r.from||num(l.blockNumber)>r.to)throw Error('SCAN_LOG_CONTEXT');if(unique.has(key))throw Error('DEPOSIT_EVIDENCE_CONFLICT');unique.set(key,l);if(unique.size>20000)throw Error('SCAN_LOG_LIMIT')}
+     }}catch(error){failed=true;throw error}
+    }));
+    const rejected=workers.find(r=>r.status==='rejected');if(rejected?.status==='rejected')throw rejected.reason;
     const recipients=new Map(selected.map(a=>[a.address.toLowerCase(),a]));
     for(const l of unique.values()){
      const n=num(l.blockNumber),index=num(l.logIndex);

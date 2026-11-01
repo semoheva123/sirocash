@@ -1,12 +1,6 @@
 name: Read-only deposit provider diagnostic
 on:
   workflow_dispatch:
-  push:
-    branches: [arena/b6ad75ac-sirocash]
-    paths:
-      - .github/workflows/deposit-read-probe.yml
-      - scripts/probe-deposit-reception.ts
-      - scripts/benchmark-deposit-reads.ts
 permissions:
   contents: read
 concurrency:

@@ -58,7 +58,9 @@ async function main(){const pg=new PGlite();try{
  const before=blockReads;head=1130;await scan.scan('BEP20',signal());assert(blockReads-before<10,'1000 empty blocks require bounded reads, not 1000 block fetches');assert.equal(logReads,4);
  // A new assignment behind the network checkpoint must be backfilled, not skipped.
  const third=randomUUID();await sql('INSERT INTO "User"(id,email,"emailVerifiedAt") VALUES($1,$2,now())',[third,third+'@scanner.test']);await allocateDepositAddress(worker,third,vaults.BEP20,'BEP20',100);
- await scan.scan('BEP20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,2,'rewind deduplicates prior events');
+ let inFlight=0,peak=0;const beforeChunks=logReads;
+ const chunked=createNetworkDepositScanner(worker,{...options,bep20QueryWindow:10,bep20:async(m,p)=>{if(m!=='eth_getLogs')return rpc(m,p);inFlight++;peak=Math.max(peak,inFlight);await new Promise<void>(resolve=>setImmediate(resolve));try{return await rpc(m,p)}finally{inFlight--}}});
+ await chunked.scan('BEP20',signal());assert.equal(logReads-beforeChunks,100);assert(peak>1&&peak<=4,'wire ranges use bounded parallel reads, one atomic logical checkpoint');assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,2,'rewind deduplicates prior events');
  head=130;incomplete=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),100);
  incomplete=false;await scan.scan('TRC20',signal());await scan.scan('TRC20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4);assert.equal(bulkReads,3,'one full receipt request per network block, not per transaction/customer');
  assert.equal(await depositScannerHealthy(worker),true);
