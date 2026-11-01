@@ -6,8 +6,8 @@ export function tronRentalSun(value:unknown):bigint {
 }
 export function tronRentalReadClient(key:string,transport:typeof fetch=fetch){
  if(!key||key.length>4096||/[\s\x00-\x1f\x7f]/.test(key))throw Error('TRONRENTAL_CREDENTIALS');
- async function request(path:'/v1/account/balance'|'/v1/bandwidth/quote',query:Record<string,string>,signal:AbortSignal){
-  if(!['/v1/account/balance','/v1/bandwidth/quote'].includes(path))throw Error('TRONRENTAL_ROUTE');
+ async function request(path:'/v1/account/balance'|'/v1/bandwidth/quote/me',query:Record<string,string>,signal:AbortSignal){
+  if(!['/v1/account/balance','/v1/bandwidth/quote/me'].includes(path))throw Error('TRONRENTAL_ROUTE');
   const url=new URL(path,'https://api.tronrental.com');url.search=new URLSearchParams(query).toString();
   let response:Response;
   try{response=await transport(url,{method:'GET',redirect:'error',cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(10000)]),headers:{Accept:'application/json','X-API-Key':key}})}catch{throw Error('TRONRENTAL_TRANSPORT')}
@@ -22,9 +22,10 @@ export function tronRentalReadClient(key:string,transport:typeof fetch=fetch){
   async bandwidthQuote(volume:number,signal:AbortSignal){
    if(!Number.isSafeInteger(volume)||volume<1||volume>100000)throw Error('TRONRENTAL_VOLUME');
    const expiresAt=Date.now()+25000;
-   const data=await request('/v1/bandwidth/quote',{volume:String(volume),duration:'1h'},signal);
-   // Public-price fallback is NOT evidence that the supplied key authenticated.
-   if(data?.volume!==volume||data.duration!=='1h'||data.personal_price!==true)throw Error('TRONRENTAL_QUOTE_BINDING');
+   const data=await request('/v1/bandwidth/quote/me',{volume:String(volume),duration:'1h'},signal);
+   // /quote/me requires authentication; personal_price only describes a negotiated rate.
+   // Ordinary accounts may legitimately have personal_price=false.
+   if(data?.volume!==volume||data.duration!=='1h'||typeof data.personal_price!=='boolean')throw Error('TRONRENTAL_QUOTE_BINDING');
    const rentalSun=tronRentalSun(data.rental_trx),fixedFeeSun=tronRentalSun(data.fixed_fee_trx),costSun=tronRentalSun(data.total_trx);
    if(costSun<=0n||costSun!==rentalSun+fixedFeeSun||Date.now()>=expiresAt)throw Error('TRONRENTAL_QUOTE_BINDING');
    return {volume,duration:'1h' as const,costSun,rentalSun,fixedFeeSun,expiresAt};
