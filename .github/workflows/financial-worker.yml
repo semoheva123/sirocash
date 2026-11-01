@@ -50,6 +50,14 @@ jobs:
               valid = isinstance(result, dict) and result.get('state') == 'COMPLETED' and result.get('healthy') is True
               valid = valid and all(type(result.get(k)) is int and result[k] >= 0 for k in ['scans', 'staged', 'held', 'valuations'])
               if not valid or result['held'] != 0:
+                  checks = result.get('checks', {})
+                  if isinstance(checks, dict):
+                      safe = {'RPC_HTTP_FAILURE', 'RPC_CONTENT_TYPE_INVALID', 'RPC_RESPONSE_TOO_LARGE', 'RPC_EMPTY_RESPONSE', 'RPC_TIMEOUT', 'RPC_INVALID_JSON', 'RPC_INVALID_ENVELOPE', 'RPC_TRANSPORT_FAILURE', 'RPC_LOG_WRONG_CHAIN', 'SCAN_WRONG_CHAIN', 'SCAN_INVALID_FINALITY', 'SCAN_INVALID_HEIGHT', 'SCAN_INVALID_HASH', 'SCAN_INVALID_OBJECT', 'SCAN_BULK_RECEIPTS_UNAVAILABLE', 'SCAN_ADDRESS_CAPACITY', 'SCAN_ABORTED', 'SCAN_LEASE_LOST', 'SCAN_ASSIGNMENTS_CHANGED', 'CHAIN_REORG', 'DEPOSIT_EVIDENCE_CONFLICT', 'SCAN_FAILED'}
+                      for network in ['BEP20', 'TRC20']:
+                          check = checks.get(network)
+                          if isinstance(check, dict) and check.get('state') == 'FAILED':
+                              code = check.get('failureCode')
+                              print(network + ': ' + (code if isinstance(code, str) and code in safe else 'SCAN_FAILED'), flush=True)
                   raise ValueError()
           except Exception:
               sys.exit('DEPOSIT_MONITOR_NOT_HEALTHY: no customer reception readiness established.')

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import {depositMonitorFailureCode} from '../lib/deposit-monitor-diagnostics';
 import {verifyDepositMonitorReadiness} from '../lib/deposit-monitor-readiness';
 import type {WalletDb} from '../lib/wallet-engine';
 import {POST} from '../app/api/internal/deposit-monitor/route';
 import {depositOnlyForbiddenFlags} from '../lib/deposit-only-mode';
 import {readFile} from 'node:fs/promises';
 async function main(){
+ assert.equal(depositMonitorFailureCode(new Error('RPC_TIMEOUT')),'RPC_TIMEOUT');
+ for(const value of [new Error('https://provider.example/private-key'),new Error('RPC_TIMEOUT secret'),{message:'RPC_TIMEOUT'},'RPC_TIMEOUT'])assert.equal(depositMonitorFailureCode(value),'SCAN_FAILED');
  const keys=['SIRO_FINANCIAL_WORKER_SECRET','VERCEL_ENV','SIRO_OUTBOX_WORKER_ENABLED','SIRO_DEPOSIT_ONLY_ENABLED',...depositOnlyForbiddenFlags];
  const old=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
  try{

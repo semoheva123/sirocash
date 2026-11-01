@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:probe && next build --webpack",
+    "build": "node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:monitor-reads && npm run deposit:probe && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",
@@ -89,7 +89,8 @@
     "test:tronrental": "node --conditions=react-server --import tsx tests/tronrental-read.ts && node tests/tronrental-live-probe.mjs && node --conditions=react-server --import tsx tests/dual-resource-budget-run.ts && node --conditions=react-server --import tsx tests/tronrental-orders.ts",
     "internal:readiness": "node --conditions=react-server --import tsx scripts/check-internal-transfers.ts",
     "test:internal-transfers": "node --conditions=react-server --import tsx tests/internal-transfers.ts",
-    "deposit:monitor-check": "node --conditions=react-server --import tsx scripts/check-deposit-monitor.ts"
+    "deposit:monitor-check": "node --conditions=react-server --import tsx scripts/check-deposit-monitor.ts",
+    "deposit:monitor-reads": "node --conditions=react-server --import tsx scripts/probe-deposit-monitor-reads.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
