@@ -241,3 +241,24 @@
   from { opacity: 0; transform: translate(-50%,12px) scale(.97); }
   to { opacity: 1; transform: translate(-50%,0) scale(1); }
 }
+/* Shared service guidance appears on deposit, withdrawal, Sham Cash and top-up.
+   Explicit descendants prevent legacy light surfaces / inherited white-on-white. */
+:root[data-theme="obsidian"] .account-workspace .app-heading h1 { color: var(--obs-text); }
+:root[data-theme="obsidian"] .atelier-service-brief {
+  background: #141419d9; color: var(--obs-text); border-color: var(--obs-border);
+  box-shadow: var(--pro-surface-shadow); backdrop-filter: blur(18px);
+}
+:root[data-theme="obsidian"] .atelier-brief-title { background: #ffffff03; border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .atelier-brief-title>span,
+:root[data-theme="obsidian"] .atelier-brief-title a,
+:root[data-theme="obsidian"] .atelier-brief-grid>div>svg { color: var(--obs-cyan); }
+:root[data-theme="obsidian"] .atelier-brief-grid>div { border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .atelier-brief-grid span,
+:root[data-theme="obsidian"] .atelier-brief-grid p { color: #b4b4c0; }
+:root[data-theme="obsidian"] .atelier-brief-grid strong { color: var(--obs-text); }
+:root[data-theme="obsidian"] .account-workspace .service-unavailable { background: radial-gradient(ellipse at top,#8b5cf609,transparent 65%),var(--obs-surface); border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .account-workspace .service-unavailable h2 { color: var(--obs-text); }
+:root[data-theme="obsidian"] .account-workspace .service-unavailable-icon { background: #67e8f90a; color: var(--obs-cyan); border: 1px solid #67e8f91c; box-shadow: 0 0 0 12px #67e8f903; }
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="obsidian"] .atelier-service-brief { background: var(--obs-surface); backdrop-filter: none; }
+}

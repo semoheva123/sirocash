@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {readFile} from 'node:fs/promises';
+import {ServiceBrief} from '../components/service-brief';
 import {WalletActions} from '../components/wallet-actions';
 import {receiveDetails,withdrawalPrefill,withdrawalReviewHref} from '../lib/wallet-presentation';
 const owner='11111111-2222-4333-8444-555555555555';
@@ -26,12 +27,18 @@ async function main(){
   assert(html.includes('href="/deposit"'));assert(html.includes('href="/withdraw"'));
   assert(!html.includes('SC-8901'));
  }
+ for(const ar of [true,false])for(const service of ['deposit','withdraw','sham-cash','mobile-topup'] as const){
+  const html=renderToStaticMarkup(<ServiceBrief ar={ar} service={service}/>);
+  assert(html.includes('atelier-service-brief'));assert(html.includes('atelier-brief-grid'));
+  assert(html.includes(ar?'قبل المتابعة':'BEFORE YOU PROCEED'));
+ }
  const actions=await readFile('components/wallet-actions.tsx','utf8');
  assert(!actions.includes('fetch('));assert(!actions.includes('authorizePayment('));
  assert(actions.includes('owned.capabilities?.withdrawals'));
  assert(actions.includes("notify('info'"));assert(actions.includes("notify('success'"));
  assert(actions.indexOf('await navigator.clipboard.writeText')<actions.indexOf("notify('success'"));
  const css=await readFile('app/obsidian.css','utf8');
+ for(const selector of ['.atelier-service-brief','.atelier-brief-title','.atelier-brief-grid strong','.account-workspace .app-heading h1','.account-workspace .service-unavailable-icon'])assert(css.includes(':root[data-theme="obsidian"] '+selector), 'Missing explicit dark service styling: '+selector);
  for(const rule of ['#09090b','backdrop-filter: blur','obsidian-dialog-in','obsidian-toast-in','safe-area-inset-bottom','prefers-reduced-motion','prefers-reduced-transparency'])assert(css.includes(rule));
  const layout=await readFile('app/layout.tsx','utf8');assert(layout.includes('data-theme="obsidian"'));assert(layout.indexOf('./obsidian.css')>layout.indexOf('./professional.css'));
  console.log('Obsidian wallet PASS: owner-bound receive QR, no invented addresses, exact-decimal review handoff, hostile prefill rejected, disabled execution cannot submit, copy success only after clipboard, accessible theme contracts.');
