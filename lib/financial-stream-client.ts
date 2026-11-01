@@ -1,7 +1,7 @@
 export type SyncState='syncing'|'current'|'retrying'|'paused'|'unauthenticated'|'disabled';
 export interface FinancialEventSource{addEventListener(type:string,listener:(event:MessageEvent)=>void):void;close():void}
 /** Event-driven ONLY: timers monitor transport liveness/reconnect, never poll snapshots. */
-export function createFinancialStream<T extends {enabled:boolean;userId:string}>(o:{open:()=>FinancialEventSource;active:()=>boolean;data:(d:T)=>void;state:(s:SyncState)=>void;expectedUserId?:string;setTimer?:(fn:()=>void,ms:number)=>ReturnType<typeof setTimeout>;clearTimer?:(id:ReturnType<typeof setTimeout>)=>void}){
+export function createFinancialStream<T extends {enabled:boolean;userId:string;readable?:boolean}>(o:{open:()=>FinancialEventSource;active:()=>boolean;data:(d:T)=>void;state:(s:SyncState)=>void;expectedUserId?:string;setTimer?:(fn:()=>void,ms:number)=>ReturnType<typeof setTimeout>;clearTimer?:(id:ReturnType<typeof setTimeout>)=>void}){
  const timer=o.setTimer??setTimeout,clear=o.clearTimer??clearTimeout;
  let source:FinancialEventSource|undefined,generation=0,stopped=false,terminal=false,failures=0,retry:ReturnType<typeof setTimeout>|undefined,watchdog:ReturnType<typeof setTimeout>|undefined,waiting:{resolve:()=>void;reject:(e:Error)=>void}|undefined;
  const clearTimers=()=>{if(retry!==undefined)clear(retry);if(watchdog!==undefined)clear(watchdog);retry=watchdog=undefined};
@@ -20,8 +20,9 @@ export function createFinancialStream<T extends {enabled:boolean;userId:string}>
     try{
      const d=JSON.parse(e.data) as T;if(typeof d.enabled!=='boolean'||typeof d.userId!=='string')throw Error();
      if(o.expectedUserId&&d.userId!==o.expectedUserId){endSession();return}
-     failures=0;o.data(d);o.state(d.enabled?'current':'disabled');waiting?.resolve();waiting=undefined;
-     if(!d.enabled){disconnect();return}arm();
+     const readable=d.enabled||d.readable===true;
+     failures=0;o.data(d);o.state(readable?'current':'disabled');waiting?.resolve();waiting=undefined;
+     if(!readable){disconnect();return}arm();
     }catch{reconnect()}
    });
    s.addEventListener('heartbeat',()=>{if(live())arm()});

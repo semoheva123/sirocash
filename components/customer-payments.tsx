@@ -48,5 +48,6 @@ export function CustomerPayments(){
    </section>}
    <FinancialHistory status={status} ar={ar}/>
   </>}
+ {status&&!status.enabled&&status.balance&&<FinancialHistory status={status} ar={ar}/>}
  </main></div>;
 }

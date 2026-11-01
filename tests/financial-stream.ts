@@ -30,6 +30,12 @@ async function main(){
  const disabledSource=new Source();const disabledStates:string[]=[];
  const disabled=createFinancialStream({open:()=>disabledSource,active:()=>true,data:()=>{},state:s=>disabledStates.push(s)});
  disabled.wake();disabledSource.emit('snapshot',{enabled:false,userId:'alice'});assert(disabledSource.closed);assert.equal(disabledStates.at(-1),'disabled');disabled.stop();
+ const readSource=new Source(),readStates:string[]=[],readValues:unknown[]=[];
+ const readOnly=createFinancialStream({open:()=>readSource,active:()=>true,expectedUserId:'alice',data:d=>readValues.push(d),state:s=>readStates.push(s),setTimer:()=>0 as unknown as ReturnType<typeof setTimeout>,clearTimer:()=>{}});
+ readOnly.wake();readSource.emit('snapshot',{enabled:false,readable:true,userId:'alice',balance:{posted:'0',held:'0'}});assert.equal(readStates.at(-1),'current');assert(!readSource.closed);
+ for(let i=0;i<100;i++)readSource.emit('heartbeat');assert.equal(readValues.length,1);
+ readSource.emit('snapshot',{enabled:false,readable:true,userId:'alice',balance:{posted:'2',held:'0'}});assert.equal(readValues.length,2);assert(!readSource.closed);
+ readSource.emit('snapshot',{enabled:false,readable:true,userId:'bob',balance:{posted:'999'}});assert(readSource.closed);assert.equal(readStates.at(-1),'unauthenticated');assert.equal(readValues.length,2);readOnly.stop();
  assert.equal(new URL(financialEventConnection({FINANCIAL_DATABASE_URL:'postgresql://sirocash_financial_worker.project:fixture@aws-0-us-east-1.pooler.supabase.com:6543/postgres'})).port,'5432');
  assert.throws(()=>financialEventConnection({FINANCIAL_DATABASE_URL:'postgresql://postgres:fixture@example.test:6543/postgres'}),/UNSAFE_ROLE/);
  assert.throws(()=>financialEventConnection({FINANCIAL_DATABASE_URL:'postgresql://sirocash_financial_worker:fixture@example.test:6543/postgres'}),/SESSION_CONNECTION/);

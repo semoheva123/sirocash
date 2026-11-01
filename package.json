@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run identity:deployment-check && npm run financial:readiness && next build --webpack",
+    "build": "npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",
@@ -76,7 +76,8 @@
     "test:financial-readiness": "tsx tests/financial-activation-readiness.ts",
     "test:postgres-financial": "node --conditions=react-server --import tsx tests/postgres-financial-integration.ts",
     "financial:events-check": "node --conditions=react-server --import tsx scripts/check-financial-events.ts",
-    "test:financial-stream": "tsx tests/financial-stream.ts && tsx tests/financial-sse-response.ts && tsx tests/financial-ui-coverage.tsx && tsx tests/professional-interface.tsx",
+    "financial:read-check": "node --conditions=react-server --import tsx scripts/check-financial-read.ts",
+    "test:financial-stream": "tsx tests/financial-read.ts && tsx tests/financial-stream.ts && tsx tests/financial-sse-response.ts && tsx tests/financial-ui-coverage.tsx && tsx tests/professional-interface.tsx",
     "test:financial-sync": "node --conditions=react-server --import tsx tests/financial-sync.ts",
     "test:customer-financial": "node --conditions=react-server --import tsx tests/customer-financial-boundaries.ts",
     "test:deposit-discovery": "node --conditions=react-server --import tsx tests/deposit-discovery.ts",

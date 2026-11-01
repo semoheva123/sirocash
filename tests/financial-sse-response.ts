@@ -19,6 +19,12 @@ async function main(){
  const end=reader.read();lost();assert.match(text.decode((await end).value),/event: unavailable/);assert((await reader.read()).done);assert.equal(removed,1);assert.equal(clocks.size,0);abort.abort();assert.equal(removed,1);
  const unauth=financialEventResponse(new Request('https://example.test/api/financial/events'),{authenticate:async()=>null,enabled:()=>true,expiresAt:async()=>null,subscribe:async()=>{throw Error('MUST_NOT_SUBSCRIBE')},snapshot:async()=>{throw Error('MUST_NOT_READ')}});
  assert.match(await unauth.text(),/event: session-ended/);
+ const readAbort=new AbortController();let roChanged=()=>{},roReads=0,roOwner='';
+ const readResponse=financialEventResponse(new Request('https://example.test/api/financial/events?ownerId=bob',{signal:readAbort.signal}),{
+  authenticate:async()=>({id:'alice'}),enabled:()=>true,expiresAt:async()=>new Date(Date.now()+60000),subscribe:async(owner,c)=>{roOwner=owner;roChanged=c;return ()=>{}},
+  snapshot:async()=>Response.json({enabled:false,readable:true,userId:'alice',balance:{posted:String(roReads++),held:'0'}}),setTimeout:timeout,clearTimeout:clear,setInterval:timeout as unknown as typeof setInterval,clearInterval:clear as unknown as typeof clearInterval,
+ });
+ const rr=readResponse.body!.getReader();assert.match(text.decode((await rr.read()).value),/"posted":"0"/);assert.equal(roOwner,'alice');const pushed=rr.read();roChanged();assert.match(text.decode((await pushed).value),/"posted":"1"/);assert.equal(roReads,2);readAbort.abort();assert((await rr.read()).done);assert.equal(clocks.size,0);
  console.log('Financial SSE response PASS: real ReadableStream framing, trusted-owner subscription, initial snapshot, pushed update, heartbeat without reads, disconnect cleanup and unauthenticated denial.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

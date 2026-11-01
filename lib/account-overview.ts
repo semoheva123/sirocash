@@ -11,3 +11,9 @@ export function displayAccountBalance(value:string){
  const [whole,fraction='']=value.split('.');
  return whole.replace(/\B(?=(\d{3})+(?!\d))/g,',')+'.'+(fraction+'00').slice(0,2);
 }
+
+/** Only a successful owner-bound ledger snapshot can establish zero; never use User.balance. */
+export function displayLedgerBalance(status:{userId:string;balance?:{posted?:unknown}}|null|undefined,ownerId:string){
+ const posted=status?.balance?.posted;
+ return status?.userId===ownerId&&typeof posted==='string'&&/^\d+(\.\d+)?$/.test(posted)?displayAccountBalance(posted):'—';
+}

@@ -1,4 +1,5 @@
 import 'server-only';
+import {financialReadTransactions} from './financial-read-transactions';
 import {financialConnectionString} from './financial-connection';
 import {Pool} from 'pg';
 import {databaseOptions} from './database-options';
@@ -17,4 +18,13 @@ export function financialDatabase():WalletDb{
    await c.query('BEGIN');try{const result=await run(c);await c.query('COMMIT');return result}catch(error){await c.query('ROLLBACK');throw error}
   }finally{c.release()}
  }};
+}
+
+/** Balance/history reads never enable the outbox, signer, withdrawals or customer commands. */
+export function financialReadDatabase():WalletDb{
+ const connection=financialConnectionString(process.env);
+ if(process.env.VERCEL_ENV!=='production'||!connection)throw Error('FINANCIAL_READ_DATABASE_DISABLED');
+ const readCache=globalThis as unknown as {siroFinancialReadPool?:Pool};
+ const pool=readCache.siroFinancialReadPool??(readCache.siroFinancialReadPool=new Pool({...databaseOptions(connection,true,process.env.DATABASE_SSL_CA),options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000 -c timezone=UTC'}));
+ return financialReadTransactions(pool);
 }

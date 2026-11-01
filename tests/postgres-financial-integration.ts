@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {financialReadTransactions} from '../lib/financial-read-transactions';
+import {readFinancialSnapshot} from '../lib/financial-status';
 import {financialNotificationFixture,committedNetworkEvent} from './postgres-financial-events';
 import {depositDiscoveryAcceptance} from './deposit-discovery-acceptance';
 import {createDepositValuationWorker} from '../lib/deposit-valuation-worker';
@@ -45,10 +47,17 @@ async function main(){
   await pool.query('INSERT INTO "User" (id,email,"emailVerifiedAt","kycStatus") VALUES ($1,\'race-alice@example.test\',now(),\'VERIFIED\'),($2,\'race-bob@example.test\',now(),\'VERIFIED\')',[alice,bob]);
   await pool.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[settlement,revenue]);
   await financialNotificationFixture(pool,testUrl.toString(),alice);
+  // Read-only display is independent of command activation, using actual restricted-role SQL.
+  const readPool={connect:async()=>{const c=await pool!.connect();await c.query('SET ROLE sirocash_financial_worker');return {query:c.query.bind(c),release:()=>c.release(true)}}} as unknown as Pick<Pool,'connect'>;
+  const readDb=financialReadTransactions(readPool);
+  const emptyRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,alice));assert.equal(emptyRead.balance.posted,'0');assert.equal(emptyRead.balance.held,'0');
+  await assert.rejects(()=>readDb.transaction(tx=>tx.query('UPDATE "LedgerAccount" SET balance=1')),/read.only/i);
   const deposit={ownerId:alice,requestKey:'postgres:deposit:replay',amount:'100',providerReference:'fixture:postgres:deposit:1',settlementAccountId:settlement};
   const credits=await Promise.all(Array.from({length:16},()=>creditConfirmedDeposit(db,deposit)));
   assert.equal(new Set(credits.map(c=>c.id)).size,1);
   assert.equal((await walletBalances(db,alice)).available,'100.000000');
+  const postedRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,alice));assert.equal(postedRead.balance.posted,'100.000000');assert.equal(postedRead.activity.length,1);
+  const otherRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,bob));assert.equal(otherRead.balance.posted,'0');assert.equal(otherRead.activity.length,0);
   assert(pids.size>=2,'must use independent PostgreSQL backend processes, not serialized PGlite');
   const competing=await Promise.allSettled(Array.from({length:12},(_,i)=>transferWallet(db,{ownerId:alice,recipientId:bob,feeAccountId:revenue,requestKey:'postgres:competing:'+i,amount:'60'})));
   assert.equal(competing.filter(r=>r.status==='fulfilled').length,1);
