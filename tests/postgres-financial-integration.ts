@@ -50,7 +50,8 @@ async function main(){
   // Read-only display is independent of command activation, using actual restricted-role SQL.
   const readPool={connect:async()=>{const c=await pool!.connect();await c.query('SET ROLE sirocash_financial_worker');return {query:c.query.bind(c),release:()=>c.release(true)}}} as unknown as Pick<Pool,'connect'>;
   const readDb=financialReadTransactions(readPool);
-  const emptyRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,alice));assert.equal(emptyRead.balance.posted,'0');assert.equal(emptyRead.balance.held,'0');
+  const emptyRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,bob));assert.equal(emptyRead.balance.posted,'0');assert.equal(emptyRead.balance.held,'0');
+  const existingEmptyRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,alice));assert.equal(existingEmptyRead.balance.posted,'0.000000');
   await assert.rejects(()=>readDb.transaction(tx=>tx.query('UPDATE "LedgerAccount" SET balance=1')),/read.only/i);
   const deposit={ownerId:alice,requestKey:'postgres:deposit:replay',amount:'100',providerReference:'fixture:postgres:deposit:1',settlementAccountId:settlement};
   const credits=await Promise.all(Array.from({length:16},()=>creditConfirmedDeposit(db,deposit)));
