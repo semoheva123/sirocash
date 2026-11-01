@@ -172,3 +172,22 @@ passed after it. The new Handoff fixture is included in test:catfee. A future li
 read-only retry must use corrected source6213a58 (or later), with a fresh temporary
 probe enablement; remove it after the result. Do not request/reveal secrets or
 change account permissions based solely on this inconclusive attempt.
+
+## Corrected Handoff live recheck, 2026-11-01
+
+Production-origin diagnostic dpl_DGKCNzAQq856sCvAp3VeF58xv4Kj used source
+7198089f86d56ffad5f92d5a2e04e8a9dc77076e with the corrected application/json
+Content-Type and exact timestamp + POST + encoded path/query HMAC.
+POST /v1/mate/open/transaction/estimate?quantity=65000&resource_type=ENERGY
+still returned business code101. This proves rejection persists after the header
+correction; it does not identify whether product access, key scope, signing or
+another account-specific requirement caused it. Do not label the account inactive
+or all credentials invalid from this result. BANDWIDTH1000 was not requested,
+because the probe stops after the first authentication rejection.
+
+No purchases, broadcasts, account-data disclosure or publication occurred. The
+probe variable9g2tEM1688pkoaV2 was deleted after completion. Targeted typecheck,
+CatFee/probe, autonomous-flow, purchase-budget and delivery tests all passed locally.
+Next external check: confirm Transaction Handoff application/access status and its
+API Access credentials with CatFee; do not solicit secrets in chat, blindly retry,
+change products/hosts to bypass rejection, or add funds to fix an auth failure.
