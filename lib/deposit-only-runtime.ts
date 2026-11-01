@@ -12,13 +12,15 @@ import type {WalletDb} from './wallet-engine';
 export function productionDepositOnlyWorkers(db:WalletDb){
  assertDepositOnlyIsolation();
  if(!depositOnlyConfiguration(process.env,{workerOnly:true}).configurationReady)throw Error('DEPOSIT_ONLY_CONFIGURATION_REQUIRED');
+ const window=process.env.SIRO_BEP20_SCAN_WINDOW??'1000';
+ if(!/^[1-9]\d{0,3}$/.test(window)||Number(window)>1000)throw Error('DEPOSIT_SCAN_WINDOW_INVALID');
  const blocked=async()=>{throw Error('DEPOSIT_ONLY_SEND_FORBIDDEN')};
  return {payout:blocked,sweep:blocked,batch:async()=>{
   let price:Awaited<ReturnType<typeof observeUsdtUsdPrice>>|undefined;
   const value=createDepositValuationWorker(db,{enabled:true,settlementAccountId:process.env.SIRO_SETTLEMENT_ACCOUNT_ID??'',price:async()=>{if(!price||Date.now()-Date.parse(price.observedAt)>10000)price=await observeUsdtUsdPrice();return price}});
   const deadline=Date.now()+110000;
   const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),110000);
-  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal),genesisId:process.env.SIRO_TRON_GENESIS_ID!,minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
+  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal),genesisId:process.env.SIRO_TRON_GENESIS_ID!,bep20Window:Number(window),minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
   let scans=0,held=0,staged=0;
   const stopped=new Set<string>();
   try{

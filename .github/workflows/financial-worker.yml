@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      # Manual dispatch on this branch is deliberately authentication-only.
-      # Scheduled runs retain their separately gated worker behavior.
+      # Manual dispatch first verifies authentication, then runs the isolated deposit monitor.
+      # No external execution is composed by the deposit-monitor endpoint.
       - name: Verify worker credential without executing financial work
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -30,6 +30,31 @@ jobs:
             401) echo 'AUTH_CHECK_REJECTED: credential missing, invalid or different from deployed production.'; exit 1 ;;
             *) echo "AUTH_CHECK_UNEXPECTED_HTTP_${status}: not accepted; no worker execution requested."; exit 1 ;;
           esac
+      - name: Run isolated deposit monitor
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
+        run: |
+          set -eu
+          trap 'rm -f deposit-monitor-result.json' EXIT
+          status=$(curl --silent --show-error --max-time 175 --retry 0 \
+            --proto '=https' --request POST --output deposit-monitor-result.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${WORKER_SECRET}" --header 'Content-Length: 0' \
+            'https://sirocash.vercel.app/api/internal/deposit-monitor') || { echo 'DEPOSIT_MONITOR_TRANSPORT_FAILED: inspect scanner health before another run.'; exit 1; }
+          test "$status" = 200 || { echo "DEPOSIT_MONITOR_HTTP_${status}: monitor did not confirm completion."; exit 1; }
+          python3 - <<'PYTHON'
+          import json, sys
+          try:
+              with open('deposit-monitor-result.json') as f:
+                  result = json.load(f)
+              valid = isinstance(result, dict) and result.get('state') == 'COMPLETED' and result.get('healthy') is True
+              valid = valid and all(type(result.get(k)) is int and result[k] >= 0 for k in ['scans', 'staged', 'held', 'valuations'])
+              if not valid or result['held'] != 0:
+                  raise ValueError()
+          except Exception:
+              sys.exit('DEPOSIT_MONITOR_NOT_HEALTHY: no customer reception readiness established.')
+          print('DEPOSIT_MONITOR_PASS: scanners healthy; no signing, purchases or broadcasts.')
+          PYTHON
       - name: Invoke authenticated bounded worker
         if: github.event_name == 'schedule'
         env:
