@@ -75,3 +75,38 @@ Operator explicitly changed SIRO_BEP20_LOG_RPC_URL from https://1rpc.io/bnb to h
 Replacement-provider production build dpl_AMCq3XHvsquJurxtQYPit2UqoHj8 also failed BEP20 DISCOVERY with RPC_INVALID_ENVELOPE while TRC20 passed (event1793571355261); it was NOT promoted. Do not treat this as repaired. Restored log URL https://1rpc.io/bnb and set SIRO_CUSTOMER_DEPOSITS_ENABLED=false. Started safety rollback deployment dpl_8FZpy4x7z7iGr9FwjAX9FHgs11Jf from the last published merge25746e4 to apply closure without bypassing the newly failing live-read preflight. Until rollback is confirmed READY, stale scanner guards remain the existing protection. PR4 remains OPEN/unmerged: verify and PG16/17 checks passed, but hosted Vercel discovery check failed. No additional provider guessing, secret decryption, timestamp overrides or paid operations were performed.
 
 Safety rollback confirmed READY/PROMOTED1793571561012 with aliases assigned1793571561314 to sirocash.online and sirocash.vercel.app. Customer deposits are closed again in published production. Financial isolation remains unchanged. Root provider rejection detail beyond RPC_INVALID_ENVELOPE remains unresolved; do not claim a repaired monitor or request another customer deposit.
+
+## RPC repair follow-up (2026-11-02)
+
+Customer reception remains closed; no signing, broadcast, resource purchase,
+scanner timestamp override or credit was performed. PR #4 is not merged.
+
+- Hosted attempt `dpl_7yh2qC9c5BpRuqBie5SmaFsUWhwA` failed BEP20 finality
+  with HTTP 429; TRC20 discovery passed. Original 1rpc had also returned HTTP
+  403. Public single-block log probes are diagnostic, not monitor acceptance.
+- Added one bounded retry for HTTP 429 reads only, under the original deadline,
+  and cached log-transport chain identity within the RPC instance. This does not
+  retry writes, 403, malformed evidence, signing or orders.
+- `dpl_6Tmddnu8oh6jnVpVymASq6dUF7ei` still failed primary chain ID with 429.
+- Added explicit `SIRO_BEP20_READ_RPC_URL` / optional
+  `SIRO_BEP20_READ_RPC_AUTHORIZATION` for the deposit read transport. An explicit
+  override never inherits legacy financial RPC credentials. Legacy financial
+  RPC configuration remains unchanged. Production read override is currently
+  PublicNode; log transport is dRPC. Neither public service is proven adequate.
+- `dpl_4DGMGKPivzUQP5ZuoJpKVCawmxno` failed finality `eth_getBlockByNumber`
+  with HTTP 429 even on the explicit PublicNode primary. TRC20 passed again.
+  dRPC diagnostic logs also returned 429; 1rpc returned JSON-RPC -32005.
+- Removed the speculative shared-tip clamping change: provider-tip divergence
+  was not established as the cause, and finality/cursor/reorg semantics must not
+  change merely to work around provider throttling. Primary finality and receipt
+  verification remain authoritative. Valid remote -32005 errors now report
+  `RPC_RATE_LIMITED`, not an ambiguous invalid envelope.
+
+**Blocked:** configure dedicated, adequately provisioned BSC read endpoints in
+Vercel production (sensitive values if the URLs contain keys), supporting chain
+ID 56, finalized blocks, canonical receipts and the required USDT getLogs range.
+Keep credentials out of chat/source. Then deploy the branch, require both hosted
+read probes PASS and READY/alias assignment, merge only after checks pass, and
+obtain an owner's fresh `DEPOSIT_MONITOR_PASS` on main before reopening reception.
+Do not request a customer transfer while blocked. Scheduled liveness and actual
+exactly-once deposit acceptance remain separate, unproven requirements.

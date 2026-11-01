@@ -78,12 +78,13 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
     const message=typeof error.message==='string'?error.message.slice(0,4096).toLowerCase():'';
     const reason:RpcFailureInfo['reason']=/rate|too many|limit exceeded/.test(message)?'RATE_LIMIT':/block range|range.*block|block.*range|unknown block|not found|future|greater than|after last|after latest/.test(message)?'BLOCK_RANGE':/method.*(support|available|found)|unsupported method/.test(message)?'METHOD':/invalid.*(param|argument)|invalid.*topic/.test(message)?'PARAMS':'OTHER';
     options.onFailure?.({method,versionMatches:p.jsonrpc==='2.0',idMatches:p.id===id,hasResult:Object.hasOwn(p,'result'),hasError:Object.hasOwn(p,'error'),remoteCode:code,reason});
+    if(p.jsonrpc==='2.0'&&p.id===id&&!Object.hasOwn(p,'result')&&code===-32005)throw new Error('RPC_RATE_LIMITED');
     throw new Error('RPC_INVALID_ENVELOPE');
    }
    return p.result;
   }catch(error){
    if(abort.signal.aborted)throw new Error('RPC_TIMEOUT');
-   const safe=new Set(['RPC_HTTP_FAILURE','RPC_CONTENT_TYPE_INVALID','RPC_RESPONSE_TOO_LARGE','RPC_EMPTY_RESPONSE','RPC_TIMEOUT','RPC_INVALID_JSON','RPC_INVALID_ENVELOPE']);
+   const safe=new Set(['RPC_HTTP_FAILURE','RPC_RATE_LIMITED','RPC_CONTENT_TYPE_INVALID','RPC_RESPONSE_TOO_LARGE','RPC_EMPTY_RESPONSE','RPC_TIMEOUT','RPC_INVALID_JSON','RPC_INVALID_ENVELOPE']);
    if(error instanceof Error&&safe.has(error.message))throw new Error(error.message);
    throw new Error('RPC_TRANSPORT_FAILURE');
   }finally{
@@ -103,23 +104,7 @@ export function createBep20DepositReadRpc(primary:Options,logs?:Options):Bep20Rp
   await assertLogChain();
   return logRead(method,params);
  };
- if(logRead)rpc.discoveryHeight=async(primaryFinalHeight)=>{
-  if(!Number.isSafeInteger(primaryFinalHeight)||primaryFinalHeight<0)throw Error('RPC_LOG_HEIGHT_INVALID');
-  await assertLogChain();
-  const raw=await logRead('eth_blockNumber',[]);
-  if(typeof raw!=='string'||!/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(raw)||BigInt(raw)>BigInt(Number.MAX_SAFE_INTEGER))throw Error('RPC_LOG_HEIGHT_INVALID');
-  const logHead=Number(BigInt(raw)),common=Math.min(primaryFinalHeight,logHead);
-  if(primaryFinalHeight-common>2000)throw Error('RPC_LOG_PROVIDER_LAG');
-  const tag='0x'+common.toString(16);
-  const [primaryBlock,logBlock]=await Promise.all([read('eth_getBlockByNumber',[tag,false]),logRead('eth_getBlockByNumber',[tag,false])]);
-  const valid=(v:unknown):v is {hash:string;number:string}=>{
-   if(!v||typeof v!=='object'||Array.isArray(v))return false;
-   const b=v as Record<string,unknown>;
-   return typeof b.hash==='string'&&/^0x[a-f0-9]{64}$/i.test(b.hash)&&typeof b.number==='string'&&/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(b.number)&&BigInt(b.number)===BigInt(common);
-  };
-  if(!valid(primaryBlock)||!valid(logBlock)||primaryBlock.hash.toLowerCase()!==logBlock.hash.toLowerCase())throw Error('RPC_LOG_CHAIN_MISMATCH');
-  return common;
- };
+
  return rpc;
 }
 /** Independent read-only production gate: does not enable signing or financial writes. */
