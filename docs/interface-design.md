@@ -1,20 +1,23 @@
-# Clarity interface / November 2026
+# Horizon / SiroCash interface
 
-The interface update covers the landing page and product illustration, wallet and service surfaces, shared desktop/mobile account navigation, payment workspace, authentication, settings, and financial history. `app/professional.css` is the final product-wide visual contract; historical styles remain underneath for legacy/ancillary surfaces. It does not remove those stylesheets.
+Horizon replaces the preceding Clarity presentation. This is a composition and navigation change, not another imported theme layer. `app/professional.css` has been replaced, not appended as a new stylesheet. Historical shared CSS remains underneath for ancillary screens and low-level legacy controls; its removal is separate technical debt.
 
-## Components and behavior
+## New compositions
 
-- `PlatformPreview` is a labelled illustration with wallet/security tabs, never an issued payment card or an actual balance. Used on landing and authentication.
-- `financial-ui.tsx` shares explicit state badges, empty states, UTC dates and copyable ledger/network references. Clipboard failure is reported instead of showing false success.
-- `FinancialActivity` searches and filters the records already received from the shared owner stream. Search is **not** a database-wide search; each list still contains its latest 30 records. Desktop uses a semantic table; narrow viewports present the same records as rows/cards without document-wide horizontal overflow.
-- Amount strings are not rounded or converted to floating point. Balance privacy masks posted/held balances and movement/command amounts. Transaction references are identifiers, not signed transaction payloads.
-- The account rail is visible above 900px; a safe-area-aware five-destination bottom navigation is used below that width. Each navigation has its own active destination. Existing service tabs and quick access remain available.
-- Payment workflows, authentication, ownership checks, fees, caps and financial activation gates are unchanged. The old authentication marketing phrase promising zero internal fees has been removed; fees are shown before approval.
-- SSE, one owner-bound provider, and no healthy polling remain unchanged. An inactive financial service has an explicit non-operational empty state, not demo transactions.
+- `ModernLanding`: editorial cover with a custom decorative sculpture, full-width interactive service stage, service directory, security narrative, linear onboarding and FAQ. No phone/dashboard mockup or fabricated balance/activity on the landing page.
+- `ServiceShowcase`: three selectable experience descriptions with one active button, a matching destination and an explicit preview/inactive-services notice.
+- `VaultOverview`: capital canvas, separate asset/network explorer, horizontal service directory and account control panel. Only the existing projected account balance is passed in; asset links do not represent customer holdings. Privacy masks the capital amount and still propagates to the financial history.
+- Account navigation: horizontal desktop navigation in place of a vertical rail, with the existing five-destination mobile navigation. All service routes remain available. Quick access has its own accessible name when its visual label is hidden.
+- Authentication: split identity/credential workspace, custom decorative brand artwork, unboxed form; the previous product-preview component has been removed.
+- Settings: profile/preferences column beside a broader security workspace; reordered into one column on mobile.
+- Payments: details → review → device-approval progress. Prepared forms are replaced visually by their immutable review; editing restores details. No route, payload, approval binding, idempotency, unknown-outcome protection, limit or activation gate has changed.
 
-## Verification
+## Preserved financial behavior
 
-- Full `npm test`, including typecheck, existing financial streaming/ownership checks, and new `professional-interface.tsx` SSR contracts.
-- Local headless Chromium: landing at 1440/390/320px and authentication at desktop; no page runtime errors or landing document overflow. Actual authenticated production sessions were not used.
-- Separately mounted **synthetic test fixtures**, never a public application route: real financial history/navigation components at 1440/1000/768/390/320px in Arabic and English; search and movement-type filter exercised, no page runtime errors or document overflow. These checks do not certify a live customer SSE session, actual financial execution, physical-device behavior or all accessibility requirements.
-- Temporary browser dependencies, bundles, fixtures and screenshots are excluded from source delivery under `.cache`/`node_modules` and are not production features.
+Shared owner-bound SSE and no healthy polling remain unchanged. Financial tables/cards, current/unknown/reserved state distinctions, copy feedback, explicit UTC dates, and latest-30-record search/filtering remain. Amount strings are never converted to floating point. Service availability is explicit, and no real-money feature has been activated by this redesign.
+
+## Verification scope
+
+`npm test` covers typechecks and existing financial/authentication regressions, plus bilingual SSR contracts for the new service stage and private overview, privacy and navigation. Headless local Chromium checked landing at 1440/390/320px, English authentication and password visibility at 1440/768/390/320px, persisted LTR language and service-stage selection. Separate browser-only synthetic fixtures exercised the real overview, navigation and financial history at 1440/1000/768/390/320px in both languages, including history search/filter, balance masking propagated into history, and quick-access dialog open/Escape close. No document overflow or page runtime errors were observed in these checks.
+
+Browser fixtures, screenshots and optional test browser packages remain outside source delivery in `.cache`/`node_modules`. These checks do not certify a mounted production customer SSE session, physical-device behavior, all accessibility requirements or live financial execution. No customer account or financial operation was created during visual verification.

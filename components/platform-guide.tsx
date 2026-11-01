@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight, Check, Plus, SlidersHorizontal, ShieldCheck, Layers } from 'lucide-react';
 
 /** Honest product guidance: no invented customer numbers, licenses or returns. */
-export function PlatformGuide({ ar }: { ar: boolean }) {
+export function PlatformGuide({ ar,faqOnly=false }: { ar: boolean;faqOnly?:boolean }) {
  const t = (en: string, arabic: string) => ar ? arabic : en;
  const questions = [
   [t('Can I move real money today?', 'هل يمكنني تحويل أموال حقيقية الآن؟'), t('Not yet. This release lets you explore the account experience. Live deposits, withdrawals and transfers remain inactive. Do not send funds to demonstration addresses.', 'ليس بعد. يتيح هذا الإصدار استكشاف تجربة الحساب، بينما تظل الإيداعات والسحوبات والتحويلات الفعلية غير مفعّلة. لا ترسل أموالًا إلى العناوين التجريبية.')],
@@ -11,13 +11,13 @@ export function PlatformGuide({ ar }: { ar: boolean }) {
   [t('Where can I find service details?', 'أين أجد تفاصيل الخدمات؟'), t('The platform status page explains current availability. Service screens show their own limitations, and the help page provides further guidance.', 'توضح صفحة حالة المنصة الخدمات المتاحة حاليًا. وتعرض واجهة كل خدمة حدودها الخاصة، مع إرشادات إضافية في صفحة المساعدة.')],
  ];
  return <>
-  <section className="world-control section-width" aria-labelledby="world-control-title">
+  {!faqOnly&&<section className="world-control section-width" aria-labelledby="world-control-title">
    <div className="world-control-intro"><span className="world-overline">{t('THE DETAILS MAKE THE DIFFERENCE', 'التفاصيل تصنع الفرق')}</span><h2 id="world-control-title">{t('Everything in place.', 'كل شيء في مكانه.')}<br/><span>{t('You in control.', 'والتحكّم بين يديك.')}</span></h2><p>{t('A financial interface should make things clearer, not louder. Know where you are, what comes next and what is available.', 'الواجهة المالية الجيدة تمنحك وضوحًا، لا مزيدًا من التعقيد. اعرف حالة حسابك، وخطوتك التالية، وما هو متاح لك بدقّة.')}</p><Link className="fintech-explore" href="/trust">{t('Explore platform status', 'اطّلع على حالة المنصة')}<ArrowUpRight size={18}/></Link></div>
    <div className="world-control-panel"><div className="world-panel-heading"><span className="world-panel-mark"><SlidersHorizontal size={21}/></span><div><strong>{t('A considered workspace', 'مساحة مصمّمة بعناية')}</strong><small>SIROCASH / PERSONAL</small></div><span className="world-outline-tag">{t('Preview', 'تجريبي')}</span></div>
     {[{icon:Layers,n:'01',title:t('One coherent overview', 'نظرة واحدة، صورة متكاملة'),copy:t('Your account, assets and services, clearly organized.', 'حسابك والعملات والخدمات، بترتيب واضح.')},{icon:ShieldCheck,n:'02',title:t('Privacy within reach', 'خصوصيتك، في متناولك'),copy:t('Balance visibility and account security controls.', 'التحكّم بإظهار الرصيد وإعدادات حماية الحساب.')},{icon:Check,n:'03',title:t('Clarity at every step', 'وضوح في كل خطوة'),copy:t('Visible service status. No hidden assumptions.', 'حالة الخدمات ظاهرة، دون افتراضات خفية.')}].map(item=><div className="world-control-row" key={item.n}><span className="world-row-icon"><item.icon size={20}/></span><div><h3>{item.title}</h3><p>{item.copy}</p></div><span className="world-row-index">{item.n}</span></div>)}
     <div className="world-panel-foot"><span/>{t('Designed for clarity. Built around you.', 'وضوح في التصميم. واهتمام بتجربتك.')}</div>
    </div>
-  </section>
+  </section>}
   <section className="world-faq section-width" aria-labelledby="world-faq-title"><div><span className="world-overline">{t('GOOD TO KNOW', 'قبل أن تبدأ')}</span><h2 id="world-faq-title">{t('A little more clarity.', 'إجابات تمنحك وضوحًا.')}</h2><p>{t('Straight answers. A more confident start.', 'معلومات مباشرة، لبداية أكثر اطمئنانًا.')}</p><Link href="/support" className="fintech-explore">{t('Visit the help center', 'انتقل إلى المساعدة')}<ArrowUpRight size={18}/></Link></div><div className="world-faq-list">{questions.map(([title, copy], index)=><details key={title}><summary><span className="world-question-index">0{index+1}</span><span>{title}</span><Plus size={18}/></summary><p>{copy}</p></details>)}</div></section>
  </>;
 }

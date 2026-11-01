@@ -20,7 +20,7 @@ async function main(){
   const landing=renderToStaticMarkup(<ModernLanding ar={ar}/>);
   for(const anchor of ['main-content','business','how-it-works','security'])assert.ok(landing.includes(`id="${anchor}"`));
   for(const href of ['/auth','/dashboard','/deposit','/sham-cash','/mobile-topup','/trust'])assert.ok(landing.includes(`href="${href}"`));
-  assert.ok(landing.includes(ar?'كل ما تحتاجه.':'Your whole world.'));
+  assert.ok(landing.includes(ar?'برؤية أوسع.':'A wider horizon.'));
   assert.ok(landing.includes(ar?'الخدمات المالية الفعلية غير مفعّلة':'Live financial services are not activated'));
   assert.ok(!/SC-8901|2,450.75|\$12.50|Visa|Mastercard/.test(landing));
   const art=renderToStaticMarkup(<SignatureVisual ar={ar}/>);

@@ -1,29 +1,285 @@
-import Link from 'next/link';
-import {PlatformGuide} from './platform-guide';
-import {ArrowUpRight,ArrowLeftRight,ArrowDownLeft,ShieldCheck,Globe2,Smartphone,ScanLine,Mail,LockKeyhole,Layers,Check,ChevronDown} from 'lucide-react';
-import {PlatformPreview} from './platform-preview';
-import {ExperienceSection} from './experience-section';
-import {AssetSpotlight} from './asset-spotlight';
-
-export function ModernLanding({ar}:{ar:boolean}){
- const t=(en:string,arabic:string)=>ar?arabic:en;
- return <main id="main-content" tabIndex={-1} className="fintech-landing">
-  <section className="fintech-hero section-width"><div className="fintech-hero-copy"><span className="premium-hero-index" aria-hidden="true">SIROCASH / PERSONAL FINANCE</span><div className="fintech-kicker"><span>✦</span>{t('A fresh perspective on your wallet','محفظة رقمية. تجربة أوضح.')}</div><h1>{t('Your whole world.','كل ما تحتاجه.')}<br/><span>{t('One wallet.','في محفظة واحدة.')}</span></h1><p>{t('A simpler space for your digital wallet, transfers and account security. Less searching. More clarity. Made for the way you move.','مساحة واحدة لمحفظتك الرقمية، وتحويلاتك، وإعدادات حمايتك. خطوات أقل تعقيدًا، وتفاصيل أوضح، وتجربة تبدأ من احتياجاتك.')}</p><div className="fintech-hero-actions"><Link href="/auth" className="button fintech-primary">{t('Create your account','أنشئ حسابك')}<ArrowUpRight size={20}/></Link><a href="#business" className="fintech-explore">{t('Explore the platform','اكتشف المنصة')}<ChevronDown size={17}/></a></div><div className="fintech-hero-assurances"><span><Globe2 size={17}/>{t('Arabic & English','العربية والإنجليزية')}</span><span><ShieldCheck size={17}/>{t('Email-approved access','تحقق عبر البريد')}</span></div><div className="fintech-preview-label"><span/>{t('Product preview. Live financial services are not activated.','إصدار تجريبي. الخدمات المالية الفعلية غير مفعّلة.')}</div></div><PlatformPreview ar={ar}/></section>
-  <section className="fintech-principles section-width" aria-label={t('Platform principles','مزايا تجربة المنصة')}>
-   {[{icon:Layers,en:'USDT + USDC',ar:'USDT + USDC',subEn:'Compatible network selections',subAr:'خيارات الشبكات المتوافقة'},{icon:ScanLine,en:'Review. Then confirm.',ar:'راجع. ثم أكّد.',subEn:'Clear details before every step',subAr:'تفاصيل واضحة قبل كل خطوة'},{icon:Globe2,en:'Your language. Your space.',ar:'لغتك. مساحتك.',subEn:'Native Arabic and English',subAr:'عربية وإنجليزية باتجاه صحيح'},{icon:LockKeyhole,en:'Security you can manage',ar:'حماية تحت إدارتك',subEn:'Sessions and sensitive changes',subAr:'الجلسات والتغييرات الحسّاسة'}].map(item=><div key={item.en}><item.icon size={23}/><span><strong>{ar?item.ar:item.en}</strong><small>{ar?item.subAr:item.subEn}</small></span></div>)}
-  </section>
-  <section id="business" className="fintech-services section-width"><div className="fintech-section-heading"><div><span className="fintech-kicker">{t('BUILT AROUND YOUR DAY','أقرب إلى يومك')}</span><h2>{t('More connected.','خدمات مترابطة.')}<br/><span>{t('Less complicated.','بخطوات أكثر وضوحًا.')}</span></h2></div><p>{t('One coherent experience, from choosing a service to reviewing its availability. Explore the preview before financial services go live.','من اختيار الخدمة إلى مراجعة تفاصيلها، تجربة واحدة متناسقة. استكشف واجهات المنصة مع بيان واضح لما هو متاح وما لم يُفعّل بعد.')}</p></div>
-   <div className="fintech-bento">
-    <Link href="/dashboard" className="fintech-bento-transfer"><span className="fintech-bento-tag">{t('YOUR WALLET','محفظتك الرقمية')}</span><h3>{t('Keep the details.','التفاصيل المهمة.')}<br/>{t('Lose the complexity.','دون التعقيد.')}</h3><p>{t('An organized overview, private balance controls and direct access to your services.','ملخص منظّم للحساب، وتحكّم في إظهار الرصيد، ووصول مباشر إلى خدماتك.')}</p><div className="fintech-transfer-art" aria-hidden="true"><span><ArrowUpRight size={45}/></span><span><ArrowDownLeft size={45}/></span><i/></div><div className="fintech-bento-bottom"><span>{t('Explore your workspace','استكشف مساحة حسابك')}</span><span><ArrowUpRight size={22}/></span></div></Link>
-    <div className="fintech-bento-crypto"><AssetSpotlight ar={ar}/></div>
-    <Link href="/sham-cash" className="fintech-bento-sham"><span className="fintech-service-symbol"><ArrowLeftRight size={24}/></span><h3>{t('Sham Cash','شام كاش')}</h3><p>{t('1–24 hours during designated operating days. Service not activated.','من ساعة إلى 24 ساعة خلال أيام التنفيذ المحدّدة. الخدمة غير مفعّلة.')}</p><div className="fintech-bento-bottom"><span>{t('Service details','تفاصيل الخدمة')}</span><ArrowUpRight size={20}/></div></Link>
-    <Link href="/mobile-topup" className="fintech-bento-mobile"><span className="fintech-service-symbol"><Smartphone size={24}/></span><h3>{t('Stay connected','شحن رصيد الهاتف')}</h3><p>{t('Explore Syriatel and MTN top-up screens. No real recharge is performed.','استكشف واجهات شحن سيريتل وMTN. لا يُنفّذ شحن رصيد فعلي.')}</p><div className="fintech-bento-bottom"><span>Syriatel · MTN</span><ArrowUpRight size={20}/></div></Link>
-   </div>
-  </section>
-  <ExperienceSection ar={ar}/>
-  <section className="fintech-onboarding section-width" id="how-it-works"><div className="fintech-section-heading"><div><span className="fintech-kicker">{t('A CLEAR START','بداية واضحة')}</span><h2>{t('Your space.','مساحتك الجديدة.')}<br/><span>{t('Three simple steps.','بثلاث خطوات.')}</span></h2></div><Link href="/auth" className="button secondary">{t('Get started','ابدأ الآن')}<ArrowUpRight size={18}/></Link></div><div className="fintech-onboarding-grid">{[{icon:Mail,title:t('Create your account','أنشئ حسابك'),text:t('Use your email and a unique password.','استخدم بريدك الإلكتروني وكلمة مرور فريدة.')},{icon:ShieldCheck,title:t('Verify your email','تحقّق من بريدك'),text:t('Enter the code sent to your registered email.','أدخل رمز التحقق المرسل إلى بريدك المسجّل.')},{icon:Layers,title:t('Explore your workspace','استكشف حسابك'),text:t('Manage settings and review services. Real-money services remain inactive.','أدر إعداداتك واطّلع على الخدمات. العمليات المالية الفعلية غير مفعّلة.')}].map((step,index)=><div key={index}><div className="fintech-step-top"><span><step.icon size={25}/></span><b>0{index+1}</b></div><h3>{step.title}</h3><p>{step.text}</p></div>)}</div></section>
-  <section className="fintech-security section-width" id="security"><div className="fintech-security-graphic" aria-hidden="true"><div/><div/><ShieldCheck size={76} strokeWidth={1.3}/><span><LockKeyhole size={22}/></span></div><div><span className="fintech-kicker">{t('CONTROL THAT STAYS WITH YOU','حسابك. تحت إدارتك.')}</span><h2>{t('Clear access.','وصول واضح.')}<br/>{t('Considered protection.','وضوابط حماية مدروسة.')}</h2><p>{t('Email approval for sensitive changes, session controls and a readable security history. Review exactly what is available today.','تأكيد التغييرات الحسّاسة عبر البريد، وإدارة الجلسات، وسجل واضح للنشاط الأمني. اطّلع على ما تتيحه النسخة الحالية بدقّة.')}</p><div className="fintech-security-checks"><span><Check size={15}/>{t('Email approval','تأكيد عبر البريد')}</span><span><Check size={15}/>{t('Session controls','إدارة الجلسات')}</span></div><Link href="/trust" className="fintech-explore">{t('Security & platform status','الحماية وحالة المنصة')}<ArrowUpRight size={19}/></Link></div></section>
-  <PlatformGuide ar={ar}/>
-  <section className="fintech-final section-width"><span>SIROCASH / YOUR NEXT STEP</span><h2>{t('A fresh start.','تجربة مختلفة.')}<br/>{t('A space of your own.','ومساحة تخصّك.')}</h2><Link href="/auth" className="button">{t('Create your account','أنشئ حسابك')}<ArrowUpRight size={20}/></Link><p>{t('Preview release · No real financial transactions','نسخة تجريبية · دون معاملات مالية فعلية')}</p><div aria-hidden="true">S.</div></section>
- </main>;
+import Image from "next/image";
+import Link from "next/link";
+import {
+  ArrowUpRight,
+  ArrowDown,
+  ShieldCheck,
+  Globe2,
+  Fingerprint,
+  ArrowLeftRight,
+  Smartphone,
+  Mail,
+  MoveUpRight,
+} from "lucide-react";
+import { PlatformGuide } from "./platform-guide";
+import { ServiceShowcase } from "./service-showcase";
+export function ModernLanding({ ar }: { ar: boolean }) {
+  const t = (en: string, a: string) => (ar ? a : en);
+  return (
+    <main id="main-content" tabIndex={-1} className="sc-landing">
+      <section className="sc-hero sc-frame">
+        <div className="sc-hero-copy">
+          <span className="sc-overline">
+            <i /> SIROCASH — PERSONAL EDITION
+          </span>
+          <h1>
+            {t("Your money.", "أموالك.")}
+            <br />
+            <em>{t("A wider horizon.", "برؤية أوسع.")}</em>
+          </h1>
+          <p>
+            {t(
+              "Not another dashboard. A considered financial space, built around you. Your wallet, your decisions, your next move.",
+              "ليست مجرّد محفظة. مساحة مالية صُمّمت حولك؛ تجمع حسابك وخدماتك وقراراتك، في تجربة تستحقّها.",
+            )}
+          </p>
+          <div className="sc-hero-links">
+            <Link className="sc-button" href="/auth">
+              {t("Enter your new space", "ابدأ تجربتك الجديدة")}
+              <span>
+                <ArrowUpRight size={20} />
+              </span>
+            </Link>
+            <a className="sc-text-link" href="#business">
+              {t("Discover SiroCash", "اكتشف سيرو كاش")}
+              <ArrowDown size={16} />
+            </a>
+          </div>
+          <div className="sc-release">
+            <span />
+            {t(
+              "Product preview. Live financial services are not activated.",
+              "إصدار تجريبي. الخدمات المالية الفعلية غير مفعّلة.",
+            )}
+          </div>
+        </div>
+        <div className="sc-hero-art">
+          <Image
+            src="/images/siro-sculpture.webp"
+            alt=""
+            width={1024}
+            height={1024}
+            priority
+          />
+          <div className="sc-art-caption">
+            <span>01 / A NEW PERSPECTIVE</span>
+            <span>SIROCASH</span>
+          </div>
+          <div className="sc-art-seal">
+            <ArrowLeftRight size={24} />
+            <span>{t("Different by design", "اختلافٌ يبدأ من التصميم")}</span>
+          </div>
+        </div>
+      </section>
+      <section
+        className="sc-manifesto sc-frame"
+        aria-label={t("Platform principles", "مبادئ المنصة")}
+      >
+        <span>
+          {t("LESS NOISE. MORE INTENTION.", "تفاصيل أقل. معنى أكبر.")}
+        </span>
+        <p>
+          {t(
+            "One account. Every detail in its place.",
+            "حساب واحد. وكلّ تفصيلة في مكانها.",
+          )}
+          <small>
+            {t(
+              "Native Arabic & English. Clear review. Account-level controls.",
+              "عربية وإنجليزية أصيلة. مراجعة واضحة. وتحكّم على مستوى الحساب.",
+            )}
+          </small>
+        </p>
+        <a
+          href="#business"
+          aria-label={t("Explore services", "استكشاف الخدمات")}
+        >
+          <ArrowDown size={23} />
+        </a>
+      </section>
+      <section className="sc-experience sc-frame" id="business">
+        <div className="sc-section-title">
+          <span className="sc-overline">
+            01 / {t("THE EXPERIENCE", "التجربة")}
+          </span>
+          <h2>
+            {t("Every move.", "لكلّ خطوة.")}
+            <br />
+            <em>{t("A better starting point.", "بداية أفضل.")}</em>
+          </h2>
+          <p>
+            {t(
+              "A single destination for your financial day. Explore the experience, with availability always made clear.",
+              "وجهة واحدة لتفاصيل يومك المالي. استكشف الخدمات، مع بيان واضح لحالة إتاحتها.",
+            )}
+          </p>
+        </div>
+        <ServiceShowcase ar={ar} />
+        <div className="sc-asset-line">
+          <span>USDT / USDC</span>
+          <Link href="/deposit">
+            {t("Explore asset networks", "استكشاف العملات والشبكات")}
+            <ArrowUpRight size={16} />
+          </Link>
+        </div>
+        <div className="sc-service-links">
+          {[
+            {
+              href: "/sham-cash",
+              icon: ArrowLeftRight,
+              title: t("Sham Cash", "شام كاش"),
+              description: t(
+                "1–24 hours during designated operating days. Not activated.",
+                "من ساعة إلى 24 ساعة خلال أيام التنفيذ المحدّدة. غير مفعّلة.",
+              ),
+            },
+            {
+              href: "/mobile-topup",
+              icon: Smartphone,
+              title: t("Stay connected", "ابقَ على اتصال"),
+              description: t(
+                "Syriatel & MTN screens. No real recharge.",
+                "واجهات سيريتل وMTN. دون شحن رصيد فعلي.",
+              ),
+            },
+          ].map((s, i) => (
+            <Link href={s.href} key={s.href}>
+              <span className="sc-service-number">0{i + 1}</span>
+              <s.icon size={25} />
+              <div>
+                <h3>{s.title}</h3>
+                <p>{s.description}</p>
+              </div>
+              <MoveUpRight size={23} />
+            </Link>
+          ))}
+        </div>
+      </section>
+      <section className="sc-security" id="security">
+        <div className="sc-frame sc-security-inner">
+          <div>
+            <span className="sc-overline">
+              02 / {t("BUILT ON CONTROL", "التحكّم أساس التجربة")}
+            </span>
+            <h2>
+              {t("Confidence isn’t", "الثقة لا تأتي")}
+              <br />
+              <em>{t("an afterthought.", "في آخر القائمة.")}</em>
+            </h2>
+            <Link href="/trust" className="sc-text-link">
+              {t("Security & platform status", "الحماية وحالة المنصة")}
+              <ArrowUpRight size={18} />
+            </Link>
+          </div>
+          <div className="sc-security-list">
+            {[
+              {
+                icon: Mail,
+                title: t("Email-approved changes", "تغييرات بتأكيدك"),
+                text: t(
+                  "Sensitive account changes require email approval.",
+                  "تأكيد التغييرات الحسّاسة عبر بريدك الإلكتروني.",
+                ),
+              },
+              {
+                icon: Fingerprint,
+                title: t("Your device. Your approval.", "جهازك. موافقتك."),
+                text: t(
+                  "Device verification is required for financial authorization.",
+                  "يلزم التحقق من الجهاز لتفويض العمليات المالية.",
+                ),
+              },
+              {
+                icon: ShieldCheck,
+                title: t("A clear account record", "سجلّ واضح لحسابك"),
+                text: t(
+                  "Manage sessions and review security activity.",
+                  "أدر جلسات الدخول وراجع النشاط الأمني.",
+                ),
+              },
+            ].map((s) => (
+              <div key={s.title}>
+                <s.icon size={25} />
+                <div>
+                  <h3>{s.title}</h3>
+                  <p>{s.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="sc-onboarding sc-frame" id="how-it-works">
+        <div className="sc-section-title">
+          <span className="sc-overline">
+            03 / {t("YOUR FIRST STEP", "خطوتك الأولى")}
+          </span>
+          <h2>
+            {t("A fresh beginning.", "بداية مختلفة.")}
+            <br />
+            <em>{t("Entirely yours.", "تخصّك بالكامل.")}</em>
+          </h2>
+        </div>
+        <div className="sc-steps">
+          {[
+            {
+              title: t("Create your account", "أنشئ حسابك"),
+              text: t(
+                "Your email. A unique password.",
+                "بريدك الإلكتروني. وكلمة مرور فريدة.",
+              ),
+            },
+            {
+              title: t("Confirm your email", "أكّد بريدك"),
+              text: t(
+                "Enter the verification code sent to you.",
+                "أدخل رمز التحقق المرسل إليك.",
+              ),
+            },
+            {
+              title: t("Make yourself at home", "استكشف مساحتك"),
+              text: t(
+                "Manage your account. Financial services remain inactive.",
+                "أدر حسابك. الخدمات المالية لا تزال غير مفعّلة.",
+              ),
+            },
+          ].map((s, i) => (
+            <div key={s.title}>
+              <span>0{i + 1}</span>
+              <h3>{s.title}</h3>
+              <p>{s.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+      <div className="sc-frame sc-guide">
+        <PlatformGuide ar={ar} faqOnly />
+      </div>
+      <section className="sc-invitation sc-frame">
+        <span className="sc-overline">THE NEXT CHAPTER IS YOURS.</span>
+        <h2>
+          {t("Make room", "مساحة جديدة.")}
+          <br />
+          {t("for something better.", "لتجربة تستحقّها.")}
+        </h2>
+        <Link className="sc-button" href="/auth">
+          {t("Create your account", "أنشئ حسابك")}
+          <span>
+            <ArrowUpRight size={21} />
+          </span>
+        </Link>
+        <p>
+          {t(
+            "Preview release · No real financial transactions",
+            "نسخة تجريبية · دون معاملات مالية فعلية",
+          )}
+        </p>
+        <Globe2
+          className="sc-invitation-globe"
+          aria-hidden="true"
+          strokeWidth={0.35}
+        />
+      </section>
+    </main>
+  );
 }
