@@ -17,3 +17,6 @@ operations-data/
 
 # Generated Cloudflare binding configuration
 cloudflare/identity/wrangler.generated.json
+
+# Local Python caches produced by agent skills
+.agents/**/__pycache__/
