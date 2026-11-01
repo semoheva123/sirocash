@@ -85,8 +85,8 @@ The documented ordinary POST supports quantity, receiver, duration, client_order
 and activate. The estimate is energy-only and is not an atomic maximum charge.
 No invented max_price/max_cost_sun field is sent. Provider deductions can differ
 from the preceding estimate. A charge already made may be nonrefundable even if
-subsequent dispatch is held. Credential authentication, real prices, account-unit
-semantics and zero-native-TRX operation have not been live-tested in this patch.
+subsequent dispatch is held. Live credential authentication and the energy estimate are now verified as recorded below.
+Account billing behavior and zero-native-TRX paid operation remain unverified.
 
 ## References
 
@@ -105,3 +105,23 @@ EnergyPurchaseAttempt, SignedWithdrawalOutbox and SignedSweepOutbox rows and no
 active energy policies. That is historical evidence, not a new live DB check.
 No old paid operation is reinterpreted under another provider. Existing paid rows
 would require persisted provenance/review before any provider migration.
+
+
+## Live read acceptance, 2026-11-01
+
+Production-origin probe `dpl_Gj8v2hp7Vm6xaotTtpLoR8m5juaY` at source
+`4e2f14cd95a3858b3904bdae7a6cc2671113dd41` used the existing secret credentials
+inside Vercel, without decrypting/exporting them to the workspace or chat.
+
+- GET /v1/account: authenticated successfully, schema checked; no account data logged.
+- GET /v1/estimate?quantity=65000&duration=1h: successful, **1,820,000 SUN = 1.82 TRX**.
+- This is an observed energy-only estimate, not a price lock or Bandwidth/activation quote.
+- Purchases: 0. Broadcasts: 0. No financial activation or production DB access.
+- Intentional exit1 after the probe prevented site publication. The Vercel build's
+  ERROR state is expected for this diagnostic, not an API-authentication failure.
+- The temporary production opt-in variable was deleted after collecting the result.
+- The read probe stops on HTTP/API rejection and never retries a charged operation.
+
+Full local npm test also passed after adding the probe's synthetic safety tests.
+Actual purchase, delivery and end-to-end live transfer acceptance remain untested;
+this read result does not prove a Bandwidth purchase endpoint is available.
