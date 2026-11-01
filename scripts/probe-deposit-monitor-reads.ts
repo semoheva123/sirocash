@@ -8,7 +8,7 @@ import {bep20UsdtContract} from '../lib/bep20-deposit-verification';
 async function main(){
  if(process.env.VERCEL_ENV!=='production'||!depositOnlyMode()||process.env.SIRO_OUTBOX_WORKER_ENABLED!=='true'){console.log('Deposit monitor live reads: disabled.');return}
  assertDepositOnlyIsolation();
- const signal=AbortSignal.timeout(40000),bep20=productionBep20ReadRpc(signal),tron=productionTronRead(signal);
+ const signal=AbortSignal.timeout(40000),bep20=productionBep20ReadRpc(signal,info=>console.log('DEPOSIT_RPC_FAILURE:'+JSON.stringify(info))),tron=productionTronRead(signal);
  const scanner=createNetworkDepositScanner(financialReadDatabase(),{bep20,tron,genesisId:process.env.SIRO_TRON_GENESIS_ID??'',minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:()=>1n});
  const results=await Promise.all((['BEP20','TRC20'] as const).map(async network=>{
   let stage='FINALITY';

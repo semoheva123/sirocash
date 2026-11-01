@@ -29,6 +29,10 @@ async function main(){
  for(const handler of cases)await assert.rejects(()=>createBep20ReadRpc({endpoint,maxResponseBytes:256,fetch:mock(handler)})('eth_chainId',[]),(e:unknown)=>e instanceof Error&&e.message.startsWith('RPC_')&&!e.message.includes('secret')&&!e.message.includes(endpoint));
  await assert.rejects(()=>createBep20ReadRpc({endpoint,timeoutMs:100,fetch:mock(()=>new Promise(()=>{}))})('eth_chainId',[]),/RPC_TIMEOUT/);
  await assert.rejects(()=>createBep20ReadRpc({endpoint,timeoutMs:100,fetch:mock(()=>new Response(new ReadableStream({start(){}}),{headers:{'content-type':'application/json'}}))})('eth_chainId',[]),/RPC_TIMEOUT/);
+ let failure:unknown;
+ await assert.rejects(()=>createBep20ReadRpc({endpoint,onFailure:info=>{failure=info},fetch:mock(b=>json({jsonrpc:'2.0',id:b.id,error:{code:-32602,message:'invalid argument secret '+endpoint,data:'private'}}))})('eth_chainId',[]),/RPC_INVALID_ENVELOPE/);
+ assert.deepEqual(failure,{method:'eth_chainId',versionMatches:true,idMatches:true,hasResult:false,hasError:true,remoteCode:-32602,reason:'PARAMS'});
+ assert(!JSON.stringify(failure).includes('secret'));assert(!JSON.stringify(failure).includes(endpoint));
  const calls:string[]=[];
  const split=createBep20DepositReadRpc({endpoint,authorization:'Bearer primary',fetch:mock((b,i)=>{calls.push('primary:'+b.method);assert.equal((i.headers as Record<string,string>).Authorization,'Bearer primary');return json({jsonrpc:'2.0',id:b.id,result:'primary-proof'})})},{endpoint:'https://logs.example.invalid',fetch:mock((b,i)=>{calls.push('logs:'+b.method);assert.equal((i.headers as Record<string,string>).Authorization,undefined);return json({jsonrpc:'2.0',id:b.id,result:b.method==='eth_chainId'?'0x38':[]})})});
  assert.deepEqual(await split('eth_getLogs',[filter]),[]);assert.equal(await split('eth_getTransactionReceipt',['0x'+'a'.repeat(64)]),'primary-proof');

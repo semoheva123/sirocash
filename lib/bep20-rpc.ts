@@ -2,7 +2,8 @@ import 'server-only';
 import {randomUUID} from 'node:crypto';
 import type {Bep20Rpc} from './bep20-receipt-observer';
 
-type Options={signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
+export type RpcFailureInfo={method:string;versionMatches:boolean;idMatches:boolean;hasResult:boolean;hasError:boolean;remoteCode:number|null;reason:'RATE_LIMIT'|'BLOCK_RANGE'|'METHOD'|'PARAMS'|'OTHER'};
+type Options={onFailure?:(info:RpcFailureInfo)=>void;signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
 function validateCall(method:string,params:unknown[]){
  if(!Array.isArray(params))throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
  const empty=(method==='eth_chainId'||method==='eth_blockNumber')&&params.length===0;
@@ -57,7 +58,15 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
    let payload:unknown;try{payload=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch{throw new Error('RPC_INVALID_JSON')}
    if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('RPC_INVALID_ENVELOPE');
    const p=payload as Record<string,unknown>;
-   if(p.jsonrpc!=='2.0'||p.id!==id||Object.hasOwn(p,'error')||!Object.hasOwn(p,'result'))throw new Error('RPC_INVALID_ENVELOPE');
+   if(p.jsonrpc!=='2.0'||p.id!==id||Object.hasOwn(p,'error')||!Object.hasOwn(p,'result')){
+    const error=p.error&&typeof p.error==='object'&&!Array.isArray(p.error)?p.error as Record<string,unknown>:{};
+    const code=typeof error.code==='number'&&Number.isSafeInteger(error.code)&&Math.abs(error.code)<=2147483647?error.code:null;
+    // Inspect only bounded text in memory; output fixed categories, never messages/data.
+    const message=typeof error.message==='string'?error.message.slice(0,4096).toLowerCase():'';
+    const reason:RpcFailureInfo['reason']=/rate|too many|limit exceeded/.test(message)?'RATE_LIMIT':/block range|range.*block|block.*range|unknown block|not found|future|greater than|after last|after latest/.test(message)?'BLOCK_RANGE':/method.*(support|available|found)|unsupported method/.test(message)?'METHOD':/invalid.*(param|argument)|invalid.*topic/.test(message)?'PARAMS':'OTHER';
+    options.onFailure?.({method,versionMatches:p.jsonrpc==='2.0',idMatches:p.id===id,hasResult:Object.hasOwn(p,'result'),hasError:Object.hasOwn(p,'error'),remoteCode:code,reason});
+    throw new Error('RPC_INVALID_ENVELOPE');
+   }
    return p.result;
   }catch(error){
    if(abort.signal.aborted)throw new Error('RPC_TIMEOUT');
@@ -81,8 +90,8 @@ export function createBep20DepositReadRpc(primary:Options,logs?:Options):Bep20Rp
  };
 }
 /** Independent read-only production gate: does not enable signing or financial writes. */
-export function productionBep20ReadRpc(signal?:AbortSignal):Bep20Rpc{
+export function productionBep20ReadRpc(signal?:AbortSignal,onFailure?:Options['onFailure']):Bep20Rpc{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
  const endpoint=process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
- return createBep20DepositReadRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
+ return createBep20DepositReadRpc({endpoint,signal,onFailure,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,onFailure,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
 }
