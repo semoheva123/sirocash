@@ -72,6 +72,7 @@ async function main(){const pg=new PGlite();try{
  head=130;await sql('UPDATE "DepositNetworkScanner" SET "lastBlock"=116,"lastHash"=$1 WHERE network=\'BEP20\'',[hex(116)]);reorg=true;
  await assert.rejects(()=>scan.scan('BEP20',signal()),/CHAIN_REORG/);assert.equal((await sql('SELECT paused FROM "DepositNetworkScanner" WHERE network=\'BEP20\'')).rows[0].paused,true);
  assert.equal((await scan.scan('BEP20',signal())).state,'BUSY_OR_PAUSED');assert.equal(await depositScannerHealthy(worker),false);
+ const cached=createNetworkDepositScanner(worker,{...options,headCacheMs:5000});const reads=blockReads;await cached.finalHeight('BEP20');await cached.finalHeight('BEP20');assert.equal(blockReads-reads,1,'bounded head cache avoids repeated chain metadata reads during catch-up');
  console.log('Shared scanner PASS: 1000-block bounded range, OR recipients, complete bulk TRON receipts, partial replay, new-address backfill, owner-bound credits exactly once, balanced ledger and network-wide reorg pause. Isolated DB only.');
 }finally{await pg.close()}}
 main().catch(e=>{console.error(e);process.exitCode=1});

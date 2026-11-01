@@ -9,7 +9,7 @@ import {stageBep20Deposit,stageTronDeposit} from './deposit-inbox';
 import {bep20UsdtContract} from './bep20-deposit-verification';
 import {tronUsdtContract} from './tron-deposit-verification';
 type Network='TRC20'|'BEP20';
-type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;maxEvents?:number};
+type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;maxEvents?:number;headCacheMs?:number};
 type Address={id:string;address:string;next:number;offset:number;previous:string|null;partial:string|null};
 const transfer='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 function obj(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw Error('SCAN_INVALID_OBJECT');return v as Record<string,unknown>}
@@ -21,8 +21,9 @@ const tronHex=(address:string)=>Buffer.from(base58.decode(address)).subarray(1,2
  * Progress + inbox staging commit together; newly allocated addresses retain their own start.
  */
 export function createNetworkDepositScanner(db:WalletDb,o:Options){
- const window=o.bep20Window??1000,maxEvents=o.maxEvents??32;
- if(!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
+ const window=o.bep20Window??1000,maxEvents=o.maxEvents??32,headCacheMs=o.headCacheMs??0;
+ const heads=new Map<Network,{height:number;at:number}>();
+ if(!Number.isSafeInteger(headCacheMs)||headCacheMs<0||headCacheMs>10000||!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
  async function block(network:Network,n:number){
   if(network==='BEP20'){
    const b=obj(await o.bep20('eth_getBlockByNumber',['0x'+n.toString(16),false]));
@@ -33,7 +34,7 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
   if(num(raw.number??0)!==n||hash(b.blockID).slice(0,16)!==n.toString(16).padStart(16,'0'))throw Error('SCAN_BLOCK_MISMATCH');
   return {hash:hash(b.blockID),parent:n?hash(raw.parentHash):'0'.repeat(64),raw:b};
  }
- async function finalHeight(network:Network){
+ async function observeFinalHeight(network:Network){
   if(network==='BEP20'){
    if(num(await o.bep20('eth_chainId',[]))!==56)throw Error('SCAN_WRONG_CHAIN');
    const b=obj(await o.bep20('eth_getBlockByNumber',['finalized',false])),head=num(await o.bep20('eth_blockNumber',[]));hash(b.hash);
@@ -42,6 +43,10 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
   const genesis=obj(await o.tron('/walletsolidity/getblockbynum',{num:0}));if(hash(genesis.blockID)!==o.genesisId)throw Error('SCAN_WRONG_CHAIN');
   const b=obj(await o.tron('/walletsolidity/getnowblock',{})),n=num(obj(obj(b.block_header).raw_data).number);
   if(hash(b.blockID).slice(0,16)!==n.toString(16).padStart(16,'0'))throw Error('SCAN_INVALID_FINALITY');return n;
+ }
+ async function finalHeight(network:Network){
+  const prior=heads.get(network);if(prior&&Date.now()-prior.at<headCacheMs)return prior.height;
+  const height=await observeFinalHeight(network);heads.set(network,{height,at:Date.now()});return height;
  }
  return {finalHeight,scan:async(network:Network,signal:AbortSignal)=>{
   if(!['TRC20','BEP20'].includes(network))throw Error('SCAN_NETWORK');
@@ -122,7 +127,7 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
    if(candidates.some((c,i)=>i>0&&c.n===candidates[i-1].n&&c.offset===candidates[i-1].offset))throw Error('DEPOSIT_EVIDENCE_CONFLICT');
    const chosen=candidates.slice(0,maxEvents),partial=candidates.length>chosen.length;
    if(partial)end=chosen[chosen.length-1].n;
-   const endBlock=await block(network,end);
+   const endBlock=end===start?first:await block(network,end);
    const next=partial?end:end+1,offset=partial?chosen[chosen.length-1].offset+1:0;
    selected=selected.filter(a=>a.next<=end);
    // Verify receipts outside the DB transaction, then recheck anchor before atomic staging.

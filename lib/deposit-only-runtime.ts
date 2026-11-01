@@ -18,7 +18,7 @@ export function productionDepositOnlyWorkers(db:WalletDb){
   const value=createDepositValuationWorker(db,{enabled:true,settlementAccountId:process.env.SIRO_SETTLEMENT_ACCOUNT_ID??'',price:async()=>{if(!price||Date.now()-Date.parse(price.observedAt)>10000)price=await observeUsdtUsdPrice();return price}});
   const deadline=Date.now()+110000;
   const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),110000);
-  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal),genesisId:process.env.SIRO_TRON_GENESIS_ID!,minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
+  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal),genesisId:process.env.SIRO_TRON_GENESIS_ID!,headCacheMs:5000,bep20Window:Number(process.env.SIRO_BEP20_SCAN_WINDOW??'1000'),minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
   let scans=0,held=0,staged=0;
   const stopped=new Set<string>();
   try{
