@@ -42,7 +42,7 @@
     "test:treasury-addresses": "tsx tests/treasury-addresses.ts",
     "test:signer": "node --conditions=react-server --import tsx tests/vercel-treasury-signer.ts",
     "test:withdrawal-limits": "tsx tests/withdrawal-limits.ts",
-    "test:catfee": "node --conditions=react-server --import tsx tests/catfee.ts && node --conditions=react-server --import tsx tests/catfee-readiness.ts",
+    "test:catfee": "node --conditions=react-server --import tsx tests/catfee.ts && node --conditions=react-server --import tsx tests/catfee-readiness.ts && node tests/catfee-live-probe.mjs",
     "energy:readiness": "node --conditions=react-server --import tsx scripts/check-catfee-readiness.ts",
     "energy:check": "node --conditions=react-server --import tsx scripts/check-catfee.ts",
     "test:deposit-setup": "tsx tests/deposit-wallet-setup.ts",
