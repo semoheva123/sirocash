@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const config = { poweredByHeader: false,
+ allowedDevOrigins:['localhost','127.0.0.1','*.e2b.app'],
  async headers(){return [
   {source:'/:path*',headers:[
    {key:'X-Content-Type-Options',value:'nosniff'},
