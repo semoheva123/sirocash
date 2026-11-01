@@ -40,7 +40,7 @@ async function scenario(bundle:boolean,direct=false,dual=false,energyPresent=fal
  const log={address:TronWeb.address.toHex(tronUsdtContract).slice(2),topics:['ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',topicAddress(source),topicAddress(to)],data:(100000000n).toString(16).padStart(64,'0')};
  const chain=(async(url,init)=>{
   const path=new URL(String(url)).pathname,p=JSON.parse(String(init?.body));
-  if(path.endsWith('getaccountresource'))return result({EnergyLimit:delivered||energyPresent?65000:0,freeNetLimit:bundle?0:600,NetLimit:bundle&&delivered?1000:0});
+  if(path.endsWith('getaccountresource'))return result({EnergyLimit:delivered||energyPresent?65000:0,freeNetLimit:fault==='split'?300:bundle?0:600,NetLimit:bundle&&delivered?1000:fault==='split'?200:0});
   if(path.endsWith('getaccount'))return result(fault==='inactive'?{}:{address:senderHex,balance:0});
   if(path.endsWith('triggerconstantcontract'))return result({result:{result:true},constant_result:[(100000000n).toString(16).padStart(64,'0')]});
   if(path.endsWith('estimateenergy'))return result({result:{result:true},energy_required:65000});
@@ -72,15 +72,15 @@ async function scenario(bundle:boolean,direct=false,dual=false,energyPresent=fal
  }}):neutral;
  const client=dual?dualResourceProvider(db,{energy:energyClient,enabled:true,observe:createEnergyDeliveryObserver({...tron,genesisId:genesis}),bandwidth:tronRentalOrderClient({key:'fixture',enabled:true,assertActive:createTronActiveAccountProof({...tron,genesisId:genesis}),fetch:async(url,init)=>{
   const u=new URL(String(url));assert.equal(u.origin,'https://api.tronrental.com');assert.equal(new Headers(init?.headers).get('X-API-Key'),'fixture');assert.equal(init?.redirect,'error');
-  if(u.pathname==='/v1/bandwidth/quote/me')return result({volume:500,duration:'1h',personal_price:false,rental_trx:'0.4',fixed_fee_trx:'0.2',total_trx:'0.6'});
+  if(u.pathname==='/v1/bandwidth/quote/me')return result({volume:fault==='split'?300:500,duration:'1h',personal_price:false,rental_trx:'0.4',fixed_fee_trx:'0.2',total_trx:'0.6'});
   if(u.pathname==='/v1/bandwidth/buy'){
-   bwCreated++;assert.equal(init?.method,'POST');const body=JSON.parse(String(init?.body));assert.equal(body.max_price_trx,'0.600000');assert.equal(body.volume,500);assert.equal(body.target_address,source);
+   bwCreated++;assert.equal(init?.method,'POST');const body=JSON.parse(String(init?.body));assert.equal(body.max_price_trx,'0.600000');assert.equal(body.volume,fault==='split'?300:500);assert.equal(body.target_address,source);
    const rows=(await pg.query<any>('SELECT * FROM "ResourcePurchaseLeg"')).rows;assert.equal(rows.length,energyPresent?1:2);assert.equal(rows.find((r:any)=>r.resource==='BANDWIDTH').state,'UNKNOWN');assert.ok(new Headers(init?.headers).get('Idempotency-Key'));
    if(fault==='timeout')throw Error('fixture-secret');
    return result({id:7,status:'pending',price_trx:'0.6',activation_cost_trx:fault==='activation'?'1.2':'0',txid:null});
   }
   assert.equal(u.pathname,'/v1/orders/7');assert.equal(init?.method,'GET');
-  return result({id:7,type:'bandwidth',target_address:source,volume:500,duration:'1h',status:delivered?'filled':'pending',price_trx:'0.6',activation_cost_trx:null,delegate_txid:delivered?bandwidthTx:null});
+  return result({id:7,type:'bandwidth',target_address:source,volume:fault==='split'?300:500,duration:'1h',status:delivered?'filled':'pending',price_trx:'0.6',activation_cost_trx:null,delegate_txid:delivered?bandwidthTx:null});
  }})}):energyClient;
  const execution=createFinancialExecution(db,{purchaseEnabled:true,client,delivery:createEnergyDeliveryObserver({...tron,genesisId:genesis}),resources:createOutboxResourceObserver({bep20,tron,tronGenesisId:genesis})});
  const preparation=createFinancialPreparation(db,{enabled:true,bandwidthPackage:client.bandwidthPackage,preflight:createFinancialPreflight({bep20,tron,genesisId:genesis,tronReadOwner:to}),gas:{prepare:async()=>{throw Error('No BNB')},process:async()=>{throw Error('No BNB')}},energy:execution.energy,limits:()=>({maxAmount:1000000000n,maxFee:4000000n,minimumSweep:1000000n}),signSweep:(d,c)=>prepareSignedSweep(d,c,{loadKeys:()=>({accountXpub:account.publicExtendedKey,accountXprv:account.privateExtendedKey})})});
@@ -120,9 +120,9 @@ async function scenario(bundle:boolean,direct=false,dual=false,energyPresent=fal
  assert.equal((await renewal({kind:'SWEEP',id:expired.id},signal)).state,'UNCHANGED');
  assert.equal((await pg.query('SELECT id FROM "DispatchApprovalHistory" WHERE "outboxId"=$1',[expired.id])).rows.length,1);
  assert.equal(created,energyPresent?0:1);assert.equal(broadcasts,1);
- assert.equal((await pg.query<{bandwidthAmount:number}>('SELECT "bandwidthAmount" FROM "EnergyRentalIntent"')).rows[0].bandwidthAmount,dual?500:bundle?1000:0);
+ assert.equal((await pg.query<{bandwidthAmount:number}>('SELECT "bandwidthAmount" FROM "EnergyRentalIntent"')).rows[0].bandwidthAmount,dual?(fault==='split'?300:500):bundle?1000:0);
  if(dual){assert.equal(bwCreated,1);assert.equal((await pg.query('SELECT 1 FROM "ResourcePurchaseLeg"')).rows.length,energyPresent?1:2);console.log('Dual real adapters '+(energyPresent?'bandwidth-only':'energy + bandwidth')+': combined committed reservation -> one POST/leg -> both independent solid proofs -> signing -> zero-TRX broadcast -> settlement PASS');}
  console.log((direct?'CatFee DIRECT adapter mock cycle (not live acceptance): ':bundle?'Bundled provider-neutral fixture: ':'Energy-only provider-neutral fixture: ')+ ' unsigned simulation -> exact resource intent -> one paid-order fixture -> pending recovery without repurchase -> solid ENERGY delivery -> fresh HD signing -> resource/cost authorization with zero native prefund -> broadcast -> final exact Transfer/replay passed. No real paid calls.');
 }finally{await pg.close()}}
-async function main(){await scenario(false);await scenario(true);await scenario(false,true);await scenario(true,true);await scenario(true,false,true);await scenario(true,false,true,true);await scenario(true,false,true,false,'timeout');await scenario(true,false,true,false,'inactive');await scenario(true,false,true,false,'wrongproof');await scenario(true,false,true,false,'activation')}
+async function main(){await scenario(false);await scenario(true);await scenario(false,true);await scenario(true,true);await scenario(true,false,true);await scenario(true,false,true,true);await scenario(true,false,true,false,'timeout');await scenario(true,false,true,false,'inactive');await scenario(true,false,true,false,'wrongproof');await scenario(true,false,true,false,'activation');await scenario(true,false,true,false,'split')}
 main().catch(e=>{console.error(e);process.exitCode=1});

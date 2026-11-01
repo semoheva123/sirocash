@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import {tronBandwidth} from '../lib/tron-bandwidth';
 import {tronRentalOrderClient} from '../lib/tronrental-orders';
 import {treasuryDestination} from '../lib/treasury-addresses';
 async function main(){
+ assert.deepEqual(tronBandwidth({NetLimit:200,freeNetLimit:300}),{delegated:200,free:300,available:300});
+ assert.equal(tronBandwidth({NetLimit:200,NetUsed:100,freeNetLimit:600,freeNetUsed:500}).available,100);
  let posts=0,active=0,mode='ok';const sender=treasuryDestination('TRC20','operating');
  const order={sender,requestKey:'00000000-0000-0000-0000-000000000001',quantity:500,maxCostSun:600000n,expiresAt:Date.now()+25000,signal:new AbortController().signal};
  const mock:typeof fetch=async(input,init)=>{

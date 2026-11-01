@@ -1,3 +1,4 @@
+import {tronBandwidth} from './tron-bandwidth';
 import 'server-only';
 import {Interface,getAddress} from 'ethers';
 import {TronWeb} from 'tronweb';
@@ -39,6 +40,6 @@ export function createFinancialPreflight(options:{bep20:ChainHttpOptions;tron:Ch
   if(!Number.isSafeInteger(requiredEnergy)||requiredEnergy<=0||requiredEnergy>10000000)throw new Error('PREFLIGHT_ENERGY_INVALID');
   const tip=rpcObject(await read('/wallet/getnowblock',{})),raw=rpcObject(rpcObject(tip.block_header).raw_data),height=uint(raw.number),timestamp=uint(raw.timestamp);
   if(typeof tip.blockID!=='string'||!new RegExp('^'+height.toString(16).padStart(16,'0')+'[a-f0-9]{48}$').test(tip.blockID)||timestamp>Date.now()||Date.now()-timestamp>15000)throw new Error('PREFLIGHT_STALE_TIP');
-  return {network:'TRC20' as const,amount,requiredEnergy,availableEnergy:Math.max(0,uint(r.EnergyLimit??0)-uint(r.EnergyUsed??0)),availableBandwidth:Math.max(0,uint(r.freeNetLimit??0)-uint(r.freeNetUsed??0))+Math.max(0,uint(r.NetLimit??0)-uint(r.NetUsed??0)),transaction:{amountBaseUnits:amount,refBlockBytes:height.toString(16).padStart(4,'0').slice(-4),refBlockHash:tip.blockID.slice(16,32),timestamp:Date.now(),expiration:Date.now()+60000,feeLimitSun:Number(i.maxFee)}};
+  return {network:'TRC20' as const,amount,requiredEnergy,availableEnergy:Math.max(0,uint(r.EnergyLimit??0)-uint(r.EnergyUsed??0)),availableDelegatedBandwidth:tronBandwidth(r).delegated,availableBandwidth:tronBandwidth(r).available,transaction:{amountBaseUnits:amount,refBlockBytes:height.toString(16).padStart(4,'0').slice(-4),refBlockHash:tip.blockID.slice(16,32),timestamp:Date.now(),expiration:Date.now()+60000,feeLimitSun:Number(i.maxFee)}};
  };
 }

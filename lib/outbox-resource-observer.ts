@@ -1,3 +1,4 @@
+import {tronBandwidth} from './tron-bandwidth';
 import 'server-only';
 import {randomUUID} from 'node:crypto';
 import {Transaction,Interface,getAddress} from 'ethers';
@@ -48,7 +49,7 @@ export function createOutboxResourceObserver(options:{bep20:ChainHttpOptions;tro
    const account=obj(accountRaw),r=obj(resourcesRaw),estimate=obj(estimateRaw),balance=obj(balanceRaw);
    if(account.address!==v.owner_address||obj(estimate.result).result!==true||obj(balance.result).result!==true||!Array.isArray(balance.constant_result)||balance.constant_result.length!==1||typeof balance.constant_result[0]!=='string'||! /^[a-f0-9]{64}$/i.test(balance.constant_result[0]))throw new Error();
    const available=(limit:unknown,used:unknown)=>Math.max(0,integer(limit??0)-integer(used??0));
-   const bandwidth=available(r.NetLimit,r.NetUsed)+available(r.freeNetLimit,r.freeNetUsed);
+   const bandwidth=tronBandwidth(r).available;
    if(!Number.isSafeInteger(bandwidth))throw new Error();
    const pb=utils.transaction.txJsonToPb(t);pb.addSignature(Buffer.from(t.signature[0],'hex'));
    return {network:'TRC20',txId:input.txId,sender:TronWeb.address.fromHex(v.owner_address),observedAt,expiresAt,tokenBalance:BigInt('0x'+balance.constant_result[0]),nativeBalance:BigInt(integer(account.balance??0)),resourceCost:input.resourceCost,accountActive:true,requiredEnergy:integer(estimate.energy_required),availableEnergy:available(r.EnergyLimit,r.EnergyUsed),requiredBandwidth:pb.serializeBinary().length+64,availableBandwidth:bandwidth};

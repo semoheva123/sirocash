@@ -58,6 +58,13 @@ Full `npm test` passed after the authenticated quote fix and probe safety suite
   granted. Quote expiry is rechecked after the proof; `max_price_trx` and the saved
   `Idempotency-Key` are always sent. Unexpected activation charges hold the flow
   and disable further purchases, rather than concealing the additional cost.
+- TRON free and staked/delegated Bandwidth are **not additive** for a single
+  transaction. Preflight, delivery and final byte-size authorization now use the
+  larger individual bucket, not their sum. If free Bandwidth is insufficient,
+  rental targets the deficit in the delegated bucket, not a fictitious combined
+  pool. The split-bucket end-to-end regression (free300 + delegated200) buys the
+  missing300 delegated units for a full500-unit bucket before signing.
+  Reference: https://developers.tron.network/docs/paying-for-resources
 - Every successful child needs an independently verified solid native delegation
   contract with the matching resource type and receiver. Current resources must
   suffice; the original independent pre-sign and exact signed-byte dispatch checks

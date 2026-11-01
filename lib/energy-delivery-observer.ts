@@ -1,3 +1,4 @@
+import {tronBandwidth} from './tron-bandwidth';
 import 'server-only';
 import {TronWeb} from 'tronweb';
 import {chainJsonPost,type ChainHttpOptions} from './chain-http';
@@ -29,7 +30,7 @@ export function createEnergyDeliveryObserver(options:ChainHttpOptions&{genesisId
    const c=obj(contracts[0]),value=obj(obj(c.parameter).value);
    if((input.resourceType!==undefined&&value.resource!==input.resourceType)||c.type!=='DelegateResourceContract'||(value.resource!=='ENERGY'&&!((input.bandwidthAmount??0)>0&&value.resource==='BANDWIDTH'))||value.receiver_address!==TronWeb.address.toHex(input.sender)||num(value.balance)<=0)throw new Error();
    const r=obj(await read('/wallet/getaccountresource',{address:TronWeb.address.toHex(input.sender),visible:false}));
-   if(num(r.EnergyLimit??0)-num(r.EnergyUsed??0)<input.energyAmount||Math.max(0,num(r.NetLimit??0)-num(r.NetUsed??0))+Math.max(0,num(r.freeNetLimit??0)-num(r.freeNetUsed??0))<(input.bandwidthAmount??0))throw new Error();
+   if(num(r.EnergyLimit??0)-num(r.EnergyUsed??0)<input.energyAmount||tronBandwidth(r).available<(input.bandwidthAmount??0))throw new Error();
    if(obj(await read('/walletsolidity/getblockbynum',{num:height})).blockID!==block.blockID||Date.now()>=Date.parse(expiresAt))throw new Error();
    return {sender:input.sender,delegationTxId:input.delegationTxId,energyAmount:input.energyAmount,bandwidthAmount:input.bandwidthAmount??0,observedAt,expiresAt};
   }catch{throw new Error('ENERGY_DELIVERY_UNPROVEN')}
