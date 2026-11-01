@@ -125,3 +125,28 @@ inside Vercel, without decrypting/exporting them to the workspace or chat.
 Full local npm test also passed after adding the probe's synthetic safety tests.
 Actual purchase, delivery and end-to-end live transfer acceptance remain untested;
 this read result does not prove a Bandwidth purchase endpoint is available.
+
+## Live Bandwidth market read, 2026-11-01
+
+One authenticated GET /v1/market from production-origin diagnostic
+`dpl_HeHCAkeUZ5pWNamerY6vWVvTGACU` (source02e21a2) succeeded:
+`bandwidth_flash_price=350` SUN. Only that allowlisted numeric field was logged.
+This proves a live market-price query is available through the configured keys.
+It is NOT an address-specific Bandwidth quantity estimate, an energy+Bandwidth
+bundle quote, a successful purchase/delivery, or a whole-transaction fee. No price
+quantity denominator was inferred. No unsupported estimate query parameters were
+sent, since they could be silently ignored and return an energy quote instead.
+
+The OpenAPI linked from the Chinese create-order page documents this field under
+MarketPayload and GET /v1/market; its OrderPayload resource_type enum also contains
+BANDWIDTH. Its POST /v1/order parameters still do not document how to select that
+resource. Discovery of a price field must not be conflated with a purchase contract.
+
+No purchase, broadcast, DB access or publication occurred; exit1 was deliberate
+and the temporary production probe variable was deleted. Full local npm test PASS.
+The probe's market/missing-field fixtures verify a single GET and safe failure.
+
+Additional contract discrepancy to resolve before paid acceptance: the linked
+OpenAPI describes returned order duration in minutes, while English examples use
+1. The existing receipt validator expects1. Do not guess the returned lease units
+or infer live paid readiness from the current mock responses.
