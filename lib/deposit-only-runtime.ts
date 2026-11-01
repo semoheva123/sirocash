@@ -1,4 +1,5 @@
 import 'server-only';
+import {depositMonitorFailureCode} from './deposit-monitor-diagnostics';
 import {depositScannerHealthy} from './deposit-scanner-health';
 import {assertDepositOnlyIsolation,depositOnlyConfiguration} from './deposit-only-mode';
 import {createNetworkDepositScanner} from './deposit-network-scanner';
@@ -22,6 +23,7 @@ export function productionDepositOnlyWorkers(db:WalletDb){
   const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),110000);
   const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal),genesisId:process.env.SIRO_TRON_GENESIS_ID!,bep20Window:Number(window),minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
   let scans=0,held=0,staged=0;
+  const checks:Record<string,{state:string;failureCode?:string}>={};
   const stopped=new Set<string>();
   try{
    // Shared reads: a BEP20 job covers <=1000 blocks for <=2048 addresses; a TRON job
@@ -30,13 +32,13 @@ export function productionDepositOnlyWorkers(db:WalletDb){
     for(const network of ['BEP20','TRC20'] as const){
      if(stopped.has(network)||abort.signal.aborted)continue;
      assertDepositOnlyIsolation();
-     try{const result=await scanner.scan(network,abort.signal);scans++;staged+='staged' in result?result.staged??0:0;if(result.state!=='PROGRESSED')stopped.add(network)}catch{held++;stopped.add(network)}
+     try{const result=await scanner.scan(network,abort.signal);scans++;checks[network]={state:result.state};staged+='staged' in result?result.staged??0:0;if(result.state!=='PROGRESSED')stopped.add(network)}catch(error){checks[network]={state:'FAILED',failureCode:depositMonitorFailureCode(error)};held++;stopped.add(network)}
     }
    }
    const credit=await runFinancialWorkerBatch(db,{enabled:true,depositOnly:true,depositValuesOnly:true,limit:128,jobTimeoutMs:5000,batchTimeoutMs:Math.max(100,Math.min(25000,deadline-Date.now()-1000)),process:async(job,signal)=>{
     assertDepositOnlyIsolation();if(job.kind!=='DEPOSIT_VALUE')throw Error('DEPOSIT_ONLY_JOB_FORBIDDEN');return value(job.id,signal);
    }});
-   return {state:'COMPLETED',scans,staged,held:held+credit.held,valuations:credit.processed,healthy:await depositScannerHealthy(db)};
+   return {state:'COMPLETED',checks,scans,staged,held:held+credit.held,valuations:credit.processed,healthy:await depositScannerHealthy(db)};
   }finally{clearTimeout(timer);abort.abort()}
  },};
 }

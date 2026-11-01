@@ -2,7 +2,8 @@ import 'server-only';
 import {randomUUID} from 'node:crypto';
 import type {Bep20Rpc} from './bep20-receipt-observer';
 
-type Options={signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
+export type RpcFailureInfo={httpStatus?:number;method:string;versionMatches:boolean;idMatches:boolean;hasResult:boolean;hasError:boolean;remoteCode:number|null;reason:'RATE_LIMIT'|'BLOCK_RANGE'|'METHOD'|'PARAMS'|'OTHER'};
+type Options={onFailure?:(info:RpcFailureInfo)=>void;signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
 function validateCall(method:string,params:unknown[]){
  if(!Array.isArray(params))throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
  const empty=(method==='eth_chainId'||method==='eth_blockNumber')&&params.length===0;
@@ -39,8 +40,21 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   const timer=setTimeout(()=>abort.abort(),timeoutMs);
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
   try{
-   const response=await Promise.race([expired,request(endpoint.toString(),{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{})},body:JSON.stringify({jsonrpc:'2.0',id,method,params})})]);
-   if(!response.ok)throw new Error('RPC_HTTP_FAILURE');
+   const send=()=>Promise.race([expired,request(endpoint.toString(),{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{})},body:JSON.stringify({jsonrpc:'2.0',id,method,params})})]);
+   let response=await send();
+   // Exactly one retry for explicit HTTP throttling on allowlisted read-only calls.
+   // Same endpoint/auth/request; shared deadline; never retries 403, invalid evidence or writes.
+   if(response.status===429){
+    const retryAfter=response.headers.get('retry-after');
+    const delay=retryAfter&&/^\d+$/.test(retryAfter)?Number(retryAfter)*1000:500;
+    if(delay<=1500){
+     if(response.body)void response.body.cancel().catch(()=>{});
+     await Promise.race([expired,new Promise(resolve=>setTimeout(resolve,delay))]);
+     if(abort.signal.aborted)throw Error('RPC_TIMEOUT');
+     response=await send();
+    }
+   }
+   if(!response.ok){options.onFailure?.({method,httpStatus:response.status,versionMatches:false,idMatches:false,hasResult:false,hasError:false,remoteCode:null,reason:response.status===429?'RATE_LIMIT':'OTHER'});throw new Error('RPC_HTTP_FAILURE')}
    if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??''))throw new Error('RPC_CONTENT_TYPE_INVALID');
    const length=response.headers.get('content-length');
    if(length!==null&&(!/^\d+$/.test(length)||BigInt(length)>BigInt(maxBytes)))throw new Error('RPC_RESPONSE_TOO_LARGE');
@@ -57,11 +71,20 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
    let payload:unknown;try{payload=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch{throw new Error('RPC_INVALID_JSON')}
    if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('RPC_INVALID_ENVELOPE');
    const p=payload as Record<string,unknown>;
-   if(p.jsonrpc!=='2.0'||p.id!==id||Object.hasOwn(p,'error')||!Object.hasOwn(p,'result'))throw new Error('RPC_INVALID_ENVELOPE');
+   if(p.jsonrpc!=='2.0'||p.id!==id||Object.hasOwn(p,'error')||!Object.hasOwn(p,'result')){
+    const error=p.error&&typeof p.error==='object'&&!Array.isArray(p.error)?p.error as Record<string,unknown>:{};
+    const code=typeof error.code==='number'&&Number.isSafeInteger(error.code)&&Math.abs(error.code)<=2147483647?error.code:null;
+    // Inspect only bounded text in memory; output fixed categories, never messages/data.
+    const message=typeof error.message==='string'?error.message.slice(0,4096).toLowerCase():'';
+    const reason:RpcFailureInfo['reason']=/rate|too many|limit exceeded/.test(message)?'RATE_LIMIT':/block range|range.*block|block.*range|unknown block|not found|future|greater than|after last|after latest/.test(message)?'BLOCK_RANGE':/method.*(support|available|found)|unsupported method/.test(message)?'METHOD':/invalid.*(param|argument)|invalid.*topic/.test(message)?'PARAMS':'OTHER';
+    options.onFailure?.({method,versionMatches:p.jsonrpc==='2.0',idMatches:p.id===id,hasResult:Object.hasOwn(p,'result'),hasError:Object.hasOwn(p,'error'),remoteCode:code,reason});
+    if(p.jsonrpc==='2.0'&&p.id===id&&!Object.hasOwn(p,'result')&&code===-32005)throw new Error('RPC_RATE_LIMITED');
+    throw new Error('RPC_INVALID_ENVELOPE');
+   }
    return p.result;
   }catch(error){
    if(abort.signal.aborted)throw new Error('RPC_TIMEOUT');
-   const safe=new Set(['RPC_HTTP_FAILURE','RPC_CONTENT_TYPE_INVALID','RPC_RESPONSE_TOO_LARGE','RPC_EMPTY_RESPONSE','RPC_TIMEOUT','RPC_INVALID_JSON','RPC_INVALID_ENVELOPE']);
+   const safe=new Set(['RPC_HTTP_FAILURE','RPC_RATE_LIMITED','RPC_CONTENT_TYPE_INVALID','RPC_RESPONSE_TOO_LARGE','RPC_EMPTY_RESPONSE','RPC_TIMEOUT','RPC_INVALID_JSON','RPC_INVALID_ENVELOPE']);
    if(error instanceof Error&&safe.has(error.message))throw new Error(error.message);
    throw new Error('RPC_TRANSPORT_FAILURE');
   }finally{
@@ -74,15 +97,20 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
  * Never forward a primary provider's authorization to a different log provider. */
 export function createBep20DepositReadRpc(primary:Options,logs?:Options):Bep20Rpc{
  const read=createBep20ReadRpc(primary),logRead=logs?createBep20ReadRpc(logs):undefined;
- return async(method,params)=>{
+ let logChain:Promise<unknown>|undefined;
+ const assertLogChain=async()=>{if(!logRead)return;if(!logChain)logChain=logRead('eth_chainId',[]);if(await logChain!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN')};
+ const rpc:Bep20Rpc=async(method,params)=>{
   if(method!=='eth_getLogs'||!logRead)return read(method,params);
-  if(await logRead('eth_chainId',[])!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN');
+  await assertLogChain();
   return logRead(method,params);
  };
+
+ return rpc;
 }
 /** Independent read-only production gate: does not enable signing or financial writes. */
-export function productionBep20ReadRpc(signal?:AbortSignal):Bep20Rpc{
+export function productionBep20ReadRpc(signal?:AbortSignal,onFailure?:Options['onFailure']):Bep20Rpc{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
- const endpoint=process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
- return createBep20DepositReadRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
+ const override=process.env.SIRO_BEP20_READ_RPC_URL;
+ const endpoint=override??process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
+ return createBep20DepositReadRpc({endpoint,signal,onFailure,authorization:override?process.env.SIRO_BEP20_READ_RPC_AUTHORIZATION:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,onFailure,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
 }
