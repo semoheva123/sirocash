@@ -77,7 +77,7 @@
     "test:postgres-financial": "node --conditions=react-server --import tsx tests/postgres-financial-integration.ts",
     "financial:events-check": "node --conditions=react-server --import tsx scripts/check-financial-events.ts",
     "financial:read-check": "node --conditions=react-server --import tsx scripts/check-financial-read.ts",
-    "test:financial-stream": "tsx tests/financial-read.ts && tsx tests/financial-read-schema.ts && tsx tests/financial-stream.ts && tsx tests/financial-sse-response.ts && tsx tests/financial-ui-coverage.tsx && tsx tests/professional-interface.tsx && tsx tests/premium-interface.tsx",
+    "test:financial-stream": "tsx tests/financial-read.ts && tsx tests/financial-read-schema.ts && tsx tests/financial-stream.ts && tsx tests/financial-sse-response.ts && tsx tests/financial-ui-coverage.tsx && tsx tests/professional-interface.tsx && tsx tests/premium-interface.tsx && tsx tests/obsidian-wallet.tsx",
     "test:financial-sync": "node --conditions=react-server --import tsx tests/financial-sync.ts",
     "test:customer-financial": "node --conditions=react-server --import tsx tests/customer-financial-boundaries.ts",
     "test:deposit-discovery": "node --conditions=react-server --import tsx tests/deposit-discovery.ts",

@@ -1,0 +1,243 @@
+/* Obsidian / Cyber-Luxe. Explicit theme boundary over the existing layout system.
+   Cyan: USDT and primary actions. Violet: TRON/network context, never payment success. */
+:root[data-theme="obsidian"] {
+  color-scheme: dark;
+  --obs-bg: #09090b;
+  --obs-surface: #141419;
+  --obs-elevated: #1c1c24;
+  --obs-border: #ffffff16;
+  --obs-text: #f4f4f5;
+  --obs-muted: #a1a1aa;
+  --obs-cyan: #67e8f9;
+  --obs-purple: #c4b5fd;
+  --pro-canvas: var(--obs-bg);
+  --pro-ink: var(--obs-text);
+  --pro-muted: var(--obs-muted);
+  --pro-blue: var(--obs-cyan);
+  --pro-line: var(--obs-border);
+  --sc-bg: var(--obs-bg);
+  --sc-text: var(--obs-text);
+  --ft-blue: var(--obs-cyan);
+  --pro-surface-shadow: 0 16px 50px -25px #000a, inset 0 1px #ffffff05;
+}
+:root[data-theme="obsidian"] body,
+:root[data-theme="obsidian"] .site-shell,
+:root[data-theme="obsidian"] .fintech-landing,
+:root[data-theme="obsidian"] .public-workspace,
+:root[data-theme="obsidian"] .account-workspace,
+:root[data-theme="obsidian"] .settings-shell.account-workspace {
+  background: var(--obs-bg);
+  color: var(--obs-text);
+}
+:root[data-theme="obsidian"] body { background-image: radial-gradient(ellipse at 15% 0%, #164e6317, transparent 45%); }
+:root[data-theme="obsidian"] ::selection { background: #67e8f93d; color: #fff; }
+:root[data-theme="obsidian"] :is(h1,h2,h3,h4,h5,strong) { color: inherit; }
+:root[data-theme="obsidian"] :is(a,button,input,select,summary,textarea):focus-visible { outline: 2px solid var(--obs-cyan); outline-offset: 4px; }
+:root[data-theme="obsidian"] :is(.muted,.workspace-subtitle,.settings-description,.settings-note,.pro-payment-description,.pro-card-caption,.pro-eyebrow,.pro-count,.eyebrow,.pro-balance-summary span,.rail-caption,.rail-environment,.app-security,.service-state,.premium-nav-group) { color: #a1a1aa; }
+:root[data-theme="obsidian"] :is(.glass,.card,.settings-card,.account-context,.fintech-account-essentials,.fintech-assets-grid>a,.workspace-service,.financial-history,.pro-availability,.world-control-panel,.atelier-product,.premium-form-card,.atelier-state-card,.atelier-recovery-card) {
+  background: #141419d9;
+  border: 1px solid var(--obs-border);
+  color: var(--obs-text);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--pro-surface-shadow);
+}
+:root[data-theme="obsidian"] :is(.button,.premium-submit) {
+  background: var(--obs-cyan);
+  color: #083344;
+  border: 1px solid #a5f3fc55;
+  box-shadow: 0 4px 22px -10px #22d3ee70, inset 0 1px #fff5;
+  transition: background-color .2s, border-color .2s, box-shadow .2s, transform .2s;
+}
+:root[data-theme="obsidian"] :is(.button,.premium-submit):hover { background: #a5f3fc; box-shadow: 0 5px 26px -8px #22d3ee66; transform: translateY(-1px); }
+:root[data-theme="obsidian"] :is(.button,.premium-submit):active { transform: translateY(0) scale(.98); }
+:root[data-theme="obsidian"] .button.secondary { background: #ffffff06; color: #e4e4e7; border-color: #ffffff20; box-shadow: none; }
+:root[data-theme="obsidian"] .button.secondary:hover { background: #ffffff0c; border-color: #67e8f94d; }
+:root[data-theme="obsidian"] :is(button,.button):disabled { opacity: .55; box-shadow: none; transform: none; cursor: not-allowed; }
+:root[data-theme="obsidian"] :is(input,select,textarea,.premium-input,.settings-password-form input) { background: #09090bcc; color: #f4f4f5; border-color: #ffffff24; caret-color: var(--obs-cyan); }
+:root[data-theme="obsidian"] :is(input,select,textarea)::placeholder { color: #92929f; }
+:root[data-theme="obsidian"] :is(input,select,textarea):focus,
+:root[data-theme="obsidian"] .premium-input:focus-within { border-color: #67e8f9a6; box-shadow: 0 0 0 3px #22d3ee12; }
+:root[data-theme="obsidian"] .premium-input input { background: transparent; box-shadow: none; border: 0; }
+:root[data-theme="obsidian"] :is(label,.settings-password-form label,.premium-form-card label,.pro-payments label) { color: #d4d4d8; }
+:root[data-theme="obsidian"] :is(.logo,.logo .text-white) { color: #f4f4f5; }
+:root[data-theme="obsidian"] .logo-mark { color: #a5f3fc; background: linear-gradient(135deg, #164e63, #142d3d); border: 1px solid #67e8f936; box-shadow: inset 0 1px #ffffff12, 0 0 18px #22d3ee0a; }
+:root[data-theme="obsidian"] .logo-dot { color: var(--obs-cyan); }
+:root[data-theme="obsidian"] :is(.header,.public-workspace>.header,.account-workspace>.header,.premium-auth-header,.trust-header,.recovery-page>.header) { background: #09090be6; backdrop-filter: blur(20px); border-color: var(--obs-border); }
+:root[data-theme="obsidian"] :is(.header .nav,.language,.account-identity,.auth-header-secure) { color: #d4d4d8; }
+:root[data-theme="obsidian"] .language { background: #ffffff05; border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .header .nav a:hover { color: var(--obs-cyan); }
+:root[data-theme="obsidian"] .account-rail { background: linear-gradient(180deg,#101014,#0c0c10); border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .account-rail nav>a { color: #b4b4c0; }
+:root[data-theme="obsidian"] .account-rail nav>a:hover { color: #e4e4e7; background: #ffffff07; }
+:root[data-theme="obsidian"] .account-rail nav>a[aria-current="page"] { background: #22d3ee0d; border-color: #67e8f92e; color: var(--obs-cyan); box-shadow: inset 0 1px #67e8f90a; }
+:root[data-theme="obsidian"] .account-rail nav>a[aria-current="page"] i { background: var(--obs-cyan); box-shadow: 0 0 8px #22d3ee55; }
+:root[data-theme="obsidian"] :is(.rail-security,.account-avatar,.context-icon,.pro-heading-icon,.pro-lock-emblem,.feature-icon,.settings-card>.feature-icon,.service-tile-icon) { background: #67e8f90a; border-color: #67e8f91c; color: #a5f3fc; }
+:root[data-theme="obsidian"] :is(.rail-security p,.premium-rail-help,.rail-environment,.account-context span,.settings-details dt,.settings-description) { color: #b4b4c0; }
+:root[data-theme="obsidian"] :is(.premium-rail-help:hover,.fintech-assets-grid>a:hover,.workspace-service:hover) { background: #1a1a23; border-color: #67e8f92e; color: #e4e4e7; }
+:root[data-theme="obsidian"] .account-workspace .dashboard-balance {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 95% 0%,#22d3ee17,transparent 58%), radial-gradient(ellipse at 5% 110%,#8b5cf612,transparent 50%), linear-gradient(125deg,#132029e6,#111116e8);
+  border: 1px solid #67e8f92e;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 20px 65px -35px #22d3ee33, inset 0 1px #ffffff0d;
+}
+:root[data-theme="obsidian"] .dashboard-balance:after { border-color: #67e8f90b; box-shadow: 0 0 0 35px #67e8f903,0 0 0 70px #67e8f902; pointer-events: none; }
+:root[data-theme="obsidian"] .signature-wallet-heading { border-color: #ffffff12; color: #e4e4e7; }
+:root[data-theme="obsidian"] :is(.signature-wallet-heading>span:last-child,.dashboard-balance .balance-label,.dashboard-balance .muted,.dashboard-balance .balance-dollar,.dashboard-balance .big-balance small) { color: #b4bdc9; }
+:root[data-theme="obsidian"] .dashboard-balance .balance-value { color: #a5f3fc; text-shadow: 0 0 28px #22d3ee20; }
+:root[data-theme="obsidian"] .balance-privacy { color: #a5f3fc; min-width: 44px; min-height: 44px; }
+:root[data-theme="obsidian"] .wallet-actions :is(button,a) { background: #ffffff05; border: 1px solid #ffffff14; color: #e4e4e7; border-radius: 13px; transition: border-color .2s,background-color .2s,transform .2s; }
+:root[data-theme="obsidian"] .wallet-actions :is(button,a):hover { background: #67e8f90a; border-color: #67e8f94d; transform: translateY(-2px); }
+:root[data-theme="obsidian"] .wallet-actions :is(button,a):active { transform: scale(.97); }
+:root[data-theme="obsidian"] :is(.fintech-assets-heading>span,.signature-services-heading>span,.workspace-service>small,.fintech-account-check,.fintech-assets-grid small,.fintech-assets-grid div>span) { color: #b4b4c0; }
+:root[data-theme="obsidian"] :is(.fintech-coin.usdt,.asset-logo.usdt) { color: #a5f3fc; background: #22d3ee12; border: 1px solid #22d3ee24; }
+:root[data-theme="obsidian"] :is(.fintech-coin.usdc,.asset-logo.usdc) { color: #c7d2fe; background: #818cf814; border: 1px solid #818cf824; }
+:root[data-theme="obsidian"] :is(.fintech-account-check,.settings-details>div,.service-state,.pro-section-heading,.signature-settings-index,.app-tabs,.footer,.pro-payments dl>div) { border-color: var(--obs-border); }
+:root[data-theme="obsidian"] :is(.fintech-neutral-status,.pro-count,.settings-note,.settings-id,.pro-balance-summary,.pro-filter,.pro-search,.crypto-selection-summary,.address-field) { background: #ffffff04; border-color: var(--obs-border); color: #b4b4c0; }
+:root[data-theme="obsidian"] :is(.settings-verified,.fintech-account-check>strong:not(.fintech-neutral-status),.pro-state-success) { color: #86efac; background: #4ade800c; }
+:root[data-theme="obsidian"] .pro-state-neutral { color: #c4c4cf; background: #ffffff09; }
+:root[data-theme="obsidian"] :is(.pro-state-warning,.demo-badge,.warning) { color: #fcd594; background: #fbbf240a; border-color: #fbbf2429; }
+:root[data-theme="obsidian"] :is(.pro-state-danger,.service-error) { color: #fda4af; background: #fb71850b; border-color: #fb718526; }
+:root[data-theme="obsidian"] .pro-sync { background: #141419; border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .pro-sync-disabled { background: #141419 !important; }
+:root[data-theme="obsidian"] :is(.pro-sync p,.pro-sync p>span,.pro-filter select,.pro-search input,.pro-card-caption,.pro-records time,.pro-record-footer time,.pro-mobile-unit,.pro-financial-table time) { color: #b4b4c0; }
+:root[data-theme="obsidian"] .pro-sync-icon { background: #ffffff08; color: #b4b4c0; }
+:root[data-theme="obsidian"] .pro-sync-current .pro-sync-icon { background: #4ade800d; color: #86efac; }
+:root[data-theme="obsidian"] :is(.pro-sync-retrying,.pro-sync-unauthenticated) .pro-sync-icon { background: #fbbf240d; color: #fcd594; }
+:root[data-theme="obsidian"] :is(.pro-financial-table th,.pro-financial-table td,.pro-records li,.pro-record-footer) { border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .pro-financial-table th { background: #ffffff04; color: #b4b4c0; }
+:root[data-theme="obsidian"] .pro-financial-table tbody tr:hover { background: #ffffff03; }
+:root[data-theme="obsidian"] :is(.financial-history .pro-movement strong,.financial-history .pro-movement,.pro-records h3,.pro-balance-summary strong) { color: #f4f4f5; }
+:root[data-theme="obsidian"] :is(.financial-history .pro-reference code,.financial-history .pro-empty p,.pro-empty>p,.pro-eyebrow,.pro-count,.pro-balance-summary span) { color: #b4b4c0; }
+:root[data-theme="obsidian"] .pro-empty { background: #ffffff02; border-color: #ffffff1f; }
+:root[data-theme="obsidian"] .pro-empty>span { color: #c4b5fd; background: #a78bfa0a; border-color: #a78bfa1f; }
+:root[data-theme="obsidian"] :is(.service-unavailable,.pro-payment-locked,.premium-auth-story,.atelier-document-hero) { background: radial-gradient(ellipse at top right,#8b5cf609,transparent 65%),#141419; border-color: var(--obs-border); color: #f4f4f5; }
+:root[data-theme="obsidian"] :is(.service-unavailable>p,.pro-payment-locked>p,.settings-heading p,.atelier-document-hero p,.trust-intro p,.settings-card p) { color: #b4b4c0; }
+:root[data-theme="obsidian"] :is(.premium-gateway-status,.premium-text-link,.text-button,.fintech-explore,.account-context>a,.rail-security>a,.auth-switch button,.auth-edit,.auth-back,.recovery-link,.settings-back) { color: var(--obs-cyan); }
+:root[data-theme="obsidian"] :is(.network-logo,.obsidian-network-tag) { background: #a78bfa12; border-color: #a78bfa29; color: #c4b5fd; }
+:root[data-theme="obsidian"] :is(.network-logo.bnb,.obsidian-network-tag.bnb) { color: #fcd594; background: #fbbf240d; }
+:root[data-theme="obsidian"] .network-logo.eth { color: #d4d4d8; background: #ffffff0c; }
+:root[data-theme="obsidian"] :is(.asset-picker button,.network-buttons button,.settings-language button,.signature-settings-index a) { background: #ffffff03; border-color: var(--obs-border); color: #d4d4d8; }
+:root[data-theme="obsidian"] :is(.asset-picker button.selected,.network-buttons button.selected,.settings-language button.selected,.signature-settings-index a:hover) { background: #67e8f908; border-color: #67e8f947; color: #a5f3fc; }
+/* Public surfaces share the product's dark material, rather than a disconnected marketing skin. */
+:root[data-theme="obsidian"] .fintech-hero { background: radial-gradient(ellipse at 20% 45%,#164e6317,transparent 60%); }
+:root[data-theme="obsidian"] :is(.fintech-hero h1,.fintech-section-heading h2,.premium-auth-story h1,.world-control h2,.world-faq h2) { color: #f4f4f5; }
+:root[data-theme="obsidian"] :is(.fintech-hero h1 span,.premium-auth-story h1 span,.fintech-section-heading h2 span,.atelier-experience h2 span) { color: var(--obs-cyan); -webkit-text-fill-color: currentColor; }
+:root[data-theme="obsidian"] :is(.fintech-hero-copy>p,.fintech-section-heading>p,.fintech-onboarding-grid p,.fintech-bento p,.premium-auth-story>p,.premium-auth .premium-auth-story>p,.premium-form-card .auth-form-description,.world-control p,.world-faq p,.atelier-experience-copy>p) { color: #b4b4c0; }
+:root[data-theme="obsidian"] :is(.fintech-kicker,.premium-hero-index,.world-overline,.pro-window-top,.pro-preview-title small,.atelier-chapter,.atelier-product-kicker) { color: #a1a1aa; }
+:root[data-theme="obsidian"] .fintech-hero-copy>.fintech-kicker { color: #a5f3fc; background: #22d3ee08; border-color: #22d3ee26; }
+:root[data-theme="obsidian"] .premium-release-note { border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .premium-release-note .fintech-preview-label { color: #b4b4c0; }
+:root[data-theme="obsidian"] .premium-release-note>a { color: var(--obs-cyan); }
+:root[data-theme="obsidian"] .pro-product-scene:before { background: radial-gradient(ellipse,#22d3ee0a,transparent 68%); }
+:root[data-theme="obsidian"] :is(.pro-product-window,.pro-product-note,.world-control-panel,.fintech-principles,.fintech-onboarding-grid>div,.atelier-product,.atelier-product-top,.atelier-product-bottom) { background: #141419; color: #f4f4f5; border-color: var(--obs-border); box-shadow: 0 25px 70px -35px #000; }
+:root[data-theme="obsidian"] :is(.pro-window-top,.pro-preview-rail,.pro-preview-avatar,.atelier-product-rail,.world-panel-heading) { background: #ffffff03; color: #a1a1aa; border-color: var(--obs-border); }
+:root[data-theme="obsidian"] :is(.pro-preview-brand,.world-panel-mark,.fintech-service-symbol,.fintech-step-top>span) { background: #67e8f90b; color: #a5f3fc; border-color: #67e8f91f; }
+:root[data-theme="obsidian"] :is(.pro-preview-title h3,.pro-preview-security h4,.pro-product-note strong,.fintech-bento h3,.atelier-product h3,.world-control-row h3) { color: #f4f4f5; }
+:root[data-theme="obsidian"] .pro-preview-tabs { border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .pro-preview-tabs button { color: #b4b4c0; }
+:root[data-theme="obsidian"] .pro-preview-tabs button[aria-pressed="true"] { color: var(--obs-cyan); border-color: var(--obs-cyan); }
+:root[data-theme="obsidian"] :is(.pro-preview-wallet,.atelier-preview-balance) { background: radial-gradient(ellipse at top right,#22d3ee16,transparent 70%),#11202a; border: 1px solid #67e8f926; color: #f4f4f5; }
+:root[data-theme="obsidian"] :is(.pro-preview-wallet>strong,.atelier-preview-balance strong) { color: #a5f3fc; }
+:root[data-theme="obsidian"] :is(.pro-preview-empty,.world-outline-tag,.atelier-preview-row,.atelier-security-preview>div,.atelier-assets-preview>div) { background: #ffffff03; border-color: var(--obs-border); color: #b4b4c0; }
+:root[data-theme="obsidian"] :is(.pro-preview-ledger p,.pro-preview-security p,.pro-product-note span,.fintech-principles small,.fintech-step-top b,.world-question-index,.world-panel-foot,.world-row-index) { color: #a1a1aa; }
+:root[data-theme="obsidian"] :is(.fintech-bento-transfer,.fintech-bento-sham,.fintech-bento-mobile,.fintech-bento-crypto) { background: #141419 !important; color: #f4f4f5 !important; border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .fintech-bento-transfer { background: radial-gradient(ellipse at bottom,#22d3ee0c,transparent 70%),#141419 !important; }
+:root[data-theme="obsidian"] .fintech-transfer-art>span { background: #1a242d !important; color: #a5f3fc !important; border-color: #67e8f929; }
+:root[data-theme="obsidian"] :is(.fintech-security,.world-control,.atelier-experience,.fintech-final) { background: radial-gradient(ellipse at top left,#8b5cf609,transparent 55%),#101014; border-color: var(--obs-border); color: #f4f4f5; }
+:root[data-theme="obsidian"] :is(.world-control-row,.world-faq details,.world-panel-foot,.atelier-chapter,.atelier-view-options button,.premium-footer-bottom) { border-color: var(--obs-border); }
+:root[data-theme="obsidian"] :is(.world-faq summary:hover,.atelier-view-options button[aria-pressed="true"]) { background: #ffffff04; color: #a5f3fc; }
+:root[data-theme="obsidian"] .premium-auth { background: radial-gradient(ellipse at 85% 0%,#164e631a,transparent 60%),#09090b; }
+:root[data-theme="obsidian"] :is(.auth-form-icon,.auth-email-pill,.settings-id,.password-meter,.auth-art) { background: #22d3ee08; border-color: #67e8f926; color: #a5f3fc; }
+:root[data-theme="obsidian"] :is(.auth-form-step>span,.auth-form-lock,.auth-demo-disclosure,.auth-input-hint,.premium-auth-footer,.premium-auth-card-footer,.auth-art-label,.auth-switch,.premium-footer-brand p,.premium-footer-disclosure,.premium-footer-bottom,.premium-footer-grid nav a) { color: #b4b4c0; }
+:root[data-theme="obsidian"] :is(.premium-form-card h2,.premium-footer-grid nav strong,.premium-auth-story h1) { color: #f4f4f5; }
+:root[data-theme="obsidian"] :is(.premium-auth-values,.auth-switch,.auth-information-links,.premium-auth-header,.premium-auth-footer) { border-color: var(--obs-border); }
+:root[data-theme="obsidian"] .premium-footer-grid nav a:hover { color: #a5f3fc; }
+:root[data-theme="obsidian"] .atelier-route-state { background: radial-gradient(ellipse at top,#164e6322,#09090b 70%); }
+/* Accessible portal dialogs and stateful wallet controls. */
+.obsidian-wallet-actions { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
+.obsidian-wallet-actions>a { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; padding: 12px 7px; font-size: 12px; min-height: 76px; }
+:root[data-theme="obsidian"] .modal-backdrop { z-index: 900; background: #000a; backdrop-filter: blur(10px); padding: 22px; animation: obsidian-fade-in .18s ease-out both; }
+:root[data-theme="obsidian"] .modal.glass { background: linear-gradient(145deg,#191b24f5,#101014f5); border: 1px solid #ffffff20; border-radius: 25px; box-shadow: 0 35px 100px #0008,inset 0 1px #ffffff0a; backdrop-filter: blur(24px); width: min(100%,480px); max-height: calc(100dvh - 44px); overflow-y: auto; padding: 32px; animation: obsidian-dialog-in .24s cubic-bezier(.2,.8,.2,1) both; color: #f4f4f5; }
+:root[data-theme="obsidian"] .close-modal { width: 44px; height: 44px; border: 1px solid #ffffff12; border-radius: 12px; color: #a1a1aa; background: #ffffff04; }
+:root[data-theme="obsidian"] .close-modal:hover { color: #fff; background: #ffffff0a; }
+.obsidian-dialog-icon { display: grid; place-items: center; width: 53px; height: 53px; border: 1px solid #67e8f929; border-radius: 16px; background: #22d3ee0a; color: #a5f3fc; margin-bottom: 24px; }
+.obsidian-dialog-icon.receive { color: #c4b5fd; background: #a78bfa0a; border-color: #a78bfa29; }
+.obsidian-overline { display: block; font-size: 10px; letter-spacing: 2px; color: #a1a1aa; margin-bottom: 12px; }
+.obsidian-dialog-description { color: #b4b4c0; font-size: 13px; line-height: 1.9; margin-block: 12px 23px; }
+.obsidian-segments { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; border: 1px solid #ffffff12; border-radius: 13px; padding: 5px; background: #09090b70; margin-bottom: 23px; }
+.obsidian-segments button { display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; border: 1px solid transparent; border-radius: 9px; min-height: 44px; color: #b4b4c0; font-size: 12px; }
+.obsidian-segments button[aria-pressed="true"] { background: #ffffff08; border-color: #ffffff14; color: #a5f3fc; }
+.obsidian-send-form label,.obsidian-network-select label { display: block; font-size: 12px; color: #d4d4d8; margin-bottom: 9px; }
+.obsidian-send-form>input,.obsidian-network-select select { width: 100%; min-height: 52px; padding: 13px 15px; border: 1px solid #ffffff24; border-radius: 12px; }
+.obsidian-send-form>input { margin-bottom: 22px; }
+.obsidian-network-select { margin-bottom: 22px; }
+.obsidian-network-tag { display: inline-flex; border: 1px solid; border-radius: 6px; font-size: 10px; padding: 3px 9px; margin-top: 9px; }
+.obsidian-amount-input { display: flex; align-items: center; border: 1px solid #ffffff24; border-radius: 12px; background: #09090bcc; padding-inline: 15px; }
+.obsidian-amount-input:focus-within { border-color: #67e8f9a6; box-shadow: 0 0 0 3px #22d3ee12; }
+:root[data-theme="obsidian"] .obsidian-amount-input input { border: 0; box-shadow: none; outline: none; background: transparent; min-width: 0; width: 100%; min-height: 55px; font-size: 23px; font-variant-numeric: tabular-nums; }
+.obsidian-amount-input>span { color: #a5f3fc; font-size: 12px; }
+.obsidian-inline-note { display: flex; gap: 10px; align-items: flex-start; color: #b4b4c0; font-size: 11px; line-height: 1.9; margin-block: 20px; }
+.obsidian-inline-note>svg { flex-shrink: 0; margin-top: 3px; color: #c4b5fd; }
+.obsidian-qr { display: grid; place-items: center; background: #fff; border: 8px solid #fff; border-radius: 17px; width: fit-content; margin: 24px auto; box-shadow: 0 0 40px -18px #22d3ee45; }
+.obsidian-receive-content>strong { display: block; text-align: center; font-size: 12px; margin-bottom: 13px; }
+.obsidian-address { display: flex; gap: 10px; align-items: center; padding: 11px 10px 11px 15px; border: 1px solid #ffffff1a; border-radius: 12px; background: #09090b80; }
+.obsidian-address code { overflow-wrap: anywhere; min-width: 0; flex: 1; font-size: 12px; color: #d4d4d8; user-select: all; }
+.obsidian-address button { display: grid; place-items: center; background: #22d3ee0d; color: #a5f3fc; border: 1px solid #67e8f924; border-radius: 10px; width: 44px; height: 44px; flex-shrink: 0; }
+.obsidian-no-address { text-align: center; padding: 30px 18px; border: 1px dashed #ffffff1f; border-radius: 15px; background: #ffffff02; }
+.obsidian-no-address>svg { margin: 0 auto 17px; color: #c4b5fd; }
+.obsidian-no-address h3 { font-size: 17px; }
+.obsidian-no-address p { color: #a1a1aa; font-size: 12px; line-height: 1.9; margin-block: 12px 20px; }
+:root[data-theme="obsidian"] .toast { background: #1a1b23f5; border-color: #ffffff20; color: #f4f4f5; backdrop-filter: blur(20px); box-shadow: 0 12px 45px #0005; z-index: 1100; }
+.obsidian-toast { display: flex; align-items: center; gap: 12px; max-width: min(440px,calc(100vw - 32px)); font-size: 12px; line-height: 1.8; animation: obsidian-dialog-in .2s ease-out both; }
+.obsidian-toast>svg { flex-shrink: 0; color: #c4b5fd; }
+.obsidian-toast.toast-success>svg { color: #86efac; }
+.obsidian-toast.toast-error>svg { color: #fda4af; }
+.obsidian-toast>button { min-height: 44px; min-width: 44px; color: #b4b4c0; }
+@keyframes obsidian-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes obsidian-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 900px) {
+  :root[data-theme="obsidian"] .pro-mobile-nav { background: #121217ed; border: 1px solid #ffffff16; box-shadow: 0 -5px 30px #0003; backdrop-filter: blur(24px); padding-bottom: max(9px,env(safe-area-inset-bottom)); }
+  :root[data-theme="obsidian"] .pro-mobile-nav a { color: #a1a1aa; min-height: 52px; }
+  :root[data-theme="obsidian"] .pro-mobile-nav a[aria-current="page"] { background: #22d3ee0b; color: #a5f3fc; }
+  :root[data-theme="obsidian"] .header .nav.open { background: #141419f5; border-color: var(--obs-border); backdrop-filter: blur(20px); box-shadow: 0 20px 45px #0005; }
+}
+@media (max-width: 680px) {
+  :root[data-theme="obsidian"] .modal-backdrop { padding: 12px; align-items: center; }
+  :root[data-theme="obsidian"] .modal.glass { border-radius: 21px; padding: 27px 21px; max-height: calc(100dvh - 24px); }
+  .obsidian-wallet-actions>a { font-size: 11px; padding-inline: 3px; }
+  .obsidian-toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="obsidian"] :is(.glass,.modal.glass,.pro-mobile-nav,.header,.toast) { background-color: #141419; backdrop-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+/* Remove remaining light-surface assumptions in legacy subcomponents. */
+:root[data-theme="obsidian"] :is(.premium-asset-top>span,.premium-network-list>span,.premium-asset-footer>small,.fintech-bento-bottom>span,.atelier-product-top>span:nth-child(2),.fintech-essentials-top small,.fintech-account-essentials-links a,.signature-settings-index a span,.settings-details dd,.footer>a,.world-faq summary,.world-faq details[open] summary) { color: #b4b4c0; }
+:root[data-theme="obsidian"] .premium-asset-switch>button { background: #ffffff04; color: #d4d4d8; border-color: #ffffff1a; }
+:root[data-theme="obsidian"] .premium-asset-switch>button[aria-pressed="true"] { background: #22d3ee08; color: #a5f3fc; border-color: #67e8f947; }
+:root[data-theme="obsidian"] .premium-network-list>div>span { background: #ffffff04; color: #b4b4c0; border-color: #ffffff16; }
+:root[data-theme="obsidian"] .premium-network-list>div>span[data-network="TRC20"] { color: #c4b5fd; background: #a78bfa0a; border-color: #a78bfa24; }
+:root[data-theme="obsidian"] :is(.atelier-preview-row>b,.premium-asset-top>a,.premium-asset-footer>a) { color: #a5f3fc; }
+:root[data-theme="obsidian"] :is(.auth-demo-disclosure,.auth-art-label,.world-row-icon,.world-panel-mark,.fintech-security-graphic>span,.fintech-security-graphic>svg,.atelier-product-rail>span.selected) { background: #ffffff04; border-color: #ffffff16; color: #c4b5fd; }
+:root[data-theme="obsidian"] .financial-history .pro-money { color: #e4e4e7; }
+:root[data-theme="obsidian"] .financial-history .pro-money.incoming { color: #86efac; }
+:root[data-theme="obsidian"] :is(.fintech-security-graphic>div,.fintech-security-graphic:before) { border-color: #a78bfa16; background: radial-gradient(circle,#8b5cf610,transparent 70%); box-shadow: none; }
+:root[data-theme="obsidian"] .world-panel-heading small { color: #a1a1aa; }
+:root[data-theme="obsidian"] .footer { background: transparent; color: #b4b4c0; border-color: #ffffff16; }
+:root[data-theme="obsidian"] .trust-page { background: #09090b; }
+:root[data-theme="obsidian"] .trust-nav a { color: #b4b4c0; background: #ffffff04; border-color: #ffffff16; }
+:root[data-theme="obsidian"] .trust-nav a[aria-current="page"] { color: #a5f3fc; background: #22d3ee08; border-color: #67e8f92e; }
+:root[data-theme="obsidian"] .trust-content :is(h2,h3) { color: #f4f4f5; }
+:root[data-theme="obsidian"] .trust-content p { color: #b4b4c0; }
+:root[data-theme="obsidian"] .trust-content a:not(.button) { color: #a5f3fc; }
+:root[data-theme="obsidian"] .footer>span { color: #a1a1aa; }
+/* Toast entry preserves the fixed horizontal centering transform. */
+.obsidian-toast { animation-name: obsidian-toast-in; }
+@keyframes obsidian-toast-in {
+  from { opacity: 0; transform: translate(-50%,12px) scale(.97); }
+  to { opacity: 1; transform: translate(-50%,0) scale(1); }
+}

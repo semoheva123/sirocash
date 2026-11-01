@@ -1,0 +1,23 @@
+/** Presentation only. This module never authorizes or executes a payment. */
+export type ReceiveSnapshot={userId:string;enabled:boolean;readable?:boolean;addresses?:{network:string;address:string}[]};
+export type SendNetwork='TRC20'|'BEP20';
+export function walletAddressShape(value:string,network:SendNetwork){
+ return network==='TRC20'?/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value):/^0x[0-9a-fA-F]{40}$/.test(value);
+}
+export function receiveDetails(status:ReceiveSnapshot|null,ownerId:string,method:'account'|'crypto',network:SendNetwork){
+ if(!status||status.userId!==ownerId||!(status.readable===true||status.enabled))return null;
+ if(method==='account')return {value:ownerId,qr:`sirocash:pay:${ownerId}`};
+ const address=status.addresses?.find(item=>item.network===network)?.address;
+ return address&&walletAddressShape(address,network)?{value:address,qr:address}:null;
+}
+export function withdrawalReviewHref(recipient:string,amount:string,network:SendNetwork){
+ if(!walletAddressShape(recipient,network))throw Error('INVALID_ADDRESS');
+ if(!/^\d{1,14}(\.\d{1,6})?$/.test(amount)||!/[1-9]/.test(amount))throw Error('INVALID_AMOUNT');
+ return '/payments?'+new URLSearchParams({kind:'WITHDRAWAL',recipient,amount,chain:network}).toString();
+}
+export function withdrawalPrefill(params:URLSearchParams){
+ if(params.get('kind')!=='WITHDRAWAL')return null;
+ const chain=params.get('chain')==='BEP20'?'BEP20':'TRC20';
+ const recipient=params.get('recipient')??'',amount=params.get('amount')??'';
+ return {chain,recipient:walletAddressShape(recipient,chain)?recipient:'',amount:/^\d{1,14}(\.\d{1,6})?$/.test(amount)&&/[1-9]/.test(amount)?amount:''};
+}

@@ -6,6 +6,7 @@ import {useEffect,useState} from 'react';
 import {FinancialHistory} from './financial-history';
 import {useFinancialStatus} from './use-financial-status';
 import {FinancialSyncStatus} from './financial-sync-status';
+import {withdrawalPrefill} from '@/lib/wallet-presentation';
 import {authorizePayment} from '@/lib/authorize-payment';
 type Prepared={kind:'TRANSFER'|'WITHDRAWAL';path:string;id?:string;payload:Record<string,string>;expiresAt?:string};
 async function call(path:string,body?:unknown,token?:string){const r=await fetch(path,{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json',...(token?{'x-siro-approval':token}:{})}:undefined,body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error??'تعذّر تأكيد نتيجة الطلب.');return data}
@@ -13,7 +14,7 @@ export function CustomerPayments(){
  const [deposit,setDeposit]=useState<{chain:string;address:string}|null>(null),[ar,setAr]=useState(true),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[kind,setKind]=useState<'TRANSFER'|'WITHDRAWAL'>('TRANSFER'),[recipient,setRecipient]=useState(''),[amount,setAmount]=useState(''),[chain,setChain]=useState('TRC20'),[prepared,setPrepared]=useState<Prepared|null>(null),[attempted,setAttempted]=useState(false),[submitted,setSubmitted]=useState<unknown>(null),[requestKey,setRequestKey]=useState('');
  const t=(a:string,e:string)=>ar?a:e;
  const {status,sync,updatedAt,refresh}=useFinancialStatus();
- useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());if(new URL(window.location.href).searchParams.get('kind')==='WITHDRAWAL')setKind('WITHDRAWAL');},[]);
+ useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());const params=new URL(window.location.href).searchParams;if(params.get('kind')==='WITHDRAWAL'){setKind('WITHDRAWAL');const prefill=withdrawalPrefill(params);if(prefill){setChain(prefill.chain);setRecipient(prefill.recipient);setAmount(prefill.amount)}}},[]);
  useEffect(()=>{document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr'},[ar]);
  function edit(){if(attempted&&!submitted)return;setAttempted(false);setPrepared(null);setSubmitted(null);setRequestKey('customer:'+crypto.randomUUID())}
  const input={kind,recipient,amount,requestKey,...(kind==='WITHDRAWAL'?{chain,asset:'USDT'}:{})};
