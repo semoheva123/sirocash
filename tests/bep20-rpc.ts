@@ -33,6 +33,15 @@ async function main(){
  await assert.rejects(()=>createBep20ReadRpc({endpoint,onFailure:info=>{failure=info},fetch:mock(b=>json({jsonrpc:'2.0',id:b.id,error:{code:-32602,message:'invalid argument secret '+endpoint,data:'private'}}))})('eth_chainId',[]),/RPC_INVALID_ENVELOPE/);
  assert.deepEqual(failure,{method:'eth_chainId',versionMatches:true,idMatches:true,hasResult:false,hasError:true,remoteCode:-32602,reason:'PARAMS'});
  assert(!JSON.stringify(failure).includes('secret'));assert(!JSON.stringify(failure).includes(endpoint));
+ let logHead=95,wrongHash=false,wrongChain=false;
+ const block=(body:Record<string,unknown>)=>({number:(body.params as unknown[])[0],hash:'0x'+'a'.repeat(64)});
+ const bounded=createBep20DepositReadRpc({endpoint,fetch:mock(b=>json({jsonrpc:'2.0',id:b.id,result:block(b)}))},{endpoint:'https://logs.example.invalid',fetch:mock(b=>json({jsonrpc:'2.0',id:b.id,result:b.method==='eth_chainId'?(wrongChain?'0x1':'0x38'):b.method==='eth_blockNumber'?'0x'+logHead.toString(16):{...block(b),hash:'0x'+(wrongHash?'b':'a').repeat(64)}}))});
+ assert.equal(await bounded.discoveryHeight!(100),95,'never request logs above the log provider tip');
+ logHead=110;assert.equal(await bounded.discoveryHeight!(100),100,'never extend beyond independently finalized primary height');
+ wrongHash=true;await assert.rejects(()=>bounded.discoveryHeight!(100),/RPC_LOG_CHAIN_MISMATCH/);wrongHash=false;
+ logHead=1;await assert.rejects(()=>bounded.discoveryHeight!(3000),/RPC_LOG_PROVIDER_LAG/);
+ wrongChain=true;await assert.rejects(()=>bounded.discoveryHeight!(100),/RPC_LOG_WRONG_CHAIN/);wrongChain=false;
+ for(const n of [-1,NaN,1.5])await assert.rejects(()=>bounded.discoveryHeight!(n),/RPC_LOG_HEIGHT_INVALID/);
  const calls:string[]=[];
  const split=createBep20DepositReadRpc({endpoint,authorization:'Bearer primary',fetch:mock((b,i)=>{calls.push('primary:'+b.method);assert.equal((i.headers as Record<string,string>).Authorization,'Bearer primary');return json({jsonrpc:'2.0',id:b.id,result:'primary-proof'})})},{endpoint:'https://logs.example.invalid',fetch:mock((b,i)=>{calls.push('logs:'+b.method);assert.equal((i.headers as Record<string,string>).Authorization,undefined);return json({jsonrpc:'2.0',id:b.id,result:b.method==='eth_chainId'?'0x38':[]})})});
  assert.deepEqual(await split('eth_getLogs',[filter]),[]);assert.equal(await split('eth_getTransactionReceipt',['0x'+'a'.repeat(64)]),'primary-proof');

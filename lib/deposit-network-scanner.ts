@@ -37,7 +37,7 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
   if(network==='BEP20'){
    if(num(await o.bep20('eth_chainId',[]))!==56)throw Error('SCAN_WRONG_CHAIN');
    const b=obj(await o.bep20('eth_getBlockByNumber',['finalized',false])),head=num(await o.bep20('eth_blockNumber',[]));hash(b.hash);
-   const n=num(b.number);if(n>head||head<o.minimumConfirmations-1)throw Error('SCAN_INVALID_FINALITY');return Math.min(n,head-o.minimumConfirmations+1);
+   const n=num(b.number);if(n>head||head<o.minimumConfirmations-1)throw Error('SCAN_INVALID_FINALITY');const primaryFinal=Math.min(n,head-o.minimumConfirmations+1);return o.bep20.discoveryHeight?o.bep20.discoveryHeight(primaryFinal):primaryFinal;
   }
   const genesis=obj(await o.tron('/walletsolidity/getblockbynum',{num:0}));if(hash(genesis.blockID)!==o.genesisId)throw Error('SCAN_WRONG_CHAIN');
   const b=obj(await o.tron('/walletsolidity/getnowblock',{})),n=num(obj(obj(b.block_header).raw_data).number);

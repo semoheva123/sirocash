@@ -4,7 +4,7 @@ import {verifyBep20UsdtDeposit,type Bep20ReceiptEvidence} from './bep20-deposit-
 /** Trusted RPC transport must enforce endpoint auth, timeout, response-size and error limits.
  * No transport supplied by customers. RPC assertions are not a cryptographic inclusion proof.
  */
-export type Bep20Rpc=(method:string,params:unknown[])=>Promise<unknown>;
+export type Bep20Rpc=((method:string,params:unknown[])=>Promise<unknown>) & {discoveryHeight?:(primaryFinalHeight:number)=>Promise<number>};
 function object(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw new Error('INVALID_RPC_OBJECT');return v as Record<string,unknown>}
 function hash(v:unknown){if(typeof v!=='string'||!/^0x[a-f0-9]{64}$/i.test(v))throw new Error('INVALID_RPC_HASH');return v.toLowerCase()}
 function quantity(v:unknown){

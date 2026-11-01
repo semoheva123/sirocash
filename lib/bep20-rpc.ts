@@ -83,11 +83,29 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
  * Never forward a primary provider's authorization to a different log provider. */
 export function createBep20DepositReadRpc(primary:Options,logs?:Options):Bep20Rpc{
  const read=createBep20ReadRpc(primary),logRead=logs?createBep20ReadRpc(logs):undefined;
- return async(method,params)=>{
+ const rpc:Bep20Rpc=async(method,params)=>{
   if(method!=='eth_getLogs'||!logRead)return read(method,params);
   if(await logRead('eth_chainId',[])!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN');
   return logRead(method,params);
  };
+ if(logRead)rpc.discoveryHeight=async(primaryFinalHeight)=>{
+  if(!Number.isSafeInteger(primaryFinalHeight)||primaryFinalHeight<0)throw Error('RPC_LOG_HEIGHT_INVALID');
+  if(await logRead('eth_chainId',[])!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN');
+  const raw=await logRead('eth_blockNumber',[]);
+  if(typeof raw!=='string'||!/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(raw)||BigInt(raw)>BigInt(Number.MAX_SAFE_INTEGER))throw Error('RPC_LOG_HEIGHT_INVALID');
+  const logHead=Number(BigInt(raw)),common=Math.min(primaryFinalHeight,logHead);
+  if(primaryFinalHeight-common>2000)throw Error('RPC_LOG_PROVIDER_LAG');
+  const tag='0x'+common.toString(16);
+  const [primaryBlock,logBlock]=await Promise.all([read('eth_getBlockByNumber',[tag,false]),logRead('eth_getBlockByNumber',[tag,false])]);
+  const valid=(v:unknown):v is {hash:string;number:string}=>{
+   if(!v||typeof v!=='object'||Array.isArray(v))return false;
+   const b=v as Record<string,unknown>;
+   return typeof b.hash==='string'&&/^0x[a-f0-9]{64}$/i.test(b.hash)&&typeof b.number==='string'&&/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(b.number)&&BigInt(b.number)===BigInt(common);
+  };
+  if(!valid(primaryBlock)||!valid(logBlock)||primaryBlock.hash.toLowerCase()!==logBlock.hash.toLowerCase())throw Error('RPC_LOG_CHAIN_MISMATCH');
+  return common;
+ };
+ return rpc;
 }
 /** Independent read-only production gate: does not enable signing or financial writes. */
 export function productionBep20ReadRpc(signal?:AbortSignal,onFailure?:Options['onFailure']):Bep20Rpc{

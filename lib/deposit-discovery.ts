@@ -29,7 +29,7 @@ export function createDepositDiscovery(db:WalletDb,o:DiscoveryOptions){
   if(network==='BEP20'){
    if(integer(await o.bep20('eth_chainId',[]))!==56)throw Error('WRONG_DEPOSIT_CHAIN');
    const finalized=obj(await o.bep20('eth_getBlockByNumber',['finalized',false])),head=integer(await o.bep20('eth_blockNumber',[]));hash(finalized.hash);
-   const n=integer(finalized.number);if(n>head)throw Error('DISCOVERY_INVALID_FINALITY');return Math.min(n,head-o.minimumBep20Confirmations+1);
+   const n=integer(finalized.number);if(n>head)throw Error('DISCOVERY_INVALID_FINALITY');const primaryFinal=Math.min(n,head-o.minimumBep20Confirmations+1);return o.bep20.discoveryHeight?o.bep20.discoveryHeight(primaryFinal):primaryFinal;
   }
   const g=obj(await o.tron('/walletsolidity/getblockbynum',{num:0}));if(hash(g.blockID)!==o.tronGenesisId)throw Error('TRON_WRONG_CHAIN');
   const b=obj(await o.tron('/walletsolidity/getnowblock',{})),n=integer(obj(obj(b.block_header).raw_data).number??0);
