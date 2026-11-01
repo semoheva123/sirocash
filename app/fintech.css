@@ -783,3 +783,13 @@ body,html[lang=ar] body { background:#f4f6fa; }
 .withdrawal-fee-summary>div{display:flex;justify-content:space-between;gap:15px;margin-block:9px;font-size:12px}
 .withdrawal-fee-summary strong{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .withdrawal-fee-summary p,.withdrawal-fee-summary small{font-size:11px;line-height:1.9;color:#536984}
+
+/* Shared live financial history: wrap public transaction identifiers on small screens. */
+.financial-history{display:grid;gap:1rem;margin-block:1.25rem;min-width:0}
+.financial-history .card{padding:1.25rem;border:1px solid #e2e8f0;border-radius:1rem;background:#fff;min-width:0}
+.financial-history h2{font-size:1.05rem;margin-block-end:.75rem}
+.financial-history p{color:#52647a;line-height:1.8}
+.financial-history ul{list-style:none;padding:0;margin:0}
+.financial-history li{padding-block:.8rem;border-bottom:1px solid #edf1f5;line-height:1.9;overflow-wrap:anywhere}
+.financial-history li:last-child{border-bottom:0}
+.financial-history code{overflow-wrap:anywhere;word-break:break-word;unicode-bidi:isolate;font-size:.85em}

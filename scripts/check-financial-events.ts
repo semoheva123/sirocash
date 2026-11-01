@@ -18,7 +18,7 @@ async function main(){
   // Synthetic invalidation only: no customer/ledger inserts, balance writes or paid commands.
   await publisher.query("SELECT pg_notify('siro_financial_changes',$1)",[JSON.stringify({ownerId:syntheticOwner})]);
   await delivery;
-  console.log('Financial event preflight: VERIFIED dedicated session LISTEN, four triggers, restricted role and synthetic owner-only delivery. No customer data or monetary operations.');
+  console.log('Financial event preflight: VERIFIED dedicated session LISTEN, seven triggers, restricted role and synthetic owner-only delivery. No customer data or monetary operations.');
  }finally{if(timeout)clearTimeout(timeout);off?.();await publisher.end()}
 }
 main().catch(()=>{console.error('Financial event preflight: FAILED (connection, migration or delivery unavailable; no credentials/data logged).');process.exitCode=1});

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {financialNotificationFixture} from './postgres-financial-events';
+import {financialNotificationFixture,committedNetworkEvent} from './postgres-financial-events';
 import {depositDiscoveryAcceptance} from './deposit-discovery-acceptance';
 import {createDepositValuationWorker} from '../lib/deposit-valuation-worker';
 import {customerFinancialCommands} from '../lib/customer-financial-commands';
@@ -112,14 +112,14 @@ async function main(){
   // A real assigned deposit address supplies DEPOSIT_SCAN and PREPARE_SWEEP, without any keys or network calls.
   const vault=randomUUID(),address=randomUUID();
   await pool.query('INSERT INTO "DepositAddressVault" (id,network,"accountXpub",enabled,"originVerified") VALUES ($1,\'TRC20\',\'xpub-fixture-not-a-key\',true,true)',[vault]);
-  await pool.query('INSERT INTO "UserDepositAddress" (id,"ownerId","vaultId",network,address,"derivationIndex") VALUES ($1,$2,$3,\'TRC20\',\'fixture-address-no-network\',0)',[address,alice,vault]);
+  await committedNetworkEvent(testUrl.toString(),alice,()=>pool!.query('INSERT INTO "UserDepositAddress" (id,"ownerId","vaultId",network,address,"derivationIndex") VALUES ($1,$2,$3,\'TRC20\',\'fixture-address-no-network\',0)',[address,alice,vault]));
   let entered!:()=>void,release!:()=>void;
   const barrier=new Promise<void>(r=>{entered=r}),gate=new Promise<void>(r=>{release=r});
   const first=runFinancialWorkerBatch(db,{enabled:true,limit:1,process:async()=>{entered();await gate;return {state:'HELD'}}});
   await Promise.race([barrier,new Promise<never>((_,reject)=>{const timer=setTimeout(()=>reject(Error('lease fixture never entered')),5000);timer.unref()})]);
   try{assert.equal((await runFinancialWorkerBatch(db,{enabled:true,process:async()=>{throw Error('must not run')}})).state,'BUSY')}finally{release();await first}
   const inbox=randomUUID();
-  await pool.query('INSERT INTO "ChainDepositInbox" (id,"eventKey","addressId",network,"txId","logIndex","blockNumber","blockHash","amountBaseUnits",fingerprint) VALUES ($1,\'fixture:automatic:valuation\',$2,\'TRC20\',$3,0,100,$4,20000000,$5)',[inbox,address,'ab'.repeat(32),'cd'.repeat(32),'ef'.repeat(32)]);
+  await committedNetworkEvent(testUrl.toString(),alice,()=>pool!.query('INSERT INTO "ChainDepositInbox" (id,"eventKey","addressId",network,"txId","logIndex","blockNumber","blockHash","amountBaseUnits",fingerprint) VALUES ($1,\'fixture:automatic:valuation\',$2,\'TRC20\',$3,0,100,$4,20000000,$5)',[inbox,address,'ab'.repeat(32),'cd'.repeat(32),'ef'.repeat(32)]));
   const pricing=()=>observeUsdtUsdPrice(async()=>new Response(JSON.stringify({data:{base:'USDT',currency:'USD',amount:'0.998'}})));
   const valuer=createDepositValuationWorker(db,{enabled:true,settlementAccountId:settlement,price:pricing});
   const beforeValue=(await walletBalances(db,alice)).posted;

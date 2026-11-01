@@ -76,7 +76,7 @@
     "test:financial-readiness": "tsx tests/financial-activation-readiness.ts",
     "test:postgres-financial": "node --conditions=react-server --import tsx tests/postgres-financial-integration.ts",
     "financial:events-check": "node --conditions=react-server --import tsx scripts/check-financial-events.ts",
-    "test:financial-stream": "tsx tests/financial-stream.ts && tsx tests/financial-sse-response.ts",
+    "test:financial-stream": "tsx tests/financial-stream.ts && tsx tests/financial-sse-response.ts && tsx tests/financial-ui-coverage.tsx",
     "test:financial-sync": "node --conditions=react-server --import tsx tests/financial-sync.ts",
     "test:customer-financial": "node --conditions=react-server --import tsx tests/customer-financial-boundaries.ts",
     "test:deposit-discovery": "node --conditions=react-server --import tsx tests/deposit-discovery.ts",

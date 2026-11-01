@@ -54,3 +54,23 @@ permissions granted by hosted default privileges; production preflight checks th
   The existing worker schedule is unchanged. Latest history remains bounded to 30 rows.
 - Production browser/device acceptance and load/capacity testing are separate from SQL/transport
   tests. Connection/memory/function usage must be capacity-planned; unlimited free scale is not promised.
+
+## Account-wide financial UI
+
+The authenticated account layout owns one shared SSE subscription across dashboard, deposits,
+withdrawals, payments, Sham Cash and mobile top-up routes. Consumers reuse the provider rather
+than creating a connection for each card. Balances on member routes no longer fall back to
+legacy `User.balance`; the authenticated dashboard no longer renders the legacy/demo history.
+
+The common live feed includes ledger movements of every persisted transaction type, wallet
+command states, assigned deposit addresses, observed deposit/valuation states and signed payout
+network-delivery states. Migration `20261101020000_financial_network_events` adds three owner-only
+invalidation triggers for address assignment, deposit inbox and payout outbox changes. Preflight
+now checks seven triggers and isolation of both trigger functions. Private signed bytes, keys,
+vault metadata and other users' records are never projected into snapshots.
+
+Pending/observed deposits are not labelled as credited; signed/unknown payouts are not labelled
+as confirmed. Each list shows the latest 30 records, not an unlimited/paginated history. Services
+without a live execution backend remain explicitly disabled; broadcasting their future ledger
+records does not activate those services. Member deposit/withdrawal pages route commands to the
+secure payments screen rather than displaying disabled demo forms as live functionality.

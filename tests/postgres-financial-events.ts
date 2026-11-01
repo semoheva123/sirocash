@@ -22,3 +22,13 @@ export async function financialNotificationFixture(pool:Pool,url:string,ownerId:
   console.log('PostgreSQL event PASS: separate LISTEN session receives only owner invalidation after COMMIT, none before commit or on ROLLBACK.');
  }finally{await listener.end()}
 }
+export async function committedNetworkEvent(url:string,ownerId:string,mutate:()=>Promise<unknown>){
+ const c=new Client({connectionString:url});await c.connect();let timeout:ReturnType<typeof setTimeout>|undefined;
+ try{
+  let delivered!:()=>void;
+  const received=new Promise<void>((resolve,reject)=>{delivered=resolve;timeout=setTimeout(()=>reject(Error('NETWORK_EVENT_MISSING')),3000)});
+  void received.catch(()=>{});
+  c.on('notification',m=>{const p=JSON.parse(m.payload!);assert.deepEqual(Object.keys(p),['ownerId']);assert.equal(p.ownerId,ownerId);delivered()});
+  await c.query('LISTEN siro_financial_changes');await mutate();await received;
+ }finally{if(timeout)clearTimeout(timeout);await c.end()}
+}

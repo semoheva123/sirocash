@@ -5,5 +5,8 @@ export async function readFinancialSnapshot(tx:WalletTx,ownerId:string){
    const {rows:[balance]}=await tx.query(`SELECT COALESCE(a.balance,0)::text AS posted,COALESCE((SELECT SUM(w.amount) FROM "WalletOperation" w WHERE w."ownerId"=$1 AND w.kind='WITHDRAWAL' AND w.state IN ('RESERVED','SUBMITTED')),0)::text AS held FROM (SELECT $1::uuid AS owner) u LEFT JOIN "LedgerAccount" a ON a."userId"=u.owner AND a."accountType"='USER' AND a.currency='USD'`,[ownerId]);
    const {rows:operations}=await tx.query('SELECT id,kind,amount::text,"feeAmount"::text,state,"createdAt" FROM "WalletOperation" WHERE "ownerId"=$1 ORDER BY "createdAt" DESC,id DESC LIMIT 30',[ownerId]);
    const {rows:activity}=await tx.query(`SELECT t.id,e.amount::text,t.type,t.status,t."createdAt" FROM "LedgerEntry" e JOIN "LedgerAccount" a ON a.id=e."accountId" JOIN "Transaction" t ON t.id=e."transactionId" WHERE a."userId"=$1 AND a."accountType"='USER' AND a.currency='USD' ORDER BY t."createdAt" DESC,t.id DESC LIMIT 30`,[ownerId]);
-   return {balance,operations,activity};
+   const {rows:deposits}=await tx.query('SELECT d.id,d.network,d."txId",d."amountBaseUnits"::text,d.state,d."createdAt" FROM "ChainDepositInbox" d JOIN "UserDepositAddress" a ON a.id=d."addressId" AND a.network=d.network WHERE a."ownerId"=$1 ORDER BY d."createdAt" DESC,d.id DESC LIMIT 30',[ownerId]);
+   const {rows:payouts}=await tx.query('SELECT p.id,p."operationId",p.network,p."txId",p.state,p."createdAt" FROM "SignedWithdrawalOutbox" p JOIN "WalletOperation" w ON w.id=p."operationId" WHERE w."ownerId"=$1 ORDER BY p."createdAt" DESC,p.id DESC LIMIT 30',[ownerId]);
+   const {rows:addresses}=await tx.query('SELECT network,address FROM "UserDepositAddress" WHERE "ownerId"=$1 ORDER BY network',[ownerId]);
+   return {balance,operations,activity,deposits,payouts,addresses};
 }

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import {useEffect,useState} from 'react';
-import {FinancialActivity} from './financial-activity';
+import {FinancialHistory} from './financial-history';
 import {useFinancialStatus} from './use-financial-status';
 import {FinancialSyncStatus} from './financial-sync-status';
 import {authorizePayment} from '@/lib/authorize-payment';
@@ -11,7 +11,7 @@ export function CustomerPayments(){
  const [deposit,setDeposit]=useState<{chain:string;address:string}|null>(null),[ar,setAr]=useState(true),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[kind,setKind]=useState<'TRANSFER'|'WITHDRAWAL'>('TRANSFER'),[recipient,setRecipient]=useState(''),[amount,setAmount]=useState(''),[chain,setChain]=useState('TRC20'),[prepared,setPrepared]=useState<Prepared|null>(null),[attempted,setAttempted]=useState(false),[submitted,setSubmitted]=useState<unknown>(null),[requestKey,setRequestKey]=useState('');
  const t=(a:string,e:string)=>ar?a:e;
  const {status,sync,updatedAt,refresh}=useFinancialStatus();
- useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());},[]);
+ useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());if(new URL(window.location.href).searchParams.get('kind')==='WITHDRAWAL')setKind('WITHDRAWAL');},[]);
  function edit(){if(attempted&&!submitted)return;setAttempted(false);setPrepared(null);setSubmitted(null);setRequestKey('customer:'+crypto.randomUUID())}
  const input={kind,recipient,amount,requestKey,...(kind==='WITHDRAWAL'?{chain,asset:'USDT'}:{})};
  async function prepare(e:React.FormEvent){e.preventDefault();setBusy(true);setNotice('');try{setPrepared(await call('/api/financial/prepare',input))}catch(e){setNotice(e instanceof Error?e.message:'تعذّر إنشاء العرض.')}finally{setBusy(false)}}
@@ -43,8 +43,7 @@ export function CustomerPayments(){
     {attempted&&!submitted&&<p role="alert">{t('نتيجة الإرسال غير مؤكدة. أعد المحاولة بالطلب نفسه فقط؛ لا تُنشئ طلبًا بديلًا.','Submission outcome is uncertain. Retry this exact command only; do not create a replacement.')}</p>}
     <button className="button secondary" disabled={busy||(attempted&&!submitted)} onClick={edit}>{submitted?t('طلب جديد','New command'):t('تعديل العرض','Edit quote')}</button>
    </section>}
-   <FinancialActivity status={status} ar={ar}/>
-   <section className="card"><h2>{t('آخر طلبات حسابك','Recent account commands')}</h2><ul>{status.operations?.map(o=><li key={o.id}><code>{o.id}</code> · {o.kind} · {o.amount} USD · {o.state}</li>)}</ul></section>
+   <FinancialHistory status={status} ar={ar}/>
   </>}
  </main>;
 }
