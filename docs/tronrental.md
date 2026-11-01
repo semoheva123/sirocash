@@ -101,3 +101,29 @@ identity reactivation, or native TRX burn fallback was introduced.
 The write API documents `max_price_trx` and `Idempotency-Key`. Activation of an
 inactive target is charged **outside** max_price_trx, so independent active-account
 proof is mandatory before any future buy. No automatic activation authorized.
+
+## Production publication and final validation
+
+Production deployment `dpl_8P5k7cSwv3mxNsMKykCaFERGW1Lm` is READY/PROMOTED,
+source `f1899913cbb7d86117a902657173aaf5d0b29149`. Aliases were assigned by
+Vercel; the public https://sirocash.vercel.app/ landing page was fetched successfully.
+This is software publication, **not** financial activation or custom-domain DNS proof.
+
+The hosted build verified all 30 financial/auth tables, RLS/app isolation, the new
+guards, restricted DB TLS/session role, owner-only LISTEN delivery and read-only
+financial projections. Financial activation configuration remained false, including
+worker, purchase, signing, preparation, authorization, broadcast and withdrawals.
+The deposit-readiness probe was skipped by its existing disabled configuration:
+this publication is not a new live TRON/BSC RPC/finality or deposit-readiness check.
+No financial env variable or provider balance was changed during this work.
+
+The earlier source141175a deployment `dpl_AGzgZR5Znui3c4jYypZDy473HsPL`
+was canceled before publication to replace it with the split-Bandwidth fix.
+No temporary probe variables were created this turn.
+
+The final software passed full npm test and production build after the split-bucket
+fix. The real multi-session acceptance suite passed on PostgreSQL **16.15 and
+17.11**, with 16 sessions each. These local runs did not request the optional
+pg_dump/pg_restore drill; existing CI can run that separately. Both isolated
+servers were stopped after testing. No downloaded database binaries or generated
+logs/data were added to Git.
