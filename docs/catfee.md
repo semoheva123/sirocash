@@ -150,3 +150,25 @@ Additional contract discrepancy to resolve before paid acceptance: the linked
 OpenAPI describes returned order duration in minutes, while English examples use
 1. The existing receipt validator expects1. Do not guess the returned lease units
 or infer live paid readiness from the current mock responses.
+
+## Handoff estimate eligibility attempt, 2026-11-01
+
+Diagnostic dpl_FizweKRgvzoE62MuGni7fLLCM128 at source10c368b sent only the
+ENERGY65000 estimate to POST /v1/mate/open/transaction/estimate. The API returned
+business code101 (authentication/signature rejection), so the probe stopped;
+BANDWIDTH1000 was NOT requested. No purchase endpoint, broadcast, DB access or
+publication occurred. The temporary production probe variable was deleted.
+
+The signature was reviewed against the official overview. The probe lacked the
+required JSON Content-Type header; source6213a58 corrects this and tests it. That
+corrected request has NOT been tested live: the tooling suppressed recreation of
+the same temporary variable within the reply after cleanup. Do not interpret the
+first101 as proof that Handoff is inactive, that the stored keys are invalid, or
+that the corrected signing/header contract has been rejected. Existing account,
+energy-estimate and market GET acceptance remain valid historical observations.
+
+Full local npm test passed before the header correction; both probe safety suites
+passed after it. The new Handoff fixture is included in test:catfee. A future live
+read-only retry must use corrected source6213a58 (or later), with a fresh temporary
+probe enablement; remove it after the result. Do not request/reveal secrets or
+change account permissions based solely on this inconclusive attempt.
