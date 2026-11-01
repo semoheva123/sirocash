@@ -27,6 +27,12 @@ export async function depositDiscoveryAcceptance(admin:WalletDb,worker:WalletDb)
   assert.equal(String((await sql('SELECT "nextIndex" FROM "DepositAddressVault" WHERE id=$1',[vaults[network]])).rows[0].nextIndex),'1');
   assert.equal(String((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[a.id])).rows[0].nextBlock),'100');
  }
+ const gated={vaultId:vaults.BEP20,finalHeight:async()=>100,requireScannerHealth:true};
+ await assert.rejects(()=>customerDepositAddress(worker,c,{chain:'BEP20',asset:'USDT'},gated),/SCANNER_NOT_HEALTHY/);
+ await sql('UPDATE "DepositNetworkScanner" SET "lastSuccessAt"=clock_timestamp(),"lagBlocks"=0 WHERE network=\'BEP20\'');
+ assert.equal((await customerDepositAddress(worker,c,{chain:'BEP20',asset:'USDT'},gated)).address,addresses.BEP20);
+ await sql('UPDATE "DepositNetworkScanner" SET "lastSuccessAt"=clock_timestamp()-interval \'11 minutes\' WHERE network=\'BEP20\'');
+ await assert.rejects(()=>customerDepositAddress(worker,c,{chain:'BEP20',asset:'USDT'},gated),/SCANNER_NOT_HEALTHY/);
  await assert.rejects(()=>customerDepositAddress(worker,c,{chain:'BEP20',asset:'USDT',ownerId:randomUUID()},{vaultId:vaults.BEP20,finalHeight:async()=>100}));
  await assert.rejects(()=>worker.transaction(tx=>tx.query('UPDATE "DepositAddressVault" SET "nextIndex"="nextIndex"+2 WHERE id=$1',[vaults.BEP20])),/INCREMENT_ONLY/);
  const topic='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',blockHash='cd'.repeat(32),parent='ab'.repeat(32),genesis='0'.repeat(16)+'ab'.repeat(24);

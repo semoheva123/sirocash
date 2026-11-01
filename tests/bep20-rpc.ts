@@ -29,6 +29,9 @@ async function main(){
  for(const handler of cases)await assert.rejects(()=>createBep20ReadRpc({endpoint,maxResponseBytes:256,fetch:mock(handler)})('eth_chainId',[]),(e:unknown)=>e instanceof Error&&e.message.startsWith('RPC_')&&!e.message.includes('secret')&&!e.message.includes(endpoint));
  await assert.rejects(()=>createBep20ReadRpc({endpoint,timeoutMs:100,fetch:mock(()=>new Promise(()=>{}))})('eth_chainId',[]),/RPC_TIMEOUT/);
  await assert.rejects(()=>createBep20ReadRpc({endpoint,timeoutMs:100,fetch:mock(()=>new Response(new ReadableStream({start(){}}),{headers:{'content-type':'application/json'}}))})('eth_chainId',[]),/RPC_TIMEOUT/);
+ const diagnostics:unknown[]=[];
+ await assert.rejects(()=>createBep20ReadRpc({endpoint,diagnostic:info=>diagnostics.push(info),fetch:mock(body=>json({jsonrpc:'2.0',id:body.id,error:{code:-32005,message:'limit exceeded private-secret-token'}}))})('eth_chainId',[]),/RPC_INVALID_ENVELOPE/);
+ assert.deepEqual(diagnostics,[{rpcCode:-32005,category:'RATE_OR_QUERY_LIMIT'}]);assert(!JSON.stringify(diagnostics).includes('private-secret-token'));
  const previous=process.env.SIRO_RPC_READ_ENABLED;delete process.env.SIRO_RPC_READ_ENABLED;assert.throws(()=>productionBep20ReadRpc(),/LIVE_READ_DISABLED/);if(previous!==undefined)process.env.SIRO_RPC_READ_ENABLED=previous;
  console.log('BEP20 read RPC transport passed: strict read-only calls, HTTPS config, no-store/no-redirect, bounded responses, request/body deadlines, envelope IDs, sanitized errors and disabled production gate. No live RPC used.');
 }
