@@ -24,10 +24,10 @@ export function chainJsonPost(options:ChainHttpOptions){
    const response=await Promise.race([expired,request(target,{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{}),...(options.apiKey?{'TRON-PRO-API-KEY':options.apiKey}:{})},body})]);
    failure={reason:!response.ok?'HTTP':'CONTENT_TYPE',httpStatus:response.status};
    if(!response.ok||!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??'')||!response.body)throw new Error('CHAIN_HTTP_RESPONSE');
-   failure={reason:'BODY_LIMIT',httpStatus:response.status};
-   const length=response.headers.get('content-length');if(length!==null&&(!/^\d+$/.test(length)||BigInt(length)>BigInt(maxBytes)))throw new Error('CHAIN_HTTP_RESPONSE');
+   failure={reason:'TRANSPORT',httpStatus:response.status};
+   const length=response.headers.get('content-length');if(length!==null&&(!/^\d+$/.test(length)||BigInt(length)>BigInt(maxBytes))){failure={reason:'BODY_LIMIT',httpStatus:response.status};throw new Error('CHAIN_HTTP_RESPONSE')}
    reader=response.body.getReader();const chunks:Uint8Array[]=[];let size=0;
-   for(;;){const part=await Promise.race([expired,reader.read()]);if(part.done)break;size+=part.value.byteLength;if(size>maxBytes)throw new Error('CHAIN_HTTP_RESPONSE');chunks.push(part.value)}
+   for(;;){const part=await Promise.race([expired,reader.read()]);if(part.done)break;size+=part.value.byteLength;if(size>maxBytes){failure={reason:'BODY_LIMIT',httpStatus:response.status};throw new Error('CHAIN_HTTP_RESPONSE')}chunks.push(part.value)}
    const data=new Uint8Array(size);let offset=0;for(const chunk of chunks){data.set(chunk,offset);offset+=chunk.length}
    failure={reason:'INVALID_JSON',httpStatus:response.status};
    return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(data));
