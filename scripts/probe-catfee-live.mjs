@@ -10,7 +10,7 @@ if(mode==='true'||mode==='market'||mode==='handoff'){
   if(!((method==='GET'&&['/v1/account','/v1/estimate','/v1/market'].includes(path))||(method==='POST'&&path==='/v1/mate/open/transaction/estimate')))throw Error('PROBE_ROUTE_DENIED');
   const url=new URL(path,'https://api.catfee.io');url.search=new URLSearchParams(params).toString();
   const timestamp=new Date().toISOString();
-  const response=await fetch(url,{method,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000),headers:{Accept:'application/json','CF-ACCESS-KEY':key,'CF-ACCESS-TIMESTAMP':timestamp,'CF-ACCESS-SIGN':createHmac('sha256',secret).update(timestamp+method+url.pathname+url.search).digest('base64')}});
+  const response=await fetch(url,{method,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/json',Accept:'application/json','CF-ACCESS-KEY':key,'CF-ACCESS-TIMESTAMP':timestamp,'CF-ACCESS-SIGN':createHmac('sha256',secret).update(timestamp+method+url.pathname+url.search).digest('base64')}});
   if(!response.ok){log(path,'HTTP_REJECTED',{httpStatus:response.status});throw Error('SAFE_STOP')}
   if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??'')||!response.body)throw Error('INVALID_RESPONSE');
   const reader=response.body.getReader();let size=0;const chunks=[];
