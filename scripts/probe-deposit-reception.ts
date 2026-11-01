@@ -1,5 +1,5 @@
 import {probeNetworkReadiness} from '../lib/network-readiness';
-import {createBep20ReadRpc} from '../lib/bep20-rpc';
+import {createBep20ReadRpc,productionBep20ReadRpc} from '../lib/bep20-rpc';
 import {observeUsdtUsdPrice} from '../lib/financial-price';
 import {createTronRead} from '../lib/tron-receipt-observer';
 import {bep20UsdtContract} from '../lib/bep20-deposit-verification';
@@ -12,7 +12,7 @@ async function main(){
   for(const result of await probeNetworkReadiness(process.env))console.log('DEPOSIT_READ_NETWORK:'+JSON.stringify(result));
   try{
    if(!process.env.SIRO_BEP20_RPC_URL)throw Error();
-   const rpc=createBep20ReadRpc({endpoint:process.env.SIRO_BEP20_RPC_URL,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION});
+   const rpc=productionBep20ReadRpc();
    const block=await rpc('eth_getBlockByNumber',['finalized',false]) as {number?:unknown};
    if(typeof block?.number!=='string'||!/^0x[0-9a-f]+$/i.test(block.number))throw Error();
    const result=await rpc('eth_getLogs',[{fromBlock:block.number,toBlock:block.number,address:bep20UsdtContract,topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',null,'0x'+'0'.repeat(64)]}]);
