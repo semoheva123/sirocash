@@ -12,7 +12,7 @@ async function main(){
   for(const result of await probeNetworkReadiness(process.env))console.log('DEPOSIT_READ_NETWORK:'+JSON.stringify(result));
   try{
    if(!process.env.SIRO_BEP20_RPC_URL)throw Error();
-   const rpc=createBep20ReadRpc({endpoint:process.env.SIRO_BEP20_RPC_URL,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION});
+   const rpc=createBep20ReadRpc({endpoint:process.env.SIRO_BEP20_RPC_URL,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION,diagnostic:info=>console.log('DEPOSIT_READ_CONFIGURED_RPC:'+JSON.stringify(info))});
    const block=await rpc('eth_getBlockByNumber',['finalized',false]) as {number?:unknown};
    if(typeof block?.number!=='string'||!/^0x[0-9a-f]+$/i.test(block.number))throw Error();
    const result=await rpc('eth_getLogs',[{fromBlock:block.number,toBlock:block.number,address:bep20UsdtContract,topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',null,'0x'+'0'.repeat(64)]}]);
@@ -20,13 +20,18 @@ async function main(){
    console.log('DEPOSIT_READ_BEP20_LOGS:SUPPORTED');
   }catch(e){console.log('DEPOSIT_READ_BEP20_LOGS:FAILED:'+safeFailure(e))}
   try{await observeUsdtUsdPrice();console.log('DEPOSIT_READ_PRICE:OBSERVED')}catch{console.log('DEPOSIT_READ_PRICE:FAILED')}
-  for(const [name,endpoint] of [['PUBLICNODE','https://bsc-rpc.publicnode.com'],['DRPC_PUBLIC','https://bsc.drpc.org'],['LLAMA_PUBLIC','https://binance.llamarpc.com']] as const){
+  for(const [name,endpoint] of [['PUBLICNODE','https://bsc-rpc.publicnode.com'],['BLOCKPI_PUBLIC','https://bsc.blockpi.network/v1/rpc/public'],['ONE_RPC_PUBLIC','https://1rpc.io/bnb'],['ONFINALITY_PUBLIC','https://bsc.api.onfinality.io/public']] as const){
    let phase='CHAIN';
    try{
-    const rpc=createBep20ReadRpc({endpoint});if(await rpc('eth_chainId',[])!=='0x38')throw Error();
+    const rpc=createBep20ReadRpc({endpoint,diagnostic:info=>console.log('DEPOSIT_READ_CANDIDATE_RPC:'+name+':'+JSON.stringify(info))});if(await rpc('eth_chainId',[])!=='0x38')throw Error();
     phase='FINALIZED';const b=await rpc('eth_getBlockByNumber',['finalized',false]) as {number:string};
     const n=BigInt(b.number),from='0x'+(n>999n?n-999n:0n).toString(16);
-    phase='FILTERED_LOGS';const logs=await rpc('eth_getLogs',[{fromBlock:from,toBlock:b.number,address:bep20UsdtContract,topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',null,['0x'+'0'.repeat(64),'0x'+'0'.repeat(63)+'1']]}]);
+    phase='FILTERED_LOGS';const filter={fromBlock:from,toBlock:b.number,address:bep20UsdtContract,topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',null,['0x'+'0'.repeat(64),'0x'+'0'.repeat(63)+'1']]};
+    let logs:unknown;try{logs=await rpc('eth_getLogs',[filter])}catch(e){
+     console.log('DEPOSIT_READ_CANDIDATE:'+name+':RANGE1000_REJECTED:'+safeFailure(e));
+     logs=await rpc('eth_getLogs',[{...filter,fromBlock:'0x'+(n-9n).toString(16)}]);
+     if(!Array.isArray(logs))throw Error();console.log('DEPOSIT_READ_CANDIDATE:'+name+':CHAIN56_FINALIZED_RANGE10_OR_LOGS_VERIFIED');continue;
+    }
     if(!Array.isArray(logs))throw Error();console.log('DEPOSIT_READ_CANDIDATE:'+name+':CHAIN56_FINALIZED_RANGE1000_OR_LOGS_VERIFIED');
    }catch(e){console.log('DEPOSIT_READ_CANDIDATE:'+name+':FAILED:'+phase+':'+safeFailure(e))}
   }

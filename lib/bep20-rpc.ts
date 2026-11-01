@@ -2,7 +2,7 @@ import 'server-only';
 import {randomUUID} from 'node:crypto';
 import type {Bep20Rpc} from './bep20-receipt-observer';
 
-type Options={signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
+type Options={signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch;diagnostic?:(info:{httpStatus?:number;rpcCode?:number;category:string})=>void};
 function validateCall(method:string,params:unknown[]){
  if(!Array.isArray(params))throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
  const empty=(method==='eth_chainId'||method==='eth_blockNumber')&&params.length===0;
@@ -40,7 +40,7 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
   try{
    const response=await Promise.race([expired,request(endpoint.toString(),{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{})},body:JSON.stringify({jsonrpc:'2.0',id,method,params})})]);
-   if(!response.ok)throw new Error('RPC_HTTP_FAILURE');
+   if(!response.ok){options.diagnostic?.({httpStatus:response.status,category:'HTTP_REJECTED'});throw new Error('RPC_HTTP_FAILURE')}
    if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??''))throw new Error('RPC_CONTENT_TYPE_INVALID');
    const length=response.headers.get('content-length');
    if(length!==null&&(!/^\d+$/.test(length)||BigInt(length)>BigInt(maxBytes)))throw new Error('RPC_RESPONSE_TOO_LARGE');
@@ -57,6 +57,7 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
    let payload:unknown;try{payload=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch{throw new Error('RPC_INVALID_JSON')}
    if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('RPC_INVALID_ENVELOPE');
    const p=payload as Record<string,unknown>;
+   if(p.error&&typeof p.error==='object'){const e=p.error as Record<string,unknown>,m=typeof e.message==='string'?e.message.toLowerCase():'';const category=/rate|too many|limit exceeded/.test(m)?'RATE_OR_QUERY_LIMIT':/range|block.*limit/.test(m)?'BLOCK_RANGE_LIMIT':/not.*support|disabled|not available|not.*exist/.test(m)?'METHOD_UNAVAILABLE':/invalid.*param|invalid.*argument/.test(m)?'INVALID_PARAMETERS':/authoriz|api.?key/.test(m)?'AUTH_REQUIRED':'PROVIDER_REJECTED';options.diagnostic?.({...(Number.isSafeInteger(e.code)?{rpcCode:Number(e.code)}:{}),category})}
    if(p.jsonrpc!=='2.0'||p.id!==id||Object.hasOwn(p,'error')||!Object.hasOwn(p,'result'))throw new Error('RPC_INVALID_ENVELOPE');
    return p.result;
   }catch(error){
