@@ -37,7 +37,7 @@ export function productionOutboxNetworkWorkers(db:WalletDb){
  const authorizeEnabled=process.env.SIRO_RESOURCE_AUTHORIZATION_ENABLED==='true',energyEnabled=process.env.SIRO_ENERGY_WORKER_ENABLED==='true';
  const tron={endpoint:process.env.SIRO_TRON_RPC_URL!,apiKey:process.env.SIRO_TRON_RPC_API_KEY};
  if(energyEnabled&&process.env.SIRO_ENERGY_PROVIDER!=='catfee')throw Error('CATFEE_PROVIDER_REQUIRED');
- const client=energyEnabled?catFeeOrderClient({credentials:catFeeCredentials()}):undefined;
+ const client=energyEnabled?catFeeOrderClient({credentials:catFeeCredentials(),directRentalEnabled:process.env.SIRO_CATFEE_DIRECT_RENTAL_ENABLED==='true'}):undefined;
  const execution=(authorizeEnabled||energyEnabled)?createFinancialExecution(db,{
   purchaseEnabled:energyEnabled&&process.env.SIRO_ENERGY_PURCHASE_ENABLED==='true',
   client,

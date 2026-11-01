@@ -1,50 +1,94 @@
-# CatFee-only resource integration
+# CatFee traditional direct energy rental
 
-Owner decision, 2026-11-01: use CatFee exclusively; remove the former provider. No fallback.
+## Owner decision
 
-## Implemented
+Use CatFee exclusively, with **manual account top-up**, not Seamless Energy. The
+latest owner instruction authorizes the direct mechanism: buy the energy needed
+for a TRON transaction and broadcast locally after independent delivery proof.
+The previous requirement for a provider-side atomic price lock is not implemented
+or claimed in direct mode. The owner has acknowledged small peak-price variation;
+no numeric USD slippage allowance was invented. This does not remove the existing
+expense policies, authorize arbitrary price differences, native TRX burning,
+automatic top-up, or a live paid test. Collection remains deferred until separately
+enabled. Deposit receipt/credit does not need CatFee. BSC is unaffected.
 
-- Runtime selects `SIRO_ENERGY_PROVIDER=catfee`; rejects another selection when energy worker is enabled.
-- `CATFEE_API_KEY` and `CATFEE_API_SECRET`: production-sensitive server-only credentials. Add directly
-  to the secret store; never chat, browser, Git, Preview, or logs. The old provider credentials were
-  deleted from the project's environment configuration. This does not revoke credentials at their
-  issuer or erase immutable old deployments. Revoke the former API key in that provider's account.
-- Fixed `https://api.catfee.io`; GET-only account, estimate, and original-client-ID order lookup.
-  HMAC-SHA256 Base64 over exact timestamp + GET + encoded path/query. No redirects, retries,
-  arbitrary hosts, private keys, wallet authorization, or signed withdrawal submission.
-- Bounded response/deadline, safe integer SUN parsing and sanitized transport errors.
-- Recovery binds client order ID, address, quantity, resource type and duration. Submission is not
-  confirmation; the existing independent on-chain delivery/current-resource checks remain mandatory.
-- No native TRX refill/fallback is introduced. BEP20 BNB handling is unchanged.
+## Implemented direct path
 
-## Intentionally NOT enabled / not a completed paid integration
+1. Simulate the exact transfer unsigned; inspect the sender's account and current
+   resources. Reuse sufficient existing resources rather than buy unnecessarily.
+2. If energy is insufficient, request the required quantity (at least CatFee's
+   65,000 minimum), for one hour. Existing sufficient Bandwidth is mandatory;
+   missing Bandwidth stops preparation **before** an energy purchase. This adapter
+   does not fabricate a Bandwidth product or permit native-burn fallback.
+3. Fetch a signed GET estimate. Reject an estimate above the intent's maximum.
+   Atomically claim the intent and reserve the estimated cost against the shared
+   per-order, provider-lifetime and network-daily expense policies before any POST.
+4. Send one signed `POST https://api.catfee.io/v1/order`, with quantity, receiver,
+   duration=1h, the committed claim UUID as client_order_id, and activate=false.
+   Address activation is not silently purchased. No private key or signed customer
+   transfer is sent to CatFee; no Seamless or handoff endpoint is used.
+5. Treat the result only as an acknowledgement. Recover through GET /v1/order using
+   the same client ID. Timeout, malformed response or unknown result retains the
+   durable claim and budget; never blindly issue a second purchase.
+6. Bind the receipt to sender, quantity, duration and client ID. Reconcile the real
+   charge, including activation fields conservatively. An actual charge above the
+   reserved estimate/approved policy holds the operation and disables further
+   purchases; **this is after-the-fact containment, not a provider price lock**.
+7. Require confirmed native delegation on the pinned TRON chain, exact receiver,
+   and currently usable Energy AND Bandwidth. Historical provider success alone is
+   insufficient; resources may have been used or reclaimed.
+8. Prepare/sign locally only after verified resources. Recheck exact signed
+   transaction resources/cost and persist dispatch authorization before broadcast.
+   The worker calls the saved outbox processor immediately after successful
+   preparation in the same job. If delegation is pending, retain/recover the job;
+   never promise zero confirmation latency or resend an unknown transfer.
 
-`/v1/order` documents idempotent creation but no atomic maximum-price parameter. Provider selection
-is NOT acceptance of variable prices. The CatFee adapter exposes a purchase blocker, checked before
-any durable purchase claim/HTTP call. Its send function always rejects. Neither toggling a purchase
-flag nor adding credentials bypasses this restriction. The retired variable-price acceptance flag
-is not recognized. Unbounded prepaid spending is not an implementation of the approved cap.
+This shared preparation/execution path supports both TRON sweeps and payouts.
+The end-to-end CatFee-adapter sweep test uses mocked HTTP and an isolated DB:
+unsigned preflight -> exactly one POST -> pending recovery -> confirmed delegation
+-> fresh signing -> dispatch authorization -> broadcast -> final transfer/replay.
+A missing-Bandwidth test proves no purchase or broadcast occurs. This is software
+coverage, not a completed funded mainnet acceptance or a guarantee of live service.
 
-The ordinary energy estimate is energy-only, not a full activation/bandwidth quote. Bundle quote and
-purchase recovery are explicitly unavailable, not fabricated using undocumented fields. Although
-CatFee documents ENERGY/BANDWIDTH products and Seamless Energy, their capped execution, billing,
-activation, expiry, and independent delivery proof still need a reviewed adapter and funded acceptance.
-Seamless Energy must use STOP on insufficient provider balance; do not silently replace our broadcaster
-or let the provider forward a signed payment before the local dispatch claim/expense checks.
+## Configuration and activation boundary
 
-Account credentials/authentication, actual prices and zero-TRX operation have NOT been live-tested
-with CatFee. Fixture domain-cycle tests use a provider-neutral synthetic adapter, not a CatFee purchase.
-Deposits, signing, paid operations and customer withdrawals remain gated off.
+- `SIRO_ENERGY_PROVIDER=catfee` selects the only supported resource provider.
+- `CATFEE_API_KEY` and `CATFEE_API_SECRET` must be Sensitive production-only values;
+  never chat, browser, Git, logs or Preview. No recovery phrase is required.
+- `SIRO_CATFEE_DIRECT_RENTAL_ENABLED=true` explicitly selects direct rental. When
+  absent/false the original purchase blocker remains. Neither account funding nor
+  the generic purchase flag silently selects direct mode.
+- The existing energy-worker, purchase, preparation, signing, resource-authorization,
+  outbox and broadcast gates, DB expense policies and deposit-only isolation remain
+  in force. Direct mode alone does not enable financial execution.
+- The owner's general limits are 50 TRX/order and 200 TRX/day; these are policy limits,
+  not a quoted fee or a claim that a DB policy is currently enabled. Do not turn
+  those maximums into a paid-test budget: the separate earlier test authorization
+  is at most 10 TRX aggregate and requires verified prerequisites.
 
-## Cutover safety
+No production flag, purchase policy or live deployment was changed in this patch.
+No production credentials were decrypted and no real purchase/broadcast was made.
 
-Read-only production preflight returned zero EnergyRentalIntent, EnergyPurchaseAttempt,
-SignedWithdrawalOutbox and SignedSweepOutbox rows, and zero enabled energy policies. No old paid
-operation was reinterpreted as a CatFee order. Future provider changes with existing rows require
-persisted provider provenance/migration; never use a different provider to resolve an old unknown order.
-No ledger or schema migration was needed for this empty, disabled cutover.
+## Safe readiness diagnostics
 
-## Official contracts reviewed
+`npm run energy:readiness` is offline by default and exits nonzero while funded
+acceptance remains unproven. `CATFEE_READ_CHECK=true npm run energy:readiness` opts
+into at most two signed GETs under a shared 25-second deadline in a secure runtime.
+It prints no account balance, email, recharge address, secret or upstream body.
+`readCheck=VERIFIED` is not `purchasesReady=true`. Direct mode is reported separately
+from priceLocked=false and the current-Bandwidth prerequisite. The unchanged
+`energy:check` command tests read authentication only, not paid readiness.
+
+## Provider contract and risk
+
+The documented ordinary POST supports quantity, receiver, duration, client_order_id
+and activate. The estimate is energy-only and is not an atomic maximum charge.
+No invented max_price/max_cost_sun field is sent. Provider deductions can differ
+from the preceding estimate. A charge already made may be nonrefundable even if
+subsequent dispatch is held. Credential authentication, real prices, account-unit
+semantics and zero-native-TRX operation have not been live-tested in this patch.
+
+## References
 
 - https://docs.catfee.io/en/getting-started/buy-energy-via-api-on-catfee/api-overview
 - https://docs.catfee.io/en/api-reference/account
@@ -52,9 +96,12 @@ No ledger or schema migration was needed for this empty, disabled cutover.
 - https://docs.catfee.io/en/api-reference/create-order
 - https://docs.catfee.io/en/api-reference/order-detail
 - https://docs.catfee.io/en/getting-started/api-supports-idempotent-requests
-- https://docs.catfee.io/en/seamless-energy/introduction
-- https://docs.catfee.io/en/seamless-energy/faq
 - https://docs.catfee.io/en/getting-started/terms-of-service
 
-Delivered resources may be non-refundable even if the subsequent transfer fails. Resource availability,
-provider estimates and advertised savings are not guaranteed final transaction costs.
+## Cutover safety
+
+The prior read-only production preflight observed zero EnergyRentalIntent,
+EnergyPurchaseAttempt, SignedWithdrawalOutbox and SignedSweepOutbox rows and no
+active energy policies. That is historical evidence, not a new live DB check.
+No old paid operation is reinterpreted under another provider. Existing paid rows
+would require persisted provenance/review before any provider migration.

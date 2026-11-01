@@ -8,6 +8,7 @@ import {createFinancialPreflight} from '../lib/financial-preflight';
 import {createFinancialExecution} from '../lib/financial-execution';
 import {createOutboxResourceObserver} from '../lib/outbox-resource-observer';
 import {createEnergyDeliveryObserver} from '../lib/energy-delivery-observer';
+import {catFeeOrderClient} from '../lib/catfee-orders';
 import type {ResourceProvider} from '../lib/resource-provider';
 import {createUnsentTronRenewal} from '../lib/unsent-tron-renewal';
 import {prepareSignedSweep} from '../lib/signed-sweep-outbox';
@@ -18,7 +19,7 @@ import {createChainBroadcaster} from '../lib/chain-broadcast';
 import {processSweepObservation} from '../lib/sweep-network-observer';
 import {tronUsdtContract} from '../lib/tron-deposit-verification';
 import type {WalletDb} from '../lib/wallet-engine';
-async function scenario(bundle:boolean){const pg=new PGlite();try{
+async function scenario(bundle:boolean,direct=false){const pg=new PGlite();try{
  await pg.exec('CREATE ROLE anon;CREATE ROLE authenticated;');
  for(const dir of (await readdir('prisma/migrations')).sort())if(!dir.endsWith('.toml'))await pg.exec(await readFile(`prisma/migrations/${dir}/migration.sql`,'utf8'));
  const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows as Record<string,unknown>[]})}))};
@@ -51,15 +52,28 @@ async function scenario(bundle:boolean){const pg=new PGlite();try{
  }) as typeof fetch;
  const tron={endpoint:'https://tron.example.invalid',fetch:chain},bep20={endpoint:'https://bsc.example.invalid',fetch:chain};
  // Provider-neutral domain fixture. This is NOT a live CatFee integration/price guarantee.
- const client:ResourceProvider={
+ const neutral:ResourceProvider={
   quote:async()=>({costSun:bundle?4850000n:3850000n,expiresAt:Date.now()+25000}),
   bandwidthPackage:async()=>1000,
   send:async o=>{created++;claim=o.requestKey;assert.equal(o.sender,source);assert.equal(o.energyAmount,65000);assert.equal(o.bandwidthAmount??0,bundle?1000:0);return {orderId:'fixture-energy'}},
   check:async o=>{assert.equal(o.requestKey,claim);return {orderId:'fixture-energy',status:delivered?'success':'pending',actualCostSun:bundle?4850000n:3850000n,priceExceeded:false,delegationTxId:delivered?delegation:undefined}},
  };
+ const client:ResourceProvider=direct?catFeeOrderClient({credentials:{key:'fixture',secret:'fixture'},directRentalEnabled:true,fetch:async(url,init)=>{
+  const u=new URL(String(url));assert.equal(u.origin,'https://api.catfee.io');
+  if(u.pathname==='/v1/estimate'){assert.equal(init?.method,'GET');return result({code:0,data:3850000})}
+  assert.equal(u.pathname,'/v1/order');
+  if(init?.method==='POST'){created++;claim=u.searchParams.get('client_order_id')!;assert.equal(u.searchParams.get('receiver'),source);assert.equal(u.searchParams.get('quantity'),'65000');assert.equal(u.searchParams.get('activate'),'false')}
+  else {assert.equal(init?.method,'GET');assert.equal(u.searchParams.get('client_order_id'),claim)}
+  return result({code:0,data:{id:'fixture-energy',client_order_id:claim,receiver:source,resource_type:'ENERGY',quantity:65000,duration:1,pay_amount_sun:3850000,activate_amount_sun:0,status:'DELEGATE_SUCCESS',confirm_status:delivered?'DELEGATION_CONFIRMED':'UNCONFIRMED',delegate_hash:delegation}});
+ }}):neutral;
  const execution=createFinancialExecution(db,{purchaseEnabled:true,client,delivery:createEnergyDeliveryObserver({...tron,genesisId:genesis}),resources:createOutboxResourceObserver({bep20,tron,tronGenesisId:genesis})});
  const preparation=createFinancialPreparation(db,{enabled:true,bandwidthPackage:client.bandwidthPackage,preflight:createFinancialPreflight({bep20,tron,genesisId:genesis,tronReadOwner:to}),gas:{prepare:async()=>{throw Error('No BNB')},process:async()=>{throw Error('No BNB')}},energy:execution.energy,limits:()=>({maxAmount:1000000000n,maxFee:4000000n,minimumSweep:1000000n}),signSweep:(d,c)=>prepareSignedSweep(d,c,{loadKeys:()=>({accountXpub:account.publicExtendedKey,accountXprv:account.privateExtendedKey})})});
  const signal=new AbortController().signal,job={kind:'PREPARE_SWEEP' as const,id};
+ if(direct&&bundle){
+  await assert.rejects(()=>preparation(job,signal),/CATFEE_BANDWIDTH_EXECUTION_UNVERIFIED/);assert.equal(created,0);assert.equal(broadcasts,0);
+  assert.equal((await pg.query('SELECT 1 FROM "EnergyPurchaseAttempt"')).rows.length,0);
+  console.log('Direct CatFee fixture: insufficient Bandwidth stops before any purchase or broadcast; no native burn fallback.');return;
+ }
  assert.equal((await preparation(job,signal)).state,'HELD');assert.equal(created,1);assert.equal(broadcasts,0);
  assert.equal((await preparation(job,signal)).state,'HELD');assert.equal(created,1);
  delivered=true;const saved=await preparation(job,signal);assert.equal(saved.state,'SAVED');if(saved.state!=='SAVED')throw Error('not saved');
@@ -81,7 +95,7 @@ async function scenario(bundle:boolean){const pg=new PGlite();try{
  assert.equal((await pg.query('SELECT id FROM "DispatchApprovalHistory" WHERE "outboxId"=$1',[expired.id])).rows.length,1);
  assert.equal(created,1);assert.equal(broadcasts,1);
  assert.equal((await pg.query<{bandwidthAmount:number}>('SELECT "bandwidthAmount" FROM "EnergyRentalIntent"')).rows[0].bandwidthAmount,bundle?1000:0);
- console.log((bundle?'Bundled energy + bandwidth: ':'Energy-only: ')+ 'Provider-neutral TRON fixture cycle (not CatFee acceptance): unsigned simulation -> exact resource intent -> one paid-order fixture -> pending recovery without repurchase -> solid ENERGY delivery -> fresh HD signing -> resource/cost authorization with zero native prefund -> broadcast -> final exact Transfer/replay passed. No real paid calls.');
+ console.log((direct?'CatFee DIRECT adapter mock cycle (not live acceptance): ':bundle?'Bundled provider-neutral fixture: ':'Energy-only provider-neutral fixture: ')+ ' unsigned simulation -> exact resource intent -> one paid-order fixture -> pending recovery without repurchase -> solid ENERGY delivery -> fresh HD signing -> resource/cost authorization with zero native prefund -> broadcast -> final exact Transfer/replay passed. No real paid calls.');
 }finally{await pg.close()}}
-async function main(){await scenario(false);await scenario(true)}
+async function main(){await scenario(false);await scenario(true);await scenario(false,true);await scenario(true,true)}
 main().catch(e=>{console.error(e);process.exitCode=1});

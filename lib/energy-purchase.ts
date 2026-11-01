@@ -5,8 +5,8 @@ import type {WalletDb} from './wallet-engine';
 import {validTronAddress} from './tron-addresses';
 import {treasuryDestination} from './treasury-addresses';
 /** PRIVATE pre-purchase budget/claim layer for both sweep and payout resource intents.
- * An injected reviewed planner supplies a fresh exact quote, including activation fees.
- * No provider purchase adapter is installed. ACK is neither delivery nor chain finality.
+ * An injected planner supplies a fresh estimate; direct CatFee disallows activation.
+ * The estimate is not a provider price lock. ACK is neither delivery nor chain finality.
  * Reservations NEVER auto-release, even across midnight or after timeout/crash.
  */
 type Quote={bandwidthAmount?:number;sender:string;energyAmount:number;durationMinutes:60;costSun:bigint;expiresAt:number;intentFingerprint:string};

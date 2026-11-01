@@ -2,25 +2,28 @@ import 'server-only';
 import {createHmac} from 'node:crypto';
 import {z} from 'zod';
 import {chainJsonPost} from './chain-http';
+import {validTronAddress} from './tron-addresses';
 export function catFeeCredentials(env:Record<string,string|undefined>=process.env){
  const key=env.CATFEE_API_KEY,secret=env.CATFEE_API_SECRET;
  if(!key||!secret||[key,secret].some(v=>v.length>4096||v.trim()!==v||/[\r\n]/.test(v)))throw Error('CATFEE_CONFIGURATION');
  return {key,secret};
 }
 export const catFeeSun=z.union([z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),z.string().regex(/^(0|[1-9]\d{0,18})$/)]).transform(v=>BigInt(v)).refine(v=>v<=9223372036854775807n);
-/** Fixed-origin GET-only API. Reuse the bounded streaming/deadline transport, but construct
- * the actual CatFee GET and HMAC over EXACT timestamp + method + encoded path/query.
- * No POST/purchase, arbitrary URL, provider-controlled redirect or retry capability here.
- */
-export function catFeeReadClient(credentials:ReturnType<typeof catFeeCredentials>,fetcher:typeof fetch=fetch){
+/** Private fixed-origin signed transport. Exact method/path/query signature;
+ * no redirects, retries or arbitrary hosts. Public read client remains GET-only. */
+function catFeeTransport(credentials:ReturnType<typeof catFeeCredentials>,fetcher:typeof fetch,method:'GET'|'POST'){
  const {key,secret}=catFeeCredentials({CATFEE_API_KEY:credentials.key,CATFEE_API_SECRET:credentials.secret});
  const read=chainJsonPost({endpoint:'https://api.catfee.io',maxResponseBytes:65536,fetch:async(url,init)=>{
   const target=new URL(String(url)),params=JSON.parse(String(init?.body)) as Record<string,string>;
   target.search=new URLSearchParams(params).toString();
   const timestamp=new Date().toISOString(),path=target.pathname+target.search;
-  const headers=new Headers({'Content-Type':'application/json',Accept:'application/json','CF-ACCESS-KEY':key,'CF-ACCESS-TIMESTAMP':timestamp,'CF-ACCESS-SIGN':createHmac('sha256',secret).update(timestamp+'GET'+path).digest('base64')});
-  return fetcher(target,{...init,method:'GET',body:undefined,headers});
+  const headers=new Headers({'Content-Type':'application/json',Accept:'application/json','CF-ACCESS-KEY':key,'CF-ACCESS-TIMESTAMP':timestamp,'CF-ACCESS-SIGN':createHmac('sha256',secret).update(timestamp+method+path).digest('base64')});
+  return fetcher(target,{...init,method,body:undefined,headers});
  }});
+ return read;
+}
+export function catFeeReadClient(credentials:ReturnType<typeof catFeeCredentials>,fetcher:typeof fetch=fetch){
+ const read=catFeeTransport(credentials,fetcher,'GET');
  async function call(path:'/v1/account'|'/v1/estimate'|'/v1/order',params:Record<string,string>,signal?:AbortSignal){
   try{const r=z.object({code:z.number().int(),data:z.unknown()}).parse(await read(path,JSON.stringify(params),signal));if(r.code!==0)throw Error();return r.data}catch{throw Error('CATFEE_READ_UNVERIFIED')}
  }
@@ -32,4 +35,19 @@ export function catFeeReadClient(credentials:ReturnType<typeof catFeeCredentials
   },
   orderByClientId:(id:string,signal:AbortSignal)=>{if(!/^[a-f0-9-]{36}$/i.test(id))throw Error('CATFEE_ORDER_ID');return call('/v1/order',{client_order_id:id},signal)},
  };
+}
+
+/** Paid API boundary: called only after the durable purchase claim commits. No retry,
+ * Seamless endpoint, signed payment, activation, or invented max-price parameter.
+ * The standard API does NOT lock the preceding estimate; reconciliation must account
+ * for the actual charge and hold/disable subsequent purchases on any price breach.
+ */
+export async function catFeeCreateEnergyOrder(credentials:ReturnType<typeof catFeeCredentials>,input:{requestKey:string;sender:string;energyAmount:number;signal:AbortSignal},fetcher:typeof fetch=fetch):Promise<unknown>{
+ if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(input.requestKey)||!validTronAddress(input.sender)||!Number.isSafeInteger(input.energyAmount)||input.energyAmount<65000||input.energyAmount>10000000||input.signal.aborted)throw Error('CATFEE_ORDER_INPUT');
+ const post=catFeeTransport(credentials,fetcher,'POST');
+ try{
+  const params={quantity:String(input.energyAmount),receiver:input.sender,duration:'1h',client_order_id:input.requestKey,activate:'false'};
+  const r=z.object({code:z.number().int(),data:z.unknown()}).parse(await post('/v1/order',JSON.stringify(params),input.signal));
+  if(r.code!==0)throw Error();return r.data;
+ }catch{throw Error('CATFEE_CREATE_UNVERIFIED')}
 }
