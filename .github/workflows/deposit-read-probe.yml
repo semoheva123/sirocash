@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/deposit-read-probe.yml
       - scripts/probe-deposit-reception.ts
+      - scripts/benchmark-deposit-reads.ts
 permissions:
   contents: read
 concurrency:
@@ -14,13 +15,15 @@ concurrency:
 jobs:
   observe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 3
+    timeout-minutes: 5
     # Public chain metadata only. No repository secrets or database credentials.
     env:
       VERCEL_ENV: production
       SIRO_SIGNER_ENABLED: 'false'
       SIRO_OUTBOX_WORKER_ENABLED: 'false'
       SIRO_DEPOSIT_READINESS_PROBE: 'true'
+      SIRO_DEPOSIT_CAPACITY_PROBE: 'true'
+      SIRO_BEP20_SCAN_WINDOW: '100'
       SIRO_BEP20_RPC_URL: https://1rpc.io/bnb
       SIRO_TRON_RPC_URL: https://api.trongrid.io
       SIRO_TRON_GENESIS_ID: '00000000000000001ebf88508a03865c71d452e25f4d51194196a1d22b6653dc'
@@ -33,4 +36,21 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npm run deposit:probe
+      - name: Public endpoint capabilities (no secrets)
+        run: |
+          set -euo pipefail
+          npm run deposit:probe | while IFS= read -r line; do
+            echo "$line"
+            case "$line" in
+              DEPOSIT_READ_CANDIDATE*|DEPOSIT_READ_BEP20_LOGS*|DEPOSIT_READ_TRON_BULK*) printf '::notice title=Deposit provider observation::%s\n' "$line" ;;
+            esac
+          done
+      - name: Bounded real-read catch-up in isolated fixture DB
+        run: |
+          set -euo pipefail
+          node --conditions=react-server --import tsx scripts/benchmark-deposit-reads.ts | while IFS= read -r line; do
+            echo "$line"
+            case "$line" in
+              DEPOSIT_READ_BENCHMARK:*) printf '::notice title=Deposit catch-up benchmark::%s\n' "$line" ;;
+            esac
+          done
