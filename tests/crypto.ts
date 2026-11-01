@@ -17,6 +17,7 @@ const hash=paymentDigest(path,payload);
 for(const changed of [{asset:'USDT'},{chain:'POLYGON'},{amount:6},{recipient:'0x'+'b'.repeat(40)}])assert.notEqual(hash,paymentDigest(path,{...payload,...changed}));
 assert.equal(hash,paymentDigest(path,{...payload,pin:'654321'}));
 const db=new PGlite();
+await db.exec('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;');
 for(const dir of (await readdir('prisma/migrations')).sort()){if(dir.endsWith('.toml'))continue;await db.exec(await readFile(`prisma/migrations/${dir}/migration.sql`,'utf8'))}
 const {rows:[user]}=await db.query<{id:string}>('INSERT INTO "User" (id,email) VALUES (gen_random_uuid(),$1) RETURNING id',['crypto@example.com']);
 await db.query('INSERT INTO "DepositAddress" (id,"userId",chain,asset,address,"derivationIndex") VALUES (gen_random_uuid(),$1,$2,$3,$4,1)',[user.id,'ETHEREUM','USDC','demo-eth']);

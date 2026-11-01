@@ -2,6 +2,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const db=new PGlite();
+await db.exec('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;');
 for(const dir of (await readdir('prisma/migrations')).sort()){if(dir.endsWith('.toml'))continue;await db.exec(await readFile(`prisma/migrations/${dir}/migration.sql`,'utf8'))}
 const {rows:[user]}=await db.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES (gen_random_uuid(),$1,NOW()) RETURNING *',['test@example.com']);
 assert.equal(user.phone,null);assert.equal(user.pinHash,null);assert.equal(Number(user.balance),0);
