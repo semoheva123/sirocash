@@ -33,22 +33,56 @@ first-failure stop and intentional publication prevention.
 Full `npm test` passed after the authenticated quote fix and probe safety suite
 (131690ms). Synthetic tests are not paid provider acceptance tests.
 
-## Not implemented / not proven
+## Financial integration implemented, 2026-11-01
 
-This is **not** an operational Bandwidth purchasing integration. The production
-outbox still uses the traditional CatFee energy-only adapter and stops on
-inadequate Bandwidth. No changes to its financial gates, caps or chain proof.
+- `dual-resource-provider.ts` composes CatFee ENERGY and TronRental BANDWIDTH.
+  The production worker opts in using `SIRO_TRONRENTAL_BANDWIDTH_ENABLED=true`.
+  Default is off; all existing worker, purchase, signer and broadcast gates remain.
+- Only deficits are purchased. When existing Energy suffices, the intent has zero
+  Energy and a Bandwidth leg only. Traditional CatFee minimum remains 65000 units
+  when an Energy purchase is needed. Bandwidth is sized to the missing resource.
+- `ResourcePurchaseLeg` stores separate immutable provider identity, UUID request
+  key, sender/quantity, quoted/actual costs, order ID, state and delegation hash.
+- The parent reservation and all children commit atomically before either POST.
+  Deferred DB enforcement requires the complete plan and exact combined total.
+  Shared per-operation, global-held and network-day mutexes cover both providers;
+  each child's known higher charge is immediately included in budget accounting.
+- Each child is claimed once (READY -> UNKNOWN) before its external request. No
+  automatic POST retry. CatFee recovery uses its original child UUID. TronRental
+  recovery uses the saved numeric order ID and checks target/type/quantity/duration.
+  If its POST response is lost, no documented read-by-idempotency-key exists:
+  keep UNKNOWN, retain the full budget and stop for provider-assisted reconciliation.
+  Never guess an order by address, issue a new key, or release an uncertain charge.
+- Active-account proof checks the configured TRON genesis, a fresh solid head and
+  the exact account address before Bandwidth purchase. No activation consent is
+  granted. Quote expiry is rechecked after the proof; `max_price_trx` and the saved
+  `Idempotency-Key` are always sent. Unexpected activation charges hold the flow
+  and disable further purchases, rather than concealing the additional cost.
+- Every successful child needs an independently verified solid native delegation
+  contract with the matching resource type and receiver. Current resources must
+  suffice; the original independent pre-sign and exact signed-byte dispatch checks
+  remain in place. A provider ACK is never permission to sign or broadcast.
+- Legacy energy-only claims still reconcile with the original CatFee request ID.
 
-Before enabling combined resource purchasing, implement durable child claims for
-both providers (provider identity, immutable target/quantity, own request key,
-quoted/actual charges and independent receipt recovery). Reserve their combined
-cost under the existing shared per-operation/day locks **before** either purchase.
-An unknown outcome must not issue a new order or release budget. Do not hide two
-purchases behind the existing single-provider order ID/receipt.
+Production migration `20261101040000_dual_resource_orders` was applied and verified:
+checksum `32fb187e6de18c6ba9acdb31843d62677117a4ba185e097326ddcb2e01c85e69`,
+RLS enabled, app/anon denied, financial worker SELECT/INSERT/UPDATE permitted,
+both guards present, zero child rows and zero parent purchase attempts. Purchase
+policy remains disabled. No financial flags or caps were increased.
 
-A funded paid test, buy_bandwidth entitlement and actual on-chain delegation have
-not been verified. Do not claim pricing success proves these. A zero balance is
-not a reason to activate buys, nor a reason to demand a large activation deposit.
+Validation: full npm test PASS; local Next production build PASS; real PostgreSQL
+17.11 PASS with 16 independent sessions, including the new competing-intent budget
+acceptance. PGlite also runs the same child-budget acceptance. Adapter-level cycles
+cover both resources and Bandwidth-only through signing, exact-byte broadcast and
+settlement, plus timeout/no-repeat, inactive account, extra activation cost and
+wrong-resource proof failures. All paid operations in those tests are synthetic.
+
+**Not live-accepted:** the historical verified account balance was zero. No real
+Bandwidth buy, paid delivery, buy-scope verification, sweep or payout was performed.
+Do not confuse completed software integration with funded operational acceptance.
+Keep financial execution disabled until a separately authorized funded test passes.
+No automatic provider refill, TronZap fallback, Seamless activation, customer debit,
+identity reactivation, or native TRX burn fallback was introduced.
 
 ## Provider documentation consulted
 

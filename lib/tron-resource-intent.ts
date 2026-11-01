@@ -12,7 +12,8 @@ const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  */
 export async function prepareTronResourceIntent(db:WalletDb,c:Command){
  if(!Number.isSafeInteger(c.bandwidthAmount??0)||(c.bandwidthAmount??0)<0||(c.bandwidthAmount??0)>10000000)throw new Error('INVALID_BANDWIDTH_INTENT');
- if(!Number.isSafeInteger(c.energyAmount)||c.energyAmount<=0||c.energyAmount>2147483647||c.durationMinutes!==60||typeof c.maxRentalSun!=='bigint'||c.maxRentalSun<=0n||c.maxRentalSun>9223372036854775807n)throw new Error('INVALID_TRON_RESOURCE_INTENT');
+ if(!Number.isSafeInteger(c.energyAmount)||c.energyAmount<0||c.energyAmount>2147483647||c.durationMinutes!==60||typeof c.maxRentalSun!=='bigint'||c.maxRentalSun<=0n||c.maxRentalSun>9223372036854775807n)throw new Error('INVALID_TRON_RESOURCE_INTENT');
+ if(c.energyAmount===0&&!(c.bandwidthAmount??0))throw Error('EMPTY_RESOURCE_INTENT');
  if(c.kind==='PAYOUT'){if(!uuid.test(c.quoteId))throw new Error('INVALID_ENERGY_TARGET')}
  else if(c.kind==='SWEEP'){if(!uuid.test(c.addressId)||! /^[A-Za-z0-9:_-]{8,128}$/.test(c.requestKey)||typeof c.amountBaseUnits!=='bigint'||c.amountBaseUnits<=0n||c.amountBaseUnits>=2n**256n)throw new Error('INVALID_ENERGY_TARGET')}
  else throw new Error('INVALID_ENERGY_TARGET');

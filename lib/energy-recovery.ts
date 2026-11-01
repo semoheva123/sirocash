@@ -27,7 +27,7 @@ export async function recoverIntentEnergy(db:WalletDb,intentId:string,options:{c
   }else if(final){
    await tx.query('UPDATE "EnergyPurchaseAttempt" SET state=\'ACKNOWLEDGED\',"providerOrderId"=$2,"actualCostSun"=$3,"providerFinalStatus"=$4,"delegationTxId"=$5,"reconciledAt"=clock_timestamp() WHERE "intentId"=$1',[intentId,receipt.orderId,receipt.actualCostSun.toString(),receipt.status,receipt.delegationTxId??null]);
   }else if(a.state==='UNKNOWN')await tx.query('UPDATE "EnergyPurchaseAttempt" SET state=\'ACKNOWLEDGED\',"providerOrderId"=$2 WHERE "intentId"=$1',[intentId,receipt.orderId]);
-  const {rows:[sum]}=await tx.query('SELECT COALESCE(sum(GREATEST("costSun",COALESCE("actualCostSun",0))),0)::text AS total FROM "EnergyPurchaseAttempt"');
+  const {rows:[sum]}=await tx.query('SELECT COALESCE(sum(GREATEST("costSun",COALESCE("actualCostSun",0),COALESCE((SELECT sum(GREATEST(l."quotedSun",COALESCE(l."actualSun",0))) FROM "ResourcePurchaseLeg" l WHERE l."claimId"="EnergyPurchaseAttempt"."claimId"),0))),0)::text AS total FROM "EnergyPurchaseAttempt"');
   const exceeded=receipt.actualCostSun>BigInt(String(a.costSun))||receipt.actualCostSun>BigInt(String(snapshot.maxRentalSun))||!policy||receipt.actualCostSun>BigInt(String(policy.perOrderSun))||BigInt(String(sum.total))>BigInt(String(policy.totalHeldSun));
   if(exceeded&&policy)await tx.query('UPDATE "EnergyPurchasePolicy" SET enabled=false WHERE id=1');
   return exceeded;

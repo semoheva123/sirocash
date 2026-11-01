@@ -1,3 +1,4 @@
+import {dualResourceBudgetAcceptance} from './dual-resource-budget';
 import assert from 'node:assert/strict';
 import {financialReadTransactions} from '../lib/financial-read-transactions';
 import {readFinancialSnapshot} from '../lib/financial-status';
@@ -148,12 +149,13 @@ async function main(){
   await depositDiscoveryAcceptance(adminDb,db);
   // Production application role: actual permission-denial probes and catalog validation.
   const check=await pool.connect();
-  try{await check.query('BEGIN READ ONLY');await check.query('SET LOCAL ROLE sirocash_app');const result=await verifyFinancialSchema((sql,params)=>check.query(sql,params));assert.equal(result.tables,29);await check.query('ROLLBACK')}finally{check.release()}
+  try{await check.query('BEGIN READ ONLY');await check.query('SET LOCAL ROLE sirocash_app');const result=await verifyFinancialSchema((sql,params)=>check.query(sql,params));assert.equal(result.tables,30);await check.query('ROLLBACK')}finally{check.release()}
   const invariant=await pool.query('SELECT "transactionId" FROM "LedgerEntry" GROUP BY "transactionId" HAVING SUM(amount)<>0');assert.equal(invariant.rowCount,0);
   const cache=await pool.query('SELECT a.id FROM "LedgerAccount" a LEFT JOIN "LedgerEntry" e ON e."accountId"=a.id GROUP BY a.id HAVING a.balance<>COALESCE(SUM(e.amount),0)');assert.equal(cache.rowCount,0);
   // Forced exception after a real insert must leave neither operation nor balance changes.
   await assert.rejects(()=>db.transaction(async tx=>{await tx.query('UPDATE "FinancialWorkerLease" SET \"cursorTime\"=clock_timestamp(),\"cursorId\"=$1,\"cursorKind\"=\'SWEEP\' WHERE id=\'outbox\'',[randomUUID()]);throw Error('fixture-rollback')}));
   assert.equal((await pool.query('SELECT \"cursorKind\" FROM "FinancialWorkerLease" WHERE id=\'outbox\'')).rows[0].cursorKind,'DEPOSIT_SCAN');
+  await dualResourceBudgetAcceptance((sql,params)=>pool!.query(sql,params),db);
   if(process.env.SIRO_TEST_RESTORE_DRILL==='true')await restoreFixtureDrill(pool,admin,testUrl);
   console.log(`Real PostgreSQL PASS: ${pids.size} independent sessions; concurrent deposit/hold/settlement replay, overspend/global-cap races, lease exclusion, application RLS denials, balanced journal, caches and rollback. No production access or external financial calls.`);
  }finally{

@@ -86,7 +86,7 @@
     "test:deposit-only": "node --conditions=react-server --import tsx tests/deposit-only.ts && npm run test:deposit-network",
     "deposit:probe": "node --conditions=react-server --import tsx scripts/probe-deposit-reception.ts",
     "test:deposit-network": "node --conditions=react-server --import tsx tests/deposit-network-scanner.ts",
-    "test:tronrental": "node --conditions=react-server --import tsx tests/tronrental-read.ts && node tests/tronrental-live-probe.mjs"
+    "test:tronrental": "node --conditions=react-server --import tsx tests/tronrental-read.ts && node tests/tronrental-live-probe.mjs && node --conditions=react-server --import tsx tests/dual-resource-budget-run.ts && node --conditions=react-server --import tsx tests/tronrental-orders.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

@@ -21,7 +21,7 @@ export function createFinancialExecution(db:WalletDb,options:{purchaseEnabled:bo
    const blocked=client.purchaseBlocker?.();if(blocked)return {state:'HELD',reason:blocked} as const;
    const q=await client.quote({requestKey:randomUUID(),sender:String(i.senderAddress),bandwidthAmount:Number(i.bandwidthAmount??0),energyAmount:Number(i.energyAmount),durationMinutes:60,maxCostSun:BigInt(String(i.maxRentalSun)),signal});
    if(signal.aborted)throw new Error('WORKER_ABORTED');
-   await purchaseIntentEnergy(db,intentId,{sender:String(i.senderAddress),bandwidthAmount:Number(i.bandwidthAmount??0),energyAmount:Number(i.energyAmount),durationMinutes:60,costSun:q.costSun,expiresAt:q.expiresAt,intentFingerprint:String(i.fingerprint)},{enabled:true,send:order=>client.send({...order,signal:AbortSignal.any([signal,order.signal])})});
+   await purchaseIntentEnergy(db,intentId,{sender:String(i.senderAddress),bandwidthAmount:Number(i.bandwidthAmount??0),energyAmount:Number(i.energyAmount),durationMinutes:60,costSun:q.costSun,expiresAt:q.expiresAt,intentFingerprint:String(i.fingerprint)},{enabled:true,reserve:client.reserve?(tx,claimId)=>client.reserve!(tx,{requestKey:claimId,sender:String(i.senderAddress),bandwidthAmount:Number(i.bandwidthAmount??0),energyAmount:Number(i.energyAmount),durationMinutes:60,maxCostSun:q.costSun,signal},q):undefined,send:order=>client.send({...order,signal:AbortSignal.any([signal,order.signal])})});
   }
   if(signal.aborted)throw new Error('WORKER_ABORTED');
   return recoverIntentEnergy(db,intentId,{signal,check:client.check,observe:delivery});
