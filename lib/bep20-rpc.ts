@@ -2,7 +2,7 @@ import 'server-only';
 import {randomUUID} from 'node:crypto';
 import type {Bep20Rpc} from './bep20-receipt-observer';
 
-type Options={signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
+type Options={signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch;diagnostic?:(info:{httpStatus?:number;rpcCode?:number;category:string})=>void};
 function validateCall(method:string,params:unknown[]){
  if(!Array.isArray(params))throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
  const empty=(method==='eth_chainId'||method==='eth_blockNumber')&&params.length===0;
@@ -40,7 +40,7 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
   try{
    const response=await Promise.race([expired,request(endpoint.toString(),{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{})},body:JSON.stringify({jsonrpc:'2.0',id,method,params})})]);
-   if(!response.ok)throw new Error('RPC_HTTP_FAILURE');
+   if(!response.ok){options.diagnostic?.({httpStatus:response.status,category:'HTTP_REJECTED'});throw new Error('RPC_HTTP_FAILURE')}
    if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??''))throw new Error('RPC_CONTENT_TYPE_INVALID');
    const length=response.headers.get('content-length');
    if(length!==null&&(!/^\d+$/.test(length)||BigInt(length)>BigInt(maxBytes)))throw new Error('RPC_RESPONSE_TOO_LARGE');
@@ -57,6 +57,7 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
    let payload:unknown;try{payload=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}catch{throw new Error('RPC_INVALID_JSON')}
    if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('RPC_INVALID_ENVELOPE');
    const p=payload as Record<string,unknown>;
+   if(p.error&&typeof p.error==='object'){const e=p.error as Record<string,unknown>,m=typeof e.message==='string'?e.message.toLowerCase():'';const category=/rate|too many|limit exceeded/.test(m)?'RATE_OR_QUERY_LIMIT':/range|block.*limit/.test(m)?'BLOCK_RANGE_LIMIT':/not.*support|disabled|not available|not.*exist/.test(m)?'METHOD_UNAVAILABLE':/invalid.*param|invalid.*argument/.test(m)?'INVALID_PARAMETERS':/authoriz|api.?key/.test(m)?'AUTH_REQUIRED':'PROVIDER_REJECTED';options.diagnostic?.({...(Number.isSafeInteger(e.code)?{rpcCode:Number(e.code)}:{}),category})}
    if(p.jsonrpc!=='2.0'||p.id!==id||Object.hasOwn(p,'error')||!Object.hasOwn(p,'result'))throw new Error('RPC_INVALID_ENVELOPE');
    return p.result;
   }catch(error){
@@ -69,9 +70,26 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   }
  };
 }
+/** Explicit index source, not fallback: primary owns finality and all receipt evidence.
+ * An index response is accepted only on chain56 and the same numeric end-block anchor.
+ * Authorization headers are separate and never forwarded between provider domains. */
+export function createBep20DiscoveryRpc(primaryOptions:Options,indexOptions?:Options):Bep20Rpc{
+ const primary=createBep20ReadRpc(primaryOptions);if(!indexOptions)return primary;
+ const index=createBep20ReadRpc(indexOptions);let bound:Promise<void>|undefined;
+ return async(method,params)=>{
+  if(method!=='eth_getLogs')return primary(method,params);
+  validateCall(method,params);
+  bound??=(async()=>{if(await index('eth_chainId',[])!=='0x38')throw Error('RPC_INDEX_WRONG_CHAIN')})();await bound;
+  const f=params[0] as {toBlock:string};
+  const anchors=await Promise.all([primary('eth_getBlockByNumber',[f.toBlock,false]),index('eth_getBlockByNumber',[f.toBlock,false])]);
+  const hashes=anchors.map(value=>{const b=value as {hash?:unknown;number?:unknown};if(!b||typeof b.hash!=='string'||!/^0x[a-f0-9]{64}$/i.test(b.hash)||typeof b.number!=='string'||!/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(b.number)||BigInt(b.number)!==BigInt(f.toBlock))throw Error('RPC_INDEX_ANCHOR_MISMATCH');return b.hash.toLowerCase()});
+  if(hashes[0]!==hashes[1])throw Error('RPC_INDEX_ANCHOR_MISMATCH');
+  return index(method,params);
+ };
+}
 /** Independent read-only production gate: does not enable signing or financial writes. */
 export function productionBep20ReadRpc(signal?:AbortSignal):Bep20Rpc{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
  const endpoint=process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
- return createBep20ReadRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION});
+ return createBep20DiscoveryRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
 }

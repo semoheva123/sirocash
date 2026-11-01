@@ -58,7 +58,9 @@ async function main(){const pg=new PGlite();try{
  const before=blockReads;head=1130;await scan.scan('BEP20',signal());assert(blockReads-before<10,'1000 empty blocks require bounded reads, not 1000 block fetches');assert.equal(logReads,4);
  // A new assignment behind the network checkpoint must be backfilled, not skipped.
  const third=randomUUID();await sql('INSERT INTO "User"(id,email,"emailVerifiedAt") VALUES($1,$2,now())',[third,third+'@scanner.test']);await allocateDepositAddress(worker,third,vaults.BEP20,'BEP20',100);
- await scan.scan('BEP20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,2,'rewind deduplicates prior events');
+ let inFlight=0,peak=0;const beforeChunks=logReads;
+ const chunked=createNetworkDepositScanner(worker,{...options,bep20QueryWindow:10,bep20:async(m,p)=>{if(m!=='eth_getLogs')return rpc(m,p);inFlight++;peak=Math.max(peak,inFlight);await new Promise<void>(resolve=>setImmediate(resolve));try{return await rpc(m,p)}finally{inFlight--}}});
+ await chunked.scan('BEP20',signal());assert.equal(logReads-beforeChunks,100);assert(peak>1&&peak<=4,'wire ranges use bounded parallel reads, one atomic logical checkpoint');assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,2,'rewind deduplicates prior events');
  head=130;incomplete=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),100);
  incomplete=false;await scan.scan('TRC20',signal());await scan.scan('TRC20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4);assert.equal(bulkReads,3,'one full receipt request per network block, not per transaction/customer');
  assert.equal(await depositScannerHealthy(worker),true);
@@ -72,6 +74,13 @@ async function main(){const pg=new PGlite();try{
  head=130;await sql('UPDATE "DepositNetworkScanner" SET "lastBlock"=116,"lastHash"=$1 WHERE network=\'BEP20\'',[hex(116)]);reorg=true;
  await assert.rejects(()=>scan.scan('BEP20',signal()),/CHAIN_REORG/);assert.equal((await sql('SELECT paused FROM "DepositNetworkScanner" WHERE network=\'BEP20\'')).rows[0].paused,true);
  assert.equal((await scan.scan('BEP20',signal())).state,'BUSY_OR_PAUSED');assert.equal(await depositScannerHealthy(worker),false);
+ const cached=createNetworkDepositScanner(worker,{...options,headCacheMs:5000});const reads=blockReads;await cached.finalHeight('BEP20');await cached.finalHeight('BEP20');assert.equal(blockReads-reads,1,'bounded head cache avoids repeated chain metadata reads during catch-up');
+ const freshRpc=async(m:string,p:unknown[])=>{const result=await rpc(m,p);return m==='eth_getBlockByNumber'?{...(result as object),timestamp:'0x'+Math.floor(Date.now()/1000).toString(16)}:result};
+ await createNetworkDepositScanner(worker,{...options,bep20:freshRpc,requireFreshHead:true}).finalHeight('BEP20');
+ const staleFinal=async(m:string,p:unknown[])=>{const result=await freshRpc(m,p);return m==='eth_getBlockByNumber'&&p[0]==='finalized'?{...(result as object),timestamp:'0x1'}:result};
+ await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,bep20:staleFinal,requireFreshHead:true}).finalHeight('BEP20'),/SCAN_STALE_HEAD/);
+ const staleTron=async(path:Parameters<typeof read>[0],body:Record<string,unknown>)=>{const result=await read(path,body);if(path!=='/walletsolidity/getnowblock')return result;const b=result as {block_header:{raw_data:Record<string,unknown>}};return {...b,block_header:{raw_data:{...b.block_header.raw_data,timestamp:Date.now()-180000}}}};
+ await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:staleTron,requireFreshHead:true}).finalHeight('TRC20'),/SCAN_STALE_HEAD/);
  console.log('Shared scanner PASS: 1000-block bounded range, OR recipients, complete bulk TRON receipts, partial replay, new-address backfill, owner-bound credits exactly once, balanced ledger and network-wide reorg pause. Isolated DB only.');
 }finally{await pg.close()}}
 main().catch(e=>{console.error(e);process.exitCode=1});
