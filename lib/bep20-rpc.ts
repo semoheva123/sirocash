@@ -69,9 +69,20 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   }
  };
 }
+/** Explicit operator-selected log service, never an automatic fallback. Receipts/finality
+ * stay on the primary endpoint; discovery still verifies each receipt and block hash.
+ * Never forward a primary provider's authorization to a different log provider. */
+export function createBep20DepositReadRpc(primary:Options,logs?:Options):Bep20Rpc{
+ const read=createBep20ReadRpc(primary),logRead=logs?createBep20ReadRpc(logs):undefined;
+ return async(method,params)=>{
+  if(method!=='eth_getLogs'||!logRead)return read(method,params);
+  if(await logRead('eth_chainId',[])!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN');
+  return logRead(method,params);
+ };
+}
 /** Independent read-only production gate: does not enable signing or financial writes. */
 export function productionBep20ReadRpc(signal?:AbortSignal):Bep20Rpc{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
  const endpoint=process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
- return createBep20ReadRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION});
+ return createBep20DepositReadRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
 }

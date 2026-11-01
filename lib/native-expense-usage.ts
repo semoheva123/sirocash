@@ -8,7 +8,7 @@ export async function nativeExpenseUsage(tx:WalletTx,network:'TRC20'|'BEP20'){
  SELECT "amountBaseUnits" AS n FROM "PayoutExpenseReservation" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
  UNION ALL SELECT expense FROM "SweepDispatchAuthorization" WHERE network=$1 AND (state='HELD' OR "settledAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
  UNION ALL SELECT expense FROM "NativeGasOutbox" WHERE $1='BEP20' AND (state<>'CONFIRMED' OR "confirmedAt">=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
- UNION ALL SELECT GREATEST("costSun",COALESCE("actualCostSun",0)) FROM "EnergyPurchaseAttempt" WHERE $1='TRC20'
+ UNION ALL SELECT GREATEST("costSun",COALESCE("actualCostSun",0),COALESCE((SELECT sum(GREATEST(l."quotedSun",COALESCE(l."actualSun",0))) FROM "ResourcePurchaseLeg" l WHERE l."claimId"="EnergyPurchaseAttempt"."claimId"),0)) FROM "EnergyPurchaseAttempt" WHERE $1='TRC20'
  ) q`,[network]);
  return BigInt(String(row.used));
 }

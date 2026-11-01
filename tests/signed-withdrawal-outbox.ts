@@ -248,7 +248,7 @@ async function main(){
   await pg.query(`INSERT INTO "PayoutDispatchApproval"("payoutId","txId","payloadHash","authorityReference","maxNativeFeeBaseUnits","approvedAt","expiresAt") VALUES($1,$2,$3,'fixture:expired:approval',4000000,now()-interval '3 minutes',now()-interval '2 minutes')`,[tronResourcePayout.id,tronResourcePayout.txId,createHash('sha256').update(expiredPayload).digest('hex')]);
   await pg.query(`INSERT INTO "PayoutExpenseReservation"("payoutId",network,"amountBaseUnits","evidenceHash",evidence) VALUES($1,'TRC20',6000000,repeat('ab',32),'{}')`,[tronResourcePayout.id]);
   const oldUnsentId=tronResourcePayout.txId;
-  const renew=createUnsentTronRenewal(db,{loadOperating:options.loadKeys,preflight:async input=>({network:'TRC20',amount:input.amount!,requiredEnergy:65000,availableEnergy:65000,availableBandwidth:600,transaction:{amountBaseUnits:input.amount!,refBlockBytes:'5678',refBlockHash:'cd'.repeat(8),timestamp:Date.now(),expiration:Date.now()+60000,feeLimitSun:4000000}})});
+  const renew=createUnsentTronRenewal(db,{loadOperating:options.loadKeys,preflight:async input=>({network:'TRC20',amount:input.amount!,requiredEnergy:65000,availableEnergy:65000,availableBandwidth:600,availableDelegatedBandwidth:0,transaction:{amountBaseUnits:input.amount!,refBlockBytes:'5678',refBlockHash:'cd'.repeat(8),timestamp:Date.now(),expiration:Date.now()+60000,feeLimitSun:4000000}})});
   assert.equal((await renew({kind:'PAYOUT',id:tronResourcePayout.id},new AbortController().signal)).state,'RENEWED');
   const refreshedTx=(await pg.query<{txId:string}>('SELECT "txId" FROM "SignedWithdrawalOutbox" WHERE id=$1',[tronResourcePayout.id])).rows[0].txId;
   assert.notEqual(oldUnsentId,refreshedTx);tronResourcePayout={...tronResourcePayout,txId:refreshedTx};

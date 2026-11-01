@@ -36,7 +36,7 @@ export async function restoreFixtureDrill(source:Pool,admin:Client,sourceUrl:URL
   restored=new Client({connectionString:targetUrl.toString(),options:'-c timezone=UTC'});await restored.connect();
   assert.deepEqual(await snapshot(restored),before,'all application rows/columns must survive a real dump/restore');
   await restored.query('BEGIN READ ONLY');await restored.query('SET LOCAL ROLE sirocash_app');
-  assert.equal((await verifyFinancialSchema((sql,params)=>restored!.query(sql,params))).tables,29);await restored.query('ROLLBACK');
+  assert.equal((await verifyFinancialSchema((sql,params)=>restored!.query(sql,params))).tables,30);await restored.query('ROLLBACK');
   assert.equal((await restored.query('SELECT "transactionId" FROM "LedgerEntry" GROUP BY "transactionId" HAVING SUM(amount)<>0')).rowCount,0);
   assert.equal((await restored.query('SELECT a.id FROM "LedgerAccount" a LEFT JOIN "LedgerEntry" e ON e."accountId"=a.id GROUP BY a.id HAVING a.balance<>COALESCE(SUM(e.amount),0)')).rowCount,0);
   await assert.rejects(()=>restored!.query('DELETE FROM "LedgerEntry"'),/immutable/);

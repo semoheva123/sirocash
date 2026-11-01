@@ -56,9 +56,9 @@ export function createFinancialPreparation(db:WalletDb,options:{enabled:boolean;
      const remaining=BigInt(String(policy.perPayoutCap))-limits.maxFee,maxRentalSun=cap<remaining?cap:remaining;
      if(maxRentalSun<=0n)throw new Error('PREPARATION_RENTAL_BUDGET');
      let bandwidthAmount=0;
-     if(observed.availableBandwidth<500){if(!options.bandwidthPackage)throw new Error('BANDWIDTH_PROVIDER_DISABLED');bandwidthAmount=await options.bandwidthPackage(500-observed.availableBandwidth,signal)}
+     if(observed.availableBandwidth<500){if(!options.bandwidthPackage)throw new Error('BANDWIDTH_PROVIDER_DISABLED');bandwidthAmount=await options.bandwidthPackage(500-observed.availableDelegatedBandwidth,signal)}
      const target=job.kind==='PREPARE_PAYOUT'?{kind:'PAYOUT' as const,quoteId:job.id}:{kind:'SWEEP' as const,addressId:job.id,requestKey:snapshot.requestKey,amountBaseUnits:observed.amount};
-     const intent=await prepareTronResourceIntent(db,{...target,bandwidthAmount,energyAmount:Math.max(50000,observed.requiredEnergy),durationMinutes:60,maxRentalSun});intentId=intent.id;
+     const intent=await prepareTronResourceIntent(db,{...target,bandwidthAmount,energyAmount:observed.availableEnergy>=observed.requiredEnergy?0:Math.max(65000,observed.requiredEnergy-observed.availableEnergy),durationMinutes:60,maxRentalSun});intentId=intent.id;
     }
     if((await options.energy(intentId,signal)).state!=='DELIVERED')return {state:'HELD',reason:'ENERGY_DELIVERY_PENDING'} as const;
     observed=await options.preflight({...snapshot,amount:observed.amount,maxAmount:limits.maxAmount,maxFee:limits.maxFee,signal});

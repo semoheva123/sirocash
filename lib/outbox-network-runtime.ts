@@ -13,6 +13,9 @@ import {createFinancialExecution} from './financial-execution';
 import {createOutboxResourceObserver} from './outbox-resource-observer';
 import {createEnergyDeliveryObserver} from './energy-delivery-observer';
 import {catFeeOrderClient} from './catfee-orders';
+import {dualResourceProvider} from './dual-resource-provider';
+import {tronRentalOrderClient} from './tronrental-orders';
+import {createTronActiveAccountProof} from './tron-active-account';
 import {catFeeCredentials} from './catfee';
 import {runFinancialWorkerBatch} from './financial-worker';
 import type {WalletDb} from './wallet-engine';
@@ -37,11 +40,17 @@ export function productionOutboxNetworkWorkers(db:WalletDb){
  const authorizeEnabled=process.env.SIRO_RESOURCE_AUTHORIZATION_ENABLED==='true',energyEnabled=process.env.SIRO_ENERGY_WORKER_ENABLED==='true';
  const tron={endpoint:process.env.SIRO_TRON_RPC_URL!,apiKey:process.env.SIRO_TRON_RPC_API_KEY};
  if(energyEnabled&&process.env.SIRO_ENERGY_PROVIDER!=='catfee')throw Error('CATFEE_PROVIDER_REQUIRED');
- const client=energyEnabled?catFeeOrderClient({credentials:catFeeCredentials()}):undefined;
+ const energyClient=energyEnabled?catFeeOrderClient({credentials:catFeeCredentials(),directRentalEnabled:process.env.SIRO_CATFEE_DIRECT_RENTAL_ENABLED==='true'}):undefined;
+ const delivery=energyEnabled?createEnergyDeliveryObserver({...tron,genesisId:genesis}):undefined;
+ const dualEnabled=process.env.SIRO_TRONRENTAL_BANDWIDTH_ENABLED==='true';
+ const client=dualEnabled&&energyClient&&delivery?dualResourceProvider(db,{
+  energy:energyClient,bandwidth:tronRentalOrderClient({key:process.env.TRONRENTAL_API_KEY??'',enabled:process.env.SIRO_ENERGY_PURCHASE_ENABLED==='true',assertActive:createTronActiveAccountProof({...tron,genesisId:genesis})}),
+  observe:delivery,enabled:process.env.SIRO_ENERGY_PURCHASE_ENABLED==='true',
+ }):energyClient;
  const execution=(authorizeEnabled||energyEnabled)?createFinancialExecution(db,{
   purchaseEnabled:energyEnabled&&process.env.SIRO_ENERGY_PURCHASE_ENABLED==='true',
   client,
-  delivery:energyEnabled?createEnergyDeliveryObserver({...tron,genesisId:genesis}):undefined,
+  delivery,
   resources:createOutboxResourceObserver({bep20:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},tron,tronGenesisId:genesis}),
  }):undefined;
  const gas=createNativeGasWorker(db,{rpc:{endpoint:process.env.SIRO_BEP20_RPC_URL!,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},enabled:process.env.SIRO_NATIVE_GAS_ENABLED==='true'&&dispatchEnabled,minimumConfirmations:Number(minimum)});

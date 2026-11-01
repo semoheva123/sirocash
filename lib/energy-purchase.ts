@@ -1,18 +1,18 @@
 import 'server-only';
 import {nativeExpenseUsage} from './native-expense-usage';
 import {randomUUID} from 'node:crypto';
-import type {WalletDb} from './wallet-engine';
+import type {WalletDb,WalletTx} from './wallet-engine';
 import {validTronAddress} from './tron-addresses';
 import {treasuryDestination} from './treasury-addresses';
 /** PRIVATE pre-purchase budget/claim layer for both sweep and payout resource intents.
- * An injected reviewed planner supplies a fresh exact quote, including activation fees.
- * No provider purchase adapter is installed. ACK is neither delivery nor chain finality.
+ * An injected planner supplies a fresh estimate; direct CatFee disallows activation.
+ * The estimate is not a provider price lock. ACK is neither delivery nor chain finality.
  * Reservations NEVER auto-release, even across midnight or after timeout/crash.
  */
 type Quote={bandwidthAmount?:number;sender:string;energyAmount:number;durationMinutes:60;costSun:bigint;expiresAt:number;intentFingerprint:string};
 type Order={bandwidthAmount?:number;requestKey:string;sender:string;energyAmount:number;durationMinutes:60;maxCostSun:bigint;signal:AbortSignal};
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
-export async function purchaseIntentEnergy(db:WalletDb,intentId:string,quote:Quote,options:{enabled?:boolean;send:(order:Order)=>Promise<{orderId:string}>;timeoutMs?:number}){
+export async function purchaseIntentEnergy(db:WalletDb,intentId:string,quote:Quote,options:{enabled?:boolean;send:(order:Order)=>Promise<{orderId:string}>;timeoutMs?:number;reserve?:(tx:WalletTx,claimId:string)=>Promise<void>}){
  quote={...quote}; // Freeze primitive quote inputs across asynchronous claims.
  if(options.enabled!==true)throw new Error('ENERGY_PURCHASE_DISABLED');
  const timeout=options.timeoutMs??10000;
@@ -45,7 +45,7 @@ export async function purchaseIntentEnergy(db:WalletDb,intentId:string,quote:Quo
   const {rows:[fresh]}=await tx.query('SELECT to_timestamp($1 / 1000.0)>clock_timestamp() AND to_timestamp($1 / 1000.0)<=clock_timestamp()+interval \'60 seconds\' AS ok',[quote.expiresAt]);
   if(fresh?.ok!==true)throw new Error('ENERGY_QUOTE_STALE');
   if(quote.costSun>BigInt(String(intent.maxRentalSun))||quote.costSun>BigInt(String(policy.perOrderSun)))throw new Error('ENERGY_ORDER_BUDGET_EXCEEDED');
-  const {rows:[held]}=await tx.query('SELECT COALESCE(sum(GREATEST("costSun",COALESCE("actualCostSun",0))),0)::text AS total FROM "EnergyPurchaseAttempt"');
+  const {rows:[held]}=await tx.query('SELECT COALESCE(sum(GREATEST("costSun",COALESCE("actualCostSun",0),COALESCE((SELECT sum(GREATEST(l."quotedSun",COALESCE(l."actualSun",0))) FROM "ResourcePurchaseLeg" l WHERE l."claimId"="EnergyPurchaseAttempt"."claimId"),0))),0)::text AS total FROM "EnergyPurchaseAttempt"');
   if(BigInt(String(held.total))+quote.costSun>BigInt(String(policy.totalHeldSun)))throw new Error('ENERGY_TOTAL_BUDGET_EXCEEDED');
   // Reserve against the SAME network daily mutex before the external purchase, not only
   // when a later outbox is authorized. An uncertain purchase never releases its budget.
@@ -54,6 +54,7 @@ export async function purchaseIntentEnergy(db:WalletDb,intentId:string,quote:Quo
   if(await nativeExpenseUsage(tx,'TRC20')+quote.costSun>BigInt(String(networkPolicy.dailyCap)))throw Error('ENERGY_NETWORK_DAILY_CAP');
   const claimId=randomUUID();
   await tx.query('INSERT INTO "EnergyPurchaseAttempt" ("intentId","claimId","intentFingerprint","senderAddress","energyAmount","costSun","quoteExpiresAt","bandwidthAmount") VALUES ($1,$2,$3,$4,$5,$6,to_timestamp($7 / 1000.0),$8)',[intentId,claimId,intent.fingerprint,intent.senderAddress,intent.energyAmount,quote.costSun.toString(),quote.expiresAt,quote.bandwidthAmount??0]);
+  await options.reserve?.(tx,claimId);
   await tx.query('UPDATE "EnergyRentalIntent" SET state=\'UNCERTAIN\',"updatedAt"=statement_timestamp() WHERE id=$1',[intentId]);
   return {state:'CLAIMED',claimId,sender:String(intent.senderAddress),energyAmount:Number(intent.energyAmount),bandwidthAmount:Number(intent.bandwidthAmount??0)};
  });

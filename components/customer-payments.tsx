@@ -6,7 +6,7 @@ import {useEffect,useState} from 'react';
 import {FinancialHistory} from './financial-history';
 import {useFinancialStatus} from './use-financial-status';
 import {FinancialSyncStatus} from './financial-sync-status';
-import {withdrawalPrefill} from '@/lib/wallet-presentation';
+import {withdrawalPrefill,internalTransferPrefill} from '@/lib/wallet-presentation';
 import {authorizePayment} from '@/lib/authorize-payment';
 type Prepared={kind:'TRANSFER'|'WITHDRAWAL';path:string;id?:string;payload:Record<string,string>;expiresAt?:string};
 async function call(path:string,body?:unknown,token?:string){const r=await fetch(path,{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json',...(token?{'x-siro-approval':token}:{})}:undefined,body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error??'تعذّر تأكيد نتيجة الطلب.');return data}
@@ -14,7 +14,7 @@ export function CustomerPayments(){
  const [deposit,setDeposit]=useState<{chain:string;address:string}|null>(null),[ar,setAr]=useState(true),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[kind,setKind]=useState<'TRANSFER'|'WITHDRAWAL'>('TRANSFER'),[recipient,setRecipient]=useState(''),[amount,setAmount]=useState(''),[chain,setChain]=useState('TRC20'),[prepared,setPrepared]=useState<Prepared|null>(null),[attempted,setAttempted]=useState(false),[submitted,setSubmitted]=useState<unknown>(null),[requestKey,setRequestKey]=useState('');
  const t=(a:string,e:string)=>ar?a:e;
  const {status,sync,updatedAt,refresh}=useFinancialStatus();
- useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());const params=new URL(window.location.href).searchParams;if(params.get('kind')==='WITHDRAWAL'){setKind('WITHDRAWAL');const prefill=withdrawalPrefill(params);if(prefill){setChain(prefill.chain);setRecipient(prefill.recipient);setAmount(prefill.amount)}}},[]);
+ useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());const params=new URL(window.location.href).searchParams;if(params.get('kind')==='WITHDRAWAL'){setKind('WITHDRAWAL');const prefill=withdrawalPrefill(params);if(prefill){setChain(prefill.chain);setRecipient(prefill.recipient);setAmount(prefill.amount)}}else{const prefill=internalTransferPrefill(params);if(prefill){setRecipient(prefill.recipient);setAmount(prefill.amount)}}},[]);
  useEffect(()=>{document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr'},[ar]);
  function edit(){if(attempted&&!submitted)return;setAttempted(false);setPrepared(null);setSubmitted(null);setRequestKey('customer:'+crypto.randomUUID())}
  const input={kind,recipient,amount,requestKey,...(kind==='WITHDRAWAL'?{chain,asset:'USDT'}:{})};
@@ -42,7 +42,7 @@ export function CustomerPayments(){
    </fieldset><button className="button" disabled={busy||!!prepared||sync!=='current'} type="submit">{t('عرض التفاصيل قبل التفويض','Review before approval')}</button></form>}
    {status.capabilities?.transfers!==false&&prepared&&<section className="card"><h2>{t('راجع تفاصيل الطلب','Review command')}</h2><dl>{Object.entries(prepared.payload).filter(([key])=>['recipient','amount','fee','netAmount','totalDebit','grossUsd','feeUsd','netUsd','chain','asset'].includes(key)).map(([key,value])=><div key={key}><dt>{({recipient:t('المستفيد','Recipient'),amount:t('المبلغ','Amount'),fee:t('الرسم','Fee'),netAmount:t('صافي المستلم','Recipient net'),totalDebit:t('إجمالي الخصم','Total debit'),grossUsd:t('الخصم بالدولار','USD debit'),feeUsd:t('الرسم بالدولار','USD fee'),netUsd:t('الصافي بالدولار','USD net'),chain:t('الشبكة','Network'),asset:t('العملة','Asset')} as Record<string,string>)[key]}</dt><dd dir="ltr">{value}</dd></div>)}</dl>
     {prepared.expiresAt&&<p>{t('انتهاء العرض','Quote expiry')}: <time>{new Date(prepared.expiresAt).toLocaleString(ar?'ar':'en')}</time></p>}
-    <p>{t('يُستخدم سعر صرف مرصود ومحفوظ، وليس افتراض تعادل USDT مع الدولار.','The stored observed exchange rate is used; USDT is not assumed equal to USD.')}</p>
+    <p>{prepared.kind==='TRANSFER'?t('يستلم المستفيد المبلغ كاملًا، وتُضاف عمولة 1% على المرسل. تحويل 100 دولار يخصم 101 دولار.','The recipient receives the full amount; a 1% fee is added to the sender. Sending $100 debits $101.'):t('يُستخدم سعر صرف مرصود ومحفوظ، وليس افتراض تعادل USDT مع الدولار.','The stored observed exchange rate is used; USDT is not assumed equal to USD.')}</p>
     <button className="button" disabled={busy||!!submitted||sync!=='current'} onClick={()=>void submit()}>{busy?t('جارٍ التحقق…','Verifying…'):t('تفويض الجهاز وتأكيد الطلب','Approve with device and confirm')}</button>
     {attempted&&!submitted&&<p role="alert">{t('نتيجة الإرسال غير مؤكدة. أعد المحاولة بالطلب نفسه فقط؛ لا تُنشئ طلبًا بديلًا.','Submission outcome is uncertain. Retry this exact command only; do not create a replacement.')}</p>}
     <button className="button secondary" disabled={busy||(attempted&&!submitted)} onClick={edit}>{submitted?t('طلب جديد','New command'):t('تعديل العرض','Edit quote')}</button>
