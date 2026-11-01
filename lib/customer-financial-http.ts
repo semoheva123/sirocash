@@ -1,4 +1,5 @@
 import 'server-only';
+import {depositOnlyMode,depositOnlyConfiguration} from './deposit-only-mode';
 import {NextResponse} from 'next/server';
 import {sameOrigin} from './api';
 import {readJson} from './request-body';
@@ -6,8 +7,12 @@ import {requireUser,sessionTokenHash} from './email-auth';
 import {financialDatabase} from './financial-database';
 import {customerFinancialCommands} from './customer-financial-commands';
 import {securityFailure,securityHeaders} from './security-http';
-export function customerFinanceEnabled(){return process.env.VERCEL_ENV==='production'&&process.env.SIRO_CUSTOMER_FINANCE_ENABLED==='true'&&process.env.SIRO_DURABLE_PASSKEY_ENABLED==='true'&&process.env.SIRO_OUTBOX_WORKER_ENABLED==='true'}
+export function customerFinanceEnabled(){return !depositOnlyMode()&&process.env.VERCEL_ENV==='production'&&process.env.SIRO_CUSTOMER_FINANCE_ENABLED==='true'&&process.env.SIRO_DURABLE_PASSKEY_ENABLED==='true'&&process.env.SIRO_OUTBOX_WORKER_ENABLED==='true'}
 export function customerWithdrawalsEnabled(){return customerFinanceEnabled()&&process.env.SIRO_WITHDRAWALS_ENABLED==='true'}
+export function customerDepositsEnabled(){
+ if(depositOnlyMode())return depositOnlyConfiguration().configurationReady;
+ return customerFinanceEnabled()&&process.env.SIRO_CUSTOMER_DEPOSITS_ENABLED==='true'&&process.env.SIRO_DEPOSIT_DISCOVERY_ENABLED==='true'&&process.env.SIRO_DEPOSIT_VALUATION_ENABLED==='true'&&process.env.SIRO_PRICING_PROVIDER==='coinbase-spot-v1';
+}
 /** No session/owner/rate/account/fee is accepted from request JSON. No demo PIN/debit path. */
 export async function customerFinancialHttp(request:Request,action:'PREPARE'|'TRANSFER'|'WITHDRAWAL'){
  try{

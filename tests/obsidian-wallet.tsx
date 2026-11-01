@@ -32,6 +32,7 @@ async function main(){
   assert(html.includes('atelier-service-brief'));assert(html.includes('atelier-brief-grid'));
   assert(html.includes(ar?'قبل المتابعة':'BEFORE YOU PROCEED'));
  }
+ for(const ar of [true,false]){const html=renderToStaticMarkup(<ServiceBrief service="deposit" ar={ar} depositActive/>);assert(html.includes(ar?'الإيداع فقط':'Deposits only'));assert(!html.includes(ar?'إصدار تجريبي':'Preview only'));}
  const actions=await readFile('components/wallet-actions.tsx','utf8');
  assert(!actions.includes('fetch('));assert(!actions.includes('authorizePayment('));
  assert(actions.includes('owned.capabilities?.withdrawals'));

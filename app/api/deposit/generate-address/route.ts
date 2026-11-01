@@ -2,7 +2,7 @@ import {NextResponse} from 'next/server';
 import {sameOrigin} from '@/lib/api';
 import {readJson} from '@/lib/request-body';
 import {requireUser,sessionTokenHash} from '@/lib/email-auth';
-import {customerFinanceEnabled} from '@/lib/customer-financial-http';
+import {customerDepositsEnabled} from '@/lib/customer-financial-http';
 import {financialDatabase} from '@/lib/financial-database';
 import {productionDepositDiscovery} from '@/lib/deposit-discovery-runtime';
 import {customerDepositAddress} from '@/lib/customer-deposit-address';
@@ -10,7 +10,7 @@ import {securityFailure,securityHeaders} from '@/lib/security-http';
 export const runtime='nodejs';
 export async function POST(request:Request){try{
  sameOrigin(request);
- if(!customerFinanceEnabled()||process.env.SIRO_CUSTOMER_DEPOSITS_ENABLED!=='true'||process.env.SIRO_DEPOSIT_DISCOVERY_ENABLED!=='true'||process.env.SIRO_DEPOSIT_VALUATION_ENABLED!=='true'||process.env.SIRO_PRICING_PROVIDER!=='coinbase-spot-v1')return securityFailure('الإيداع غير مفعّل. لا ترسل أموالًا.',503);
+ if(!customerDepositsEnabled())return securityFailure('الإيداع غير مفعّل. لا ترسل أموالًا.',503);
  const user=await requireUser(request),sessionHash=sessionTokenHash(request),origin=process.env.WEBAUTHN_ORIGIN;
  if(!sessionHash||!origin)throw Error('SESSION_REQUIRED');
  const input=await readJson(request,2048),chain=(input as {chain?:unknown})?.chain;

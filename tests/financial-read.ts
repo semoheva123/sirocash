@@ -15,6 +15,7 @@ async function main(){
   const db=financialReadTransactions(pool);
   const options={authenticate:async()=>({id:owner}),database:()=>db,enabled:()=>false,withdrawals:()=>true,deposits:()=>true};
   const empty=await readOwnerFinancialStatus(options);assert(empty);assert.equal(empty.enabled,false);assert.equal(empty.readable,true);assert.deepEqual(empty.capabilities,{withdrawals:false,deposits:false});assert.equal(empty.balance.posted,'0');assert.equal(displayLedgerBalance(empty,owner),'0.00');assert(sqls[0].includes('READ ONLY'));assert.equal(released,1);
+  const depositsOnly=await readOwnerFinancialStatus({...options,enabled:()=>true,transfers:()=>false,withdrawals:()=>false});assert(depositsOnly);assert.deepEqual(depositsOnly.capabilities,{transfers:false,withdrawals:false,deposits:true});
   const none=await readOwnerFinancialStatus({...options,authenticate:async()=>null,database:()=>{throw Error('UNAUTHENTICATED_READ')}});assert.equal(none,null);
   await pg.exec(`INSERT INTO "LedgerAccount" VALUES ('owner','${owner}','USER','USD',12.345678),('foreign','${foreign}','USER','USD',999); INSERT INTO "Transaction" VALUES ('foreign-entry','P2P','COMPLETED',now()); INSERT INTO "LedgerEntry" VALUES ('foreign','foreign-entry',999);`);
   const funded=await readOwnerFinancialStatus(options);assert(funded);assert.equal(funded.balance.posted,'12.345678');assert.equal(funded.activity.length,0);assert.equal(displayLedgerBalance(funded,owner),'12.34');assert(!JSON.stringify(funded).includes('999'));
