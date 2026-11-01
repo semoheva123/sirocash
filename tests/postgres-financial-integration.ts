@@ -56,6 +56,9 @@ async function main(){
   const deposit={ownerId:alice,requestKey:'postgres:deposit:replay',amount:'100',providerReference:'fixture:postgres:deposit:1',settlementAccountId:settlement};
   const credits=await Promise.all(Array.from({length:16},()=>creditConfirmedDeposit(db,deposit)));
   assert.equal(new Set(credits.map(c=>c.id)).size,1);
+  const duplicateEvents=await Promise.allSettled(Array.from({length:6},(_,i)=>creditConfirmedDeposit(db,{...deposit,requestKey:'postgres:duplicate:event:'+i})));
+  for(const r of duplicateEvents){assert.equal(r.status,'rejected');if(r.status==='rejected')assert.match(String(r.reason),/IDEMPOTENCY_CONFLICT/)}
+  await assert.rejects(()=>creditConfirmedDeposit(db,{...deposit,ownerId:bob,requestKey:'postgres:foreign:event'}),/IDEMPOTENCY_CONFLICT/);
   assert.equal((await walletBalances(db,alice)).available,'100.000000');
   const postedRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,alice));assert.equal(postedRead.balance.posted,'100.000000');assert.equal(postedRead.activity.length,1);
   const otherRead=await readDb.transaction(tx=>readFinancialSnapshot(tx,bob));assert.equal(otherRead.balance.posted,'0');assert.equal(otherRead.activity.length,0);

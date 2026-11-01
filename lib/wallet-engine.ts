@@ -27,7 +27,10 @@ async function begin(tx:WalletTx,c:Command,kind:string,other:string|null=null,de
  const owner=id(c.ownerId),value=amount(c.amount);if(!/^[A-Za-z0-9:_-]{8,128}$/.test(c.requestKey))throw Error('INVALID_REQUEST_KEY');
  const details:unknown[]=[kind,owner,value,other,destination,external];if(pricing)details.push([pricing.fee,pricing.accountId,'internal-sender-1pct-v1']);
  const fingerprint=createHash('sha256').update(JSON.stringify(details)).digest('hex');
- await tx.query('INSERT INTO "WalletOperation" (id,"ownerId","requestKey",fingerprint,kind,amount,"counterpartyId",destination,"externalReference","feeAmount","feeAccountId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT ("ownerId","requestKey") DO NOTHING',[randomUUID(),owner,c.requestKey,fingerprint,kind,value,other,destination,external,pricing?.fee||'0',pricing?.accountId||null]);
+ // Replays can collide on both request identity and external event uniqueness. Handle
+ // either index atomically, then require the exact owner/request/fingerprint below.
+ // A reused provider event under a different request still fails closed.
+ await tx.query('INSERT INTO "WalletOperation" (id,"ownerId","requestKey",fingerprint,kind,amount,"counterpartyId",destination,"externalReference","feeAmount","feeAccountId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING',[randomUUID(),owner,c.requestKey,fingerprint,kind,value,other,destination,external,pricing?.fee||'0',pricing?.accountId||null]);
  const {rows:[row]}=await tx.query('SELECT * FROM "WalletOperation" WHERE "ownerId"=$1 AND "requestKey"=$2 FOR UPDATE',[owner,c.requestKey]);
  if(!row||row.fingerprint!==fingerprint)throw Error('IDEMPOTENCY_CONFLICT');return row;
 }
