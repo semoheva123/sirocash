@@ -2,7 +2,7 @@ import 'server-only';
 import {randomUUID} from 'node:crypto';
 import type {Bep20Rpc} from './bep20-receipt-observer';
 
-export type RpcFailureInfo={method:string;versionMatches:boolean;idMatches:boolean;hasResult:boolean;hasError:boolean;remoteCode:number|null;reason:'RATE_LIMIT'|'BLOCK_RANGE'|'METHOD'|'PARAMS'|'OTHER'};
+export type RpcFailureInfo={httpStatus?:number;method:string;versionMatches:boolean;idMatches:boolean;hasResult:boolean;hasError:boolean;remoteCode:number|null;reason:'RATE_LIMIT'|'BLOCK_RANGE'|'METHOD'|'PARAMS'|'OTHER'};
 type Options={onFailure?:(info:RpcFailureInfo)=>void;signal?:AbortSignal;endpoint:string;authorization?:string;timeoutMs?:number;maxResponseBytes?:number;fetch?:typeof fetch};
 function validateCall(method:string,params:unknown[]){
  if(!Array.isArray(params))throw new Error('RPC_READ_METHOD_NOT_ALLOWED');
@@ -41,7 +41,7 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
   try{
    const response=await Promise.race([expired,request(endpoint.toString(),{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{})},body:JSON.stringify({jsonrpc:'2.0',id,method,params})})]);
-   if(!response.ok)throw new Error('RPC_HTTP_FAILURE');
+   if(!response.ok){options.onFailure?.({method,httpStatus:response.status,versionMatches:false,idMatches:false,hasResult:false,hasError:false,remoteCode:null,reason:response.status===429?'RATE_LIMIT':'OTHER'});throw new Error('RPC_HTTP_FAILURE')}
    if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??''))throw new Error('RPC_CONTENT_TYPE_INVALID');
    const length=response.headers.get('content-length');
    if(length!==null&&(!/^\d+$/.test(length)||BigInt(length)>BigInt(maxBytes)))throw new Error('RPC_RESPONSE_TOO_LARGE');
