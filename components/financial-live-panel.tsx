@@ -1,4 +1,5 @@
 'use client';
+import {FinancialEmpty} from './financial-ui';
 import {useFinancialStatus} from './use-financial-status';
 import {FinancialHistory} from './financial-history';
 import {FinancialSyncStatus} from './financial-sync-status';
@@ -6,6 +7,6 @@ export function FinancialLivePanel({ar,userId,hideBalance=false}:{ar:boolean;use
  const {status,sync,updatedAt,refresh}=useFinancialStatus(true,userId);
  return <section aria-label={ar?'المتابعة المالية المباشرة':'Live financial overview'}>
   <FinancialSyncStatus sync={sync} updatedAt={updatedAt} ar={ar} retry={()=>void refresh().catch(()=>{})}/>
-  {status?.enabled?<FinancialHistory status={status} ar={ar} hideBalance={hideBalance}/>:<p>{status?ar?'الخدمات المالية غير مفعّلة؛ لا تُعرض بيانات تجريبية بدل معاملاتك.':'Financial services are disabled; no demonstration data replaces your transactions.':ar?'جارٍ التحقق من الاتصال المالي…':'Checking financial connection…'}</p>}
+  {status?.enabled?<FinancialHistory status={status} ar={ar} hideBalance={hideBalance}/>:<div className="card pro-availability"><FinancialEmpty locked title={status?ar?'العمليات المالية غير مفعّلة حاليًا':'Financial operations are not activated':ar?'جارٍ التحقق من الاتصال المالي…':'Checking financial connection…'} description={ar?'ستظهر الأرصدة والحركات المعتمدة هنا عند تفعيل الخدمة. لا تُعرض بيانات تجريبية بدل معاملات حسابك.':'Verified balances and movements appear here when the service is enabled. Demonstration data never replaces your account records.'}/></div>}
  </section>;
 }

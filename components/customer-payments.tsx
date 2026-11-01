@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import {AccountNavigation} from './account-navigation';
+import {ShieldCheck,ArrowLeftRight,Globe2} from 'lucide-react';
 import {useEffect,useState} from 'react';
 import {FinancialHistory} from './financial-history';
 import {useFinancialStatus} from './use-financial-status';
@@ -12,6 +14,7 @@ export function CustomerPayments(){
  const t=(a:string,e:string)=>ar?a:e;
  const {status,sync,updatedAt,refresh}=useFinancialStatus();
  useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());if(new URL(window.location.href).searchParams.get('kind')==='WITHDRAWAL')setKind('WITHDRAWAL');},[]);
+ useEffect(()=>{document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr'},[ar]);
  function edit(){if(attempted&&!submitted)return;setAttempted(false);setPrepared(null);setSubmitted(null);setRequestKey('customer:'+crypto.randomUUID())}
  const input={kind,recipient,amount,requestKey,...(kind==='WITHDRAWAL'?{chain,asset:'USDT'}:{})};
  async function prepare(e:React.FormEvent){e.preventDefault();setBusy(true);setNotice('');try{setPrepared(await call('/api/financial/prepare',input))}catch(e){setNotice(e instanceof Error?e.message:'تعذّر إنشاء العرض.')}finally{setBusy(false)}}
@@ -21,12 +24,12 @@ export function CustomerPayments(){
   const result=await call(prepared.kind==='TRANSFER'?'/api/financial/transfer':'/api/financial/withdraw',prepared.kind==='TRANSFER'?input:{quoteId:prepared.id},token);
   setSubmitted(result);setNotice(prepared.kind==='TRANSFER'?t('اكتمل التحويل الداخلي.','Internal transfer completed.'):t('حُجز مبلغ السحب. لا يعني ذلك تأكيد التحويل على الشبكة.','Withdrawal reserved; this is not an on-chain confirmation.'));await refresh().catch(()=>setNotice(t('تم قبول الطلب، لكن تعذّر تحديث قائمة العمليات. لا تُعِد إنشاء الطلب.','Command accepted, but history refresh failed. Do not create a duplicate command.')));
  }catch(e){setNotice(e instanceof Error?e.message:'تعذّر تأكيد النتيجة.');/* Preserve exact request/quote for retry. Never generate a second command after an unknown result. */}finally{setBusy(false)}}
- return <main className="section-width app-main" dir={ar?'rtl':'ltr'} lang={ar?'ar':'en'}>
-  <Link href="/dashboard">{t('العودة إلى المحفظة','Back to wallet')}</Link><h1>{t('الطلبات المالية','Financial commands')}</h1>
-  <p>{t('كل طلب مرتبط بحسابك وتفويض جهازك. لا تُدخل مفاتيح محافظ أو عبارة استرداد.','Every command is bound to your account and device approval. Never enter wallet keys or recovery phrases.')}</p>
+ return <div className="site-shell account-workspace pro-payments-workspace"><AccountNavigation active="/payments" ar={ar}/><main id="main-content" className="section-width app-main pro-payments" dir={ar?'rtl':'ltr'} lang={ar?'ar':'en'}>
+  <div className="pro-payment-heading"><div><Link className="pro-eyebrow" href="/dashboard">{t('المحفظة / العمليات المالية','WALLET / PAYMENTS')}</Link><h1>{t('الطلبات المالية','Financial commands')}</h1></div><div className="pro-heading-controls"><button type="button" className="language" onClick={()=>{localStorage.setItem('siro-language',ar?'en':'ar');setAr(!ar)}}><Globe2 size={16}/>{ar?'EN':'العربية'}</button><span className="pro-heading-icon"><ArrowLeftRight size={25}/></span></div></div>
+  <p className="pro-payment-description">{t('كل طلب مرتبط بحسابك وتفويض جهازك. لا تُدخل مفاتيح محافظ أو عبارة استرداد.','Every command is bound to your account and device approval. Never enter wallet keys or recovery phrases.')}</p>
   <FinancialSyncStatus sync={sync} updatedAt={updatedAt} ar={ar} retry={()=>void refresh().catch(()=>{})}/>
   {notice&&<p role="status">{notice}</p>}
-  {!status?<p>{t('جارٍ التحقق من توفر الخدمة…','Checking availability…')}</p>:!status.enabled?<section className="card"><h2>{t('التنفيذ المالي غير مفعّل','Financial execution is disabled')}</h2><p>{t('هذه الواجهة جاهزة برمجيًا، لكنها لا تتجاوز إعدادات التشغيل أو حدود المصاريف. لم تُنفّذ أي عملية.','This interface does not bypass deployment gates or spending limits. No command has executed.')}</p></section>:<>
+  {!status?<p>{t('جارٍ التحقق من توفر الخدمة…','Checking availability…')}</p>:!status.enabled?<section className="card pro-payment-locked"><span className="pro-lock-emblem"><ShieldCheck size={30}/></span><h2>{t('التنفيذ المالي غير مفعّل','Financial execution is disabled')}</h2><p>{t('هذه الواجهة جاهزة برمجيًا، لكنها لا تتجاوز إعدادات التشغيل أو حدود المصاريف. لم تُنفّذ أي عملية.','This interface does not bypass deployment gates or spending limits. No command has executed.')}</p></section>:<>
    <section className="card"><h2>{t('بيانات الحساب','Account')}</h2><p>{t('معرّف الاستلام','Receiving ID')}: <code dir="ltr">{status.userId}</code></p><p>{t('الرصيد الدفتري / المحجوز بالدولار','Posted / held USD')}: <span dir="ltr">{status.balance?.posted} / {status.balance?.held}</span></p></section>
    {(!status.capabilities?.withdrawals||!status.capabilities?.deposits)&&<p role="status">{t('التحويل الداخلي متاح؛ بعض خدمات الإيداع أو السحب لم تُفعّل بعد.','Internal transfers are available; some deposit or withdrawal services are not yet enabled.')}</p>}
    <section className="card"><h2>{t('إيداع USDT','Deposit USDT')}</h2><p>{t('العنوان مخصص لحسابك. استخدم الشبكة المطابقة فقط؛ يظهر الرصيد بعد نهائية المعاملة والتحقق منها.','The address is assigned to your account. Use the exact network; credit follows verified finality.')}</p>{(['TRC20','BEP20'] as const).map(network=><button key={network} className="button secondary" disabled={busy||!status.capabilities?.deposits} onClick={async()=>{setBusy(true);setDeposit(null);try{setDeposit(await call('/api/deposit/generate-address',{chain:network,asset:'USDT'}))}catch(e){setNotice(e instanceof Error?e.message:'Deposit unavailable')}finally{setBusy(false)}}}>{network}</button>)}{deposit&&<p>{deposit.chain}: <code dir="ltr" style={{overflowWrap:'anywhere'}}>{deposit.address}</code></p>}</section>
@@ -45,5 +48,5 @@ export function CustomerPayments(){
    </section>}
    <FinancialHistory status={status} ar={ar}/>
   </>}
- </main>;
+ </main></div>;
 }

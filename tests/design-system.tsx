@@ -10,7 +10,9 @@ async function main(){
 const routes=['/dashboard','/deposit','/withdraw','/sham-cash','/mobile-topup','/settings'];
 for(const ar of [true,false])for(const active of routes){
  const html=renderToStaticMarkup(<AccountNavigation ar={ar} active={active}/>);
- assert.equal((html.match(/aria-current="page"/g)||[]).length,1);
+ const navs=[...html.matchAll(/<nav\b[^>]*>([\s\S]*?)<\/nav>/g)].map(m=>m[1]);
+ assert.equal((navs[0].match(/aria-current="page"/g)||[]).length,1);
+ assert.equal((navs[1].match(/aria-current="page"/g)||[]).length,['/dashboard','/payments','/deposit','/withdraw','/settings'].includes(active)?1:0);
  for(const href of routes)assert.ok(html.includes(`href="${href}"`));
  assert.ok(html.includes(ar?'بيئة تجريبية':'Preview environment'));
  assert.ok(html.includes(ar?'التنقّل الرئيسي للحساب':'Main account navigation'));
