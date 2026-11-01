@@ -39,7 +39,7 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
    if(num(await o.bep20('eth_chainId',[]))!==56)throw Error('SCAN_WRONG_CHAIN');
    const b=obj(await o.bep20('eth_getBlockByNumber',['finalized',false])),head=num(await o.bep20('eth_blockNumber',[]));hash(b.hash);
    const n=num(b.number);if(n>head||head-n>2000||head<o.minimumConfirmations-1)throw Error('SCAN_INVALID_FINALITY');
-   if(o.requireFreshHead){const tip=obj(await o.bep20('eth_getBlockByNumber',['0x'+head.toString(16),false]));const age=Date.now()-num(tip.timestamp)*1000;if(num(tip.number)!==head||age>120000||age< -30000)throw Error('SCAN_STALE_HEAD')}
+   if(o.requireFreshHead){const tip=obj(await o.bep20('eth_getBlockByNumber',['0x'+head.toString(16),false]));const age=Date.now()-num(tip.timestamp)*1000,finalAge=Date.now()-num(b.timestamp)*1000;if(num(tip.number)!==head||age>120000||age< -30000||finalAge>120000||finalAge< -30000)throw Error('SCAN_STALE_HEAD')}
    return Math.min(n,head-o.minimumConfirmations+1);
   }
   const genesis=obj(await o.tron('/walletsolidity/getblockbynum',{num:0}));if(hash(genesis.blockID)!==o.genesisId)throw Error('SCAN_WRONG_CHAIN');

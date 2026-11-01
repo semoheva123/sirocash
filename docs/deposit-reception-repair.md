@@ -24,3 +24,18 @@ The isolated scanner integration test covers a 1000-block catch-up with 67 recip
 An opt-in deployment probe checks the configured endpoints plus named public diagnostic candidates for actual chain56/finalized/range1000/OR `eth_getLogs` support, and checks the TRON bulk receipt set against a solidified block. Candidates do not silently reconfigure production or become fallback providers. Only a tested endpoint may subsequently be selected by operator configuration.
 
 Public customer reception remains disabled until default-branch scheduling, authenticated worker execution, healthy lag and bounded real deposit/credit acceptance are established. A successful build alone is not an activation certificate.
+
+
+## Live provider observations (not acceptance)
+
+The Binance public endpoint returned RPC code -32005 for even a one-block filtered log query. 1RPC intermittently returned valid chain56/log results but subsequently returned HTTP403; its standalone finalized tag was also observed thousands of blocks behind the primary head. Neither observation is a production acceptance pass.
+
+The repair therefore supports an **explicit separate log-index endpoint**, with independently pinned primary-chain finality/receipt verification. Before every indexed range, both providers must be on chain56 and agree on that numeric end-block hash. Header credentials are never forwarded between provider domains. This is not automatic endpoint fallback. Current candidate index configuration is still unaccepted.
+
+Logical 1000-block scans can split into operator-configured wire ranges (default100), with at most four concurrent requests and a global20,000-log response bound. Both network catch-up loops run concurrently within the same shared deadline; metadata reuse is bounded to five seconds, and production heads/finality timestamps must be fresh. This removes the serial throughput defect without declaring an external public provider reliable.
+
+A real-read benchmark now runs the actual scanner with65 synthetic assigned addresses in an isolated in-memory DB, targeting1000 BSC blocks and100 TRON blocks within85seconds. The live run did **not** pass: the last benchmark stopped with `CHAIN_HTTP_FAILED` before processing blocks. Diagnostics now preserve only safe phase/network/HTTP-status metadata and use the configured RPC read credentials without exposing them. No customer or production financial database is involved in this benchmark.
+
+Full offline tests, PostgreSQL16/17 concurrency/restore checks and GitHub-to-production authentication checks passed. PR1 was merged, publishing the scheduler on default `main`; the workflow is active. **This is not evidence of a successful scheduled financial batch:** the outbox worker and customer deposits remain disabled until live read capacity passes and a real authenticated watcher batch is observed healthy. Temporary build diagnostics are turned off after investigation; that does not certify live reception.
+
+A stable operator-authorized BSC log RPC is still required; public HTTP403/limit responses must not be bypassed or portrayed as working. Any provider URL containing a key, authorization header, or TRON RPC API key must be stored as a Sensitive production environment variable in Vercel, never in chat/source. Collection, withdrawal, internal debits, signing and resource/gas purchases remain off.

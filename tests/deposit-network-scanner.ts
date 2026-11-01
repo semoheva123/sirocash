@@ -75,6 +75,12 @@ async function main(){const pg=new PGlite();try{
  await assert.rejects(()=>scan.scan('BEP20',signal()),/CHAIN_REORG/);assert.equal((await sql('SELECT paused FROM "DepositNetworkScanner" WHERE network=\'BEP20\'')).rows[0].paused,true);
  assert.equal((await scan.scan('BEP20',signal())).state,'BUSY_OR_PAUSED');assert.equal(await depositScannerHealthy(worker),false);
  const cached=createNetworkDepositScanner(worker,{...options,headCacheMs:5000});const reads=blockReads;await cached.finalHeight('BEP20');await cached.finalHeight('BEP20');assert.equal(blockReads-reads,1,'bounded head cache avoids repeated chain metadata reads during catch-up');
+ const freshRpc=async(m:string,p:unknown[])=>{const result=await rpc(m,p);return m==='eth_getBlockByNumber'?{...(result as object),timestamp:'0x'+Math.floor(Date.now()/1000).toString(16)}:result};
+ await createNetworkDepositScanner(worker,{...options,bep20:freshRpc,requireFreshHead:true}).finalHeight('BEP20');
+ const staleFinal=async(m:string,p:unknown[])=>{const result=await freshRpc(m,p);return m==='eth_getBlockByNumber'&&p[0]==='finalized'?{...(result as object),timestamp:'0x1'}:result};
+ await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,bep20:staleFinal,requireFreshHead:true}).finalHeight('BEP20'),/SCAN_STALE_HEAD/);
+ const staleTron=async(path:Parameters<typeof read>[0],body:Record<string,unknown>)=>{const result=await read(path,body);if(path!=='/walletsolidity/getnowblock')return result;const b=result as {block_header:{raw_data:Record<string,unknown>}};return {...b,block_header:{raw_data:{...b.block_header.raw_data,timestamp:Date.now()-180000}}}};
+ await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:staleTron,requireFreshHead:true}).finalHeight('TRC20'),/SCAN_STALE_HEAD/);
  console.log('Shared scanner PASS: 1000-block bounded range, OR recipients, complete bulk TRON receipts, partial replay, new-address backfill, owner-bound credits exactly once, balanced ledger and network-wide reorg pause. Isolated DB only.');
 }finally{await pg.close()}}
 main().catch(e=>{console.error(e);process.exitCode=1});
