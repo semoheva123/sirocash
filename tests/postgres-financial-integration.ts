@@ -148,7 +148,7 @@ async function main(){
   await depositDiscoveryAcceptance(adminDb,db);
   // Production application role: actual permission-denial probes and catalog validation.
   const check=await pool.connect();
-  try{await check.query('BEGIN READ ONLY');await check.query('SET LOCAL ROLE sirocash_app');const result=await verifyFinancialSchema((sql,params)=>check.query(sql,params));assert.equal(result.tables,28);await check.query('ROLLBACK')}finally{check.release()}
+  try{await check.query('BEGIN READ ONLY');await check.query('SET LOCAL ROLE sirocash_app');const result=await verifyFinancialSchema((sql,params)=>check.query(sql,params));assert.equal(result.tables,29);await check.query('ROLLBACK')}finally{check.release()}
   const invariant=await pool.query('SELECT "transactionId" FROM "LedgerEntry" GROUP BY "transactionId" HAVING SUM(amount)<>0');assert.equal(invariant.rowCount,0);
   const cache=await pool.query('SELECT a.id FROM "LedgerAccount" a LEFT JOIN "LedgerEntry" e ON e."accountId"=a.id GROUP BY a.id HAVING a.balance<>COALESCE(SUM(e.amount),0)');assert.equal(cache.rowCount,0);
   // Forced exception after a real insert must leave neither operation nor balance changes.
