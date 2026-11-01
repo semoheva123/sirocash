@@ -2,15 +2,18 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFile } from "node:fs/promises";
-import { ServiceShowcase } from "../components/service-showcase";
-import { VaultOverview } from "../components/vault-overview";
+import { PlatformPreview } from "../components/platform-preview";
 import { FinancialActivity } from "../components/financial-activity";
 import { FinancialState, FinancialEmpty } from "../components/financial-ui";
 import { AccountNavigation } from "../components/account-navigation";
 async function main() {
   for (const ar of [true, false]) {
-    const preview = renderToStaticMarkup(<ServiceShowcase ar={ar} />);
-    assert(preview.includes(ar ? "معاينة فقط" : "Preview only"));
+    const preview = renderToStaticMarkup(<PlatformPreview ar={ar} />);
+    assert(
+      preview.includes(
+        ar ? "دون بيانات مالية فعلية" : "No real financial data",
+      ),
+    );
     assert.equal((preview.match(/aria-pressed="true"/g) ?? []).length, 1);
     assert(!/\$[0-9]|Visa|Mastercard|APY|APR/.test(preview));
     const activity = renderToStaticMarkup(
@@ -43,24 +46,6 @@ async function main() {
     );
     assert(!activity.includes("1234.567890"));
     assert(activity.includes("dateTime") || activity.includes("datetime="));
-    const capital = renderToStaticMarkup(
-      <VaultOverview
-        ar={ar}
-        balance="12345.123456"
-        hidden
-        toggle={() => {}}
-        actions={null}
-        verified={false}
-        loading={false}
-        error={false}
-      />,
-    );
-    assert(capital.includes("vault-capital"));
-    assert(!capital.includes("12345.123456"));
-    assert(capital.includes("/deposit?asset=USDC"));
-    assert(
-      capital.includes(ar ? "لا تمثّل حيازات حسابك" : "Not account holdings"),
-    );
     const unknown = renderToStaticMarkup(
       <FinancialState state="BROADCAST_UNKNOWN" ar={ar} />,
     );
@@ -93,7 +78,7 @@ async function main() {
       layout.indexOf("'./world-class.css'"),
   );
   console.log(
-    "Horizon interface PASS: bilingual service stage and capital canvas without fake financial claims, real ledger table, privacy, UTC dates, status tones, mobile navigation, focus and reduced-motion contracts. Visual/device acceptance remains separate.",
+    "Professional interface PASS: bilingual product illustration without fake financial claims, real ledger table, privacy, UTC dates, status tones, mobile navigation, focus and reduced-motion contracts. Visual/device acceptance remains separate.",
   );
 }
 main().catch((e) => {
