@@ -29,6 +29,11 @@ async function main(){
  for(const handler of cases)await assert.rejects(()=>createBep20ReadRpc({endpoint,maxResponseBytes:256,fetch:mock(handler)})('eth_chainId',[]),(e:unknown)=>e instanceof Error&&e.message.startsWith('RPC_')&&!e.message.includes('secret')&&!e.message.includes(endpoint));
  await assert.rejects(()=>createBep20ReadRpc({endpoint,timeoutMs:100,fetch:mock(()=>new Promise(()=>{}))})('eth_chainId',[]),/RPC_TIMEOUT/);
  await assert.rejects(()=>createBep20ReadRpc({endpoint,timeoutMs:100,fetch:mock(()=>new Response(new ReadableStream({start(){}}),{headers:{'content-type':'application/json'}}))})('eth_chainId',[]),/RPC_TIMEOUT/);
+ let tries=0;
+ const throttle=createBep20ReadRpc({endpoint,fetch:mock(b=>++tries===1?new Response('private',{status:429,headers:{'retry-after':'0'}}):json({jsonrpc:'2.0',id:b.id,result:'0x38'}))});
+ assert.equal(await throttle('eth_chainId',[]),'0x38');assert.equal(tries,2);
+ tries=0;await assert.rejects(()=>createBep20ReadRpc({endpoint,fetch:mock(()=>{tries++;return new Response('private',{status:429,headers:{'retry-after':'0'}})})})('eth_chainId',[]),/RPC_HTTP_FAILURE/);assert.equal(tries,2);
+ tries=0;await assert.rejects(()=>createBep20ReadRpc({endpoint,fetch:mock(()=>{tries++;return new Response('private',{status:403})})})('eth_chainId',[]),/RPC_HTTP_FAILURE/);assert.equal(tries,1);
  let failure:unknown;
  await assert.rejects(()=>createBep20ReadRpc({endpoint,onFailure:info=>{failure=info},fetch:mock(b=>json({jsonrpc:'2.0',id:b.id,error:{code:-32602,message:'invalid argument secret '+endpoint,data:'private'}}))})('eth_chainId',[]),/RPC_INVALID_ENVELOPE/);
  assert.deepEqual(failure,{method:'eth_chainId',versionMatches:true,idMatches:true,hasResult:false,hasError:true,remoteCode:-32602,reason:'PARAMS'});
@@ -40,7 +45,7 @@ async function main(){
  logHead=110;assert.equal(await bounded.discoveryHeight!(100),100,'never extend beyond independently finalized primary height');
  wrongHash=true;await assert.rejects(()=>bounded.discoveryHeight!(100),/RPC_LOG_CHAIN_MISMATCH/);wrongHash=false;
  logHead=1;await assert.rejects(()=>bounded.discoveryHeight!(3000),/RPC_LOG_PROVIDER_LAG/);
- wrongChain=true;await assert.rejects(()=>bounded.discoveryHeight!(100),/RPC_LOG_WRONG_CHAIN/);wrongChain=false;
+ const wrongDiscovery=createBep20DepositReadRpc({endpoint,fetch:good},{endpoint:'https://logs.example.invalid',fetch:mock(b=>json({jsonrpc:'2.0',id:b.id,result:'0x1'}))});await assert.rejects(()=>wrongDiscovery.discoveryHeight!(100),/RPC_LOG_WRONG_CHAIN/);
  for(const n of [-1,NaN,1.5])await assert.rejects(()=>bounded.discoveryHeight!(n),/RPC_LOG_HEIGHT_INVALID/);
  const calls:string[]=[];
  const split=createBep20DepositReadRpc({endpoint,authorization:'Bearer primary',fetch:mock((b,i)=>{calls.push('primary:'+b.method);assert.equal((i.headers as Record<string,string>).Authorization,'Bearer primary');return json({jsonrpc:'2.0',id:b.id,result:'primary-proof'})})},{endpoint:'https://logs.example.invalid',fetch:mock((b,i)=>{calls.push('logs:'+b.method);assert.equal((i.headers as Record<string,string>).Authorization,undefined);return json({jsonrpc:'2.0',id:b.id,result:b.method==='eth_chainId'?'0x38':[]})})});

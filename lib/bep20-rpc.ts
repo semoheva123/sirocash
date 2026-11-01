@@ -40,7 +40,20 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   const timer=setTimeout(()=>abort.abort(),timeoutMs);
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
   try{
-   const response=await Promise.race([expired,request(endpoint.toString(),{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{})},body:JSON.stringify({jsonrpc:'2.0',id,method,params})})]);
+   const send=()=>Promise.race([expired,request(endpoint.toString(),{method:'POST',redirect:'error',cache:'no-store',signal:abort.signal,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.authorization?{Authorization:options.authorization}:{})},body:JSON.stringify({jsonrpc:'2.0',id,method,params})})]);
+   let response=await send();
+   // Exactly one retry for explicit HTTP throttling on allowlisted read-only calls.
+   // Same endpoint/auth/request; shared deadline; never retries 403, invalid evidence or writes.
+   if(response.status===429){
+    const retryAfter=response.headers.get('retry-after');
+    const delay=retryAfter&&/^\d+$/.test(retryAfter)?Number(retryAfter)*1000:500;
+    if(delay<=1500){
+     if(response.body)void response.body.cancel().catch(()=>{});
+     await Promise.race([expired,new Promise(resolve=>setTimeout(resolve,delay))]);
+     if(abort.signal.aborted)throw Error('RPC_TIMEOUT');
+     response=await send();
+    }
+   }
    if(!response.ok){options.onFailure?.({method,httpStatus:response.status,versionMatches:false,idMatches:false,hasResult:false,hasError:false,remoteCode:null,reason:response.status===429?'RATE_LIMIT':'OTHER'});throw new Error('RPC_HTTP_FAILURE')}
    if(!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type')??''))throw new Error('RPC_CONTENT_TYPE_INVALID');
    const length=response.headers.get('content-length');
@@ -83,14 +96,16 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
  * Never forward a primary provider's authorization to a different log provider. */
 export function createBep20DepositReadRpc(primary:Options,logs?:Options):Bep20Rpc{
  const read=createBep20ReadRpc(primary),logRead=logs?createBep20ReadRpc(logs):undefined;
+ let logChain:Promise<unknown>|undefined;
+ const assertLogChain=async()=>{if(!logRead)return;if(!logChain)logChain=logRead('eth_chainId',[]);if(await logChain!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN')};
  const rpc:Bep20Rpc=async(method,params)=>{
   if(method!=='eth_getLogs'||!logRead)return read(method,params);
-  if(await logRead('eth_chainId',[])!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN');
+  await assertLogChain();
   return logRead(method,params);
  };
  if(logRead)rpc.discoveryHeight=async(primaryFinalHeight)=>{
   if(!Number.isSafeInteger(primaryFinalHeight)||primaryFinalHeight<0)throw Error('RPC_LOG_HEIGHT_INVALID');
-  if(await logRead('eth_chainId',[])!=='0x38')throw Error('RPC_LOG_WRONG_CHAIN');
+  await assertLogChain();
   const raw=await logRead('eth_blockNumber',[]);
   if(typeof raw!=='string'||!/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(raw)||BigInt(raw)>BigInt(Number.MAX_SAFE_INTEGER))throw Error('RPC_LOG_HEIGHT_INVALID');
   const logHead=Number(BigInt(raw)),common=Math.min(primaryFinalHeight,logHead);
