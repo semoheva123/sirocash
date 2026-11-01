@@ -70,9 +70,26 @@ export function createBep20ReadRpc(options:Options):Bep20Rpc{
   }
  };
 }
+/** Explicit index source, not fallback: primary owns finality and all receipt evidence.
+ * An index response is accepted only on chain56 and the same numeric end-block anchor.
+ * Authorization headers are separate and never forwarded between provider domains. */
+export function createBep20DiscoveryRpc(primaryOptions:Options,indexOptions?:Options):Bep20Rpc{
+ const primary=createBep20ReadRpc(primaryOptions);if(!indexOptions)return primary;
+ const index=createBep20ReadRpc(indexOptions);let bound:Promise<void>|undefined;
+ return async(method,params)=>{
+  if(method!=='eth_getLogs')return primary(method,params);
+  validateCall(method,params);
+  bound??=(async()=>{if(await index('eth_chainId',[])!=='0x38')throw Error('RPC_INDEX_WRONG_CHAIN')})();await bound;
+  const f=params[0] as {toBlock:string};
+  const anchors=await Promise.all([primary('eth_getBlockByNumber',[f.toBlock,false]),index('eth_getBlockByNumber',[f.toBlock,false])]);
+  const hashes=anchors.map(value=>{const b=value as {hash?:unknown;number?:unknown};if(!b||typeof b.hash!=='string'||!/^0x[a-f0-9]{64}$/i.test(b.hash)||typeof b.number!=='string'||!/^0x(?:0|[1-9a-f][a-f0-9]*)$/i.test(b.number)||BigInt(b.number)!==BigInt(f.toBlock))throw Error('RPC_INDEX_ANCHOR_MISMATCH');return b.hash.toLowerCase()});
+  if(hashes[0]!==hashes[1])throw Error('RPC_INDEX_ANCHOR_MISMATCH');
+  return index(method,params);
+ };
+}
 /** Independent read-only production gate: does not enable signing or financial writes. */
 export function productionBep20ReadRpc(signal?:AbortSignal):Bep20Rpc{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
  const endpoint=process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
- return createBep20ReadRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION});
+ return createBep20DiscoveryRpc({endpoint,signal,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
 }

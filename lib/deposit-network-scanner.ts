@@ -9,7 +9,7 @@ import {stageBep20Deposit,stageTronDeposit} from './deposit-inbox';
 import {bep20UsdtContract} from './bep20-deposit-verification';
 import {tronUsdtContract} from './tron-deposit-verification';
 type Network='TRC20'|'BEP20';
-type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;bep20QueryWindow?:number;maxEvents?:number;headCacheMs?:number};
+type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;bep20QueryWindow?:number;maxEvents?:number;headCacheMs?:number;requireFreshHead?:boolean};
 type Address={id:string;address:string;next:number;offset:number;previous:string|null;partial:string|null};
 const transfer='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 function obj(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw Error('SCAN_INVALID_OBJECT');return v as Record<string,unknown>}
@@ -38,10 +38,13 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
   if(network==='BEP20'){
    if(num(await o.bep20('eth_chainId',[]))!==56)throw Error('SCAN_WRONG_CHAIN');
    const b=obj(await o.bep20('eth_getBlockByNumber',['finalized',false])),head=num(await o.bep20('eth_blockNumber',[]));hash(b.hash);
-   const n=num(b.number);if(n>head||head<o.minimumConfirmations-1)throw Error('SCAN_INVALID_FINALITY');return Math.min(n,head-o.minimumConfirmations+1);
+   const n=num(b.number);if(n>head||head-n>2000||head<o.minimumConfirmations-1)throw Error('SCAN_INVALID_FINALITY');
+   if(o.requireFreshHead){const tip=obj(await o.bep20('eth_getBlockByNumber',['0x'+head.toString(16),false]));const age=Date.now()-num(tip.timestamp)*1000;if(num(tip.number)!==head||age>120000||age< -30000)throw Error('SCAN_STALE_HEAD')}
+   return Math.min(n,head-o.minimumConfirmations+1);
   }
   const genesis=obj(await o.tron('/walletsolidity/getblockbynum',{num:0}));if(hash(genesis.blockID)!==o.genesisId)throw Error('SCAN_WRONG_CHAIN');
   const b=obj(await o.tron('/walletsolidity/getnowblock',{})),n=num(obj(obj(b.block_header).raw_data).number);
+  if(o.requireFreshHead){const age=Date.now()-num(obj(obj(b.block_header).raw_data).timestamp);if(age>120000||age< -30000)throw Error('SCAN_STALE_HEAD')}
   if(hash(b.blockID).slice(0,16)!==n.toString(16).padStart(16,'0'))throw Error('SCAN_INVALID_FINALITY');return n;
  }
  async function finalHeight(network:Network){

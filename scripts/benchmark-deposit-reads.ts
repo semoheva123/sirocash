@@ -3,7 +3,7 @@ import {readFile,readdir} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {HDKey} from '@scure/bip32';
 import {createNetworkDepositScanner} from '../lib/deposit-network-scanner';
-import {createBep20ReadRpc} from '../lib/bep20-rpc';
+import {createBep20DiscoveryRpc} from '../lib/bep20-rpc';
 import {createTronRead} from '../lib/tron-receipt-observer';
 import {allocateDepositAddress} from '../lib/deposit-address-allocation';
 import type {WalletDb} from '../lib/wallet-engine';
@@ -19,7 +19,7 @@ async function main(){
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(q,p)=>({rows:(await tx.query(q,p)).rows as Record<string,unknown>[]})}))};
   const worker:WalletDb={transaction:run=>db.transaction(async tx=>{await tx.query('SET LOCAL ROLE sirocash_financial_worker');return run(tx)})};
   const signal=AbortSignal.timeout(110000);
-  const scan=createNetworkDepositScanner(worker,{bep20:createBep20ReadRpc({endpoint:process.env.SIRO_BEP20_RPC_URL!,signal}),tron:createTronRead({endpoint:process.env.SIRO_TRON_RPC_URL!,maxResponseBytes:8388608,signal}),genesisId:process.env.SIRO_TRON_GENESIS_ID!,minimumConfirmations:15,maxAmount:()=>2n**256n-1n,bep20QueryWindow:Number(process.env.SIRO_BEP20_SCAN_WINDOW??'100'),headCacheMs:5000});
+  const scan=createNetworkDepositScanner(worker,{bep20:createBep20DiscoveryRpc({endpoint:process.env.SIRO_BEP20_RPC_URL!,signal},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal}:undefined),tron:createTronRead({endpoint:process.env.SIRO_TRON_RPC_URL!,maxResponseBytes:8388608,signal}),genesisId:process.env.SIRO_TRON_GENESIS_ID!,minimumConfirmations:15,requireFreshHead:true,maxAmount:()=>2n**256n-1n,bep20QueryWindow:Number(process.env.SIRO_BEP20_SCAN_WINDOW??'100'),headCacheMs:5000});
   // Public deterministic TEST fixture only. Never fund or reuse these fixture keys/addresses.
   const root=HDKey.fromMasterSeed(new Uint8Array(32).fill(77));
   for(const network of ['BEP20','TRC20'] as const){
