@@ -1,4 +1,4 @@
-/** Deposit-only custody: no signing, funding, provider purchase, sweep, payout or transfer.
+/** Deposit-only custody: no signing, funding, provider purchase, sweep or payout. Ledger transfers have a separate explicit opt-in.
  * An independent mode, not permission to relax any full-execution spending gate. */
 export function depositOnlyMode(env:Readonly<Record<string,string|undefined>>=process.env){return env.SIRO_DEPOSIT_ONLY_ENABLED==='true'}
 export const depositOnlyForbiddenFlags=['SIRO_SIGNER_ENABLED','SIRO_BROADCAST_ENABLED','SIRO_AUTOMATIC_PREPARATION_ENABLED','SIRO_NATIVE_GAS_ENABLED','SIRO_RESOURCE_AUTHORIZATION_ENABLED','SIRO_ENERGY_WORKER_ENABLED','SIRO_ENERGY_PURCHASE_ENABLED','SIRO_WITHDRAWALS_ENABLED'] as const;

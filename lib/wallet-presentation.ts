@@ -22,3 +22,14 @@ export function withdrawalPrefill(params:URLSearchParams){
  const recipient=params.get('recipient')??'',amount=params.get('amount')??'';
  return {chain,recipient:walletAddressShape(recipient,chain)?recipient:'',amount:/^\d{1,14}(\.\d{1,6})?$/.test(amount)&&/[1-9]/.test(amount)?amount:''};
 }
+
+export function internalTransferReviewHref(recipient:string,amount:string){
+ const account=recipient.replace(/^sirocash:pay:/,'').toLowerCase();
+ if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(account))throw Error('INVALID_ACCOUNT');
+ if(!/^\d{1,14}(\.\d{1,6})?$/.test(amount)||!/[1-9]/.test(amount))throw Error('INVALID_AMOUNT');
+ return '/payments?'+new URLSearchParams({kind:'TRANSFER',recipient:account,amount}).toString();
+}
+export function internalTransferPrefill(params:URLSearchParams){
+ if(params.get('kind')!=='TRANSFER')return null;
+ try{const p=new URLSearchParams(internalTransferReviewHref(params.get('recipient')??'',params.get('amount')??'').split('?')[1]);return {recipient:p.get('recipient')!,amount:p.get('amount')!}}catch{return null}
+}
