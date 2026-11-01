@@ -1,0 +1,36 @@
+name: Read-only deposit provider diagnostic
+on:
+  workflow_dispatch:
+  push:
+    branches: [arena/b6ad75ac-sirocash]
+    paths:
+      - .github/workflows/deposit-read-probe.yml
+      - scripts/probe-deposit-reception.ts
+permissions:
+  contents: read
+concurrency:
+  group: deposit-read-probe
+  cancel-in-progress: true
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    # Public chain metadata only. No repository secrets or database credentials.
+    env:
+      VERCEL_ENV: production
+      SIRO_SIGNER_ENABLED: 'false'
+      SIRO_OUTBOX_WORKER_ENABLED: 'false'
+      SIRO_DEPOSIT_READINESS_PROBE: 'true'
+      SIRO_BEP20_RPC_URL: https://1rpc.io/bnb
+      SIRO_TRON_RPC_URL: https://api.trongrid.io
+      SIRO_TRON_GENESIS_ID: '00000000000000001ebf88508a03865c71d452e25f4d51194196a1d22b6653dc'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run deposit:probe
