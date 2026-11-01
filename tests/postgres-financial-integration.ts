@@ -157,4 +157,9 @@ async function main(){
   await pool?.end();await admin.query(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();
  }
 }
-main().catch(error=>{console.error(error instanceof Error?error.message:'POSTGRES_FIXTURE_FAILED');process.exitCode=1});
+main().catch(error=>{
+ const detail=error instanceof Error?(error.stack??error.message):'POSTGRES_FIXTURE_FAILED';console.error(detail);
+ // Keep isolated-fixture failures visible through the Checks API when log downloads are unavailable.
+ if(process.env.GITHUB_ACTIONS==='true')console.error(`::error title=Isolated PostgreSQL fixture::${detail.replaceAll('%','%25').replaceAll('\r','%0D').replaceAll('\n','%0A')}`);
+ process.exitCode=1;
+});
