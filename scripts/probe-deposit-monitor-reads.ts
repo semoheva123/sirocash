@@ -8,7 +8,7 @@ import {bep20UsdtContract} from '../lib/bep20-deposit-verification';
 async function main(){
  if(process.env.VERCEL_ENV!=='production'||!depositOnlyMode()||process.env.SIRO_OUTBOX_WORKER_ENABLED!=='true'){console.log('Deposit monitor live reads: disabled.');return}
  assertDepositOnlyIsolation();
- const signal=AbortSignal.timeout(40000),bep20=productionBep20ReadRpc(signal,info=>console.log('DEPOSIT_RPC_FAILURE:'+JSON.stringify(info))),tron=productionTronRead(signal);
+ const signal=AbortSignal.timeout(40000),bep20=productionBep20ReadRpc(signal,info=>console.log('DEPOSIT_RPC_FAILURE:'+JSON.stringify(info))),tron=productionTronRead(signal,info=>console.log('DEPOSIT_TRON_HTTP_FAILURE:'+JSON.stringify(info)));
  const scanner=createNetworkDepositScanner(financialReadDatabase(),{bep20,tron,genesisId:process.env.SIRO_TRON_GENESIS_ID??'',minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:()=>1n});
  const results=await Promise.all((['BEP20','TRC20'] as const).map(async network=>{
   let stage='FINALITY';
@@ -18,6 +18,23 @@ async function main(){
     const logs=await bep20('eth_getLogs',[{fromBlock:'0x'+head.toString(16),toBlock:'0x'+head.toString(16),address:bep20UsdtContract,topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',null,'0x'+'0'.repeat(64)]}]);
     if(!Array.isArray(logs))throw Error('SCAN_INVALID_OBJECT');
    }else if(!Array.isArray(await tron('/wallet/gettransactioninfobyblocknum',{num:head})))throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
+   if(network==='TRC20'){
+    stage='CURSOR_LOOKUP';
+    const cursor=await financialReadDatabase().transaction(async tx=>(await tx.query('SELECT MIN(s."nextBlock") AS height FROM "DepositScanCursor" s JOIN "UserDepositAddress" a ON a.id=s."addressId" WHERE a.network=\'TRC20\' AND NOT s.paused')).rows[0]);
+    if(cursor?.height!==null&&cursor?.height!==undefined){
+     const height=Number(cursor.height);if(!Number.isSafeInteger(height)||height<0)throw Error('SCAN_INVALID_HEIGHT');
+     if(height<=head){
+      stage='CURSOR_BLOCK';
+      const block=await tron('/walletsolidity/getblockbynum',{num:height}) as {blockID?:string;block_header?:{raw_data?:{number?:number;parentHash?:string}};transactions?:{txID:string}[]};
+      if(block.block_header?.raw_data?.number!==height||typeof block.blockID!=='string'||! /^[a-f0-9]{64}$/.test(block.blockID)||block.blockID.slice(0,16)!==height.toString(16).padStart(16,'0')||typeof block.block_header.raw_data.parentHash!=='string')throw Error('SCAN_BLOCK_MISMATCH');
+      stage='CURSOR_RECEIPTS';
+      const receipts=await tron('/wallet/gettransactioninfobyblocknum',{num:height});
+      if(!Array.isArray(receipts))throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
+      const ids=new Set((block.transactions??[]).map(t=>t.txID));
+      if(ids.size!==(block.transactions??[]).length||receipts.length!==ids.size||new Set(receipts.map(r=>r.id)).size!==ids.size||receipts.some(r=>!ids.has(r.id)||r.blockNumber!==height))throw Error('SCAN_INCOMPLETE_RECEIPTS');
+     }
+    }
+   }
    return {network,stage,status:'PASS'};
   }catch(error){return {network,stage,status:'FAILED',failureCode:depositMonitorFailureCode(error)}}
  }));

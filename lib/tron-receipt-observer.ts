@@ -43,8 +43,8 @@ export async function observeTronUsdtReceipt(read:TronRead,input:{txId:string;lo
  if(recheck.height!==n||recheck.id!==included.id)throw new Error('TRON_OBSERVATION_REORG');
  return {event,evidence};
 }
-export function productionTronRead(signal?:AbortSignal){
+export function productionTronRead(signal?:AbortSignal,onFailure?:ChainHttpOptions['onFailure']){
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
  const endpoint=process.env.SIRO_TRON_RPC_URL;if(!endpoint)throw new Error('TRON_RPC_CONFIGURATION');
- return createTronRead({endpoint,signal,maxResponseBytes:8388608,apiKey:process.env.SIRO_TRON_RPC_API_KEY});
+ return createTronRead({endpoint,signal,onFailure,maxResponseBytes:8388608,apiKey:process.env.SIRO_TRON_RPC_API_KEY});
 }

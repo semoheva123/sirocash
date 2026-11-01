@@ -105,6 +105,14 @@ async function main(){
  const evmLog={address:bep20UsdtContract,topics,data:'0x'+(10n**18n).toString(16).padStart(64,'0'),transactionHash:evmTx,transactionIndex:'0x0',blockNumber:'0x64',blockHash:bh,logIndex:'0x7',removed:false};
  const bep20=async(m:string,p:unknown[])=>m==='eth_chainId'?'0x38':m==='eth_blockNumber'?'0x78':m==='eth_getTransactionReceipt'?{transactionHash:evmTx,transactionIndex:'0x0',blockNumber:'0x64',blockHash:bh,status:'0x1',logs:[evmLog]}:p[0]==='finalized'?{number:'0x73',hash:bh}:{number:'0x64',hash:bh,transactions:[evmTx]};
  assert.equal((await observeOutboxTransfer({...obOptions,bep20},{network:'BEP20',txId:evmTx,sender:evmFrom,recipient:evmTo,amountBaseUnits:(10n**18n).toString()})).event.amountBaseUnits,(10n**18n).toString());
+ let diagnostic:unknown;
+ for(const status of [403,429,503]){
+  await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid/private-key',apiKey:'private',fetch:async()=>new Response('private body',{status}),onFailure:info=>{diagnostic=info}})('/walletsolidity/getnowblock','{}'),/CHAIN_HTTP_FAILED/);
+  assert.deepEqual(diagnostic,{reason:'HTTP',httpStatus:status});assert(!JSON.stringify(diagnostic).includes('private'));
+ }
+ await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid',fetch:async()=>new Response('secret',{headers:{'content-type':'application/json'}}),onFailure:info=>{diagnostic=info}})('/walletsolidity/getnowblock','{}'),/CHAIN_HTTP_FAILED/);
+ assert.deepEqual(diagnostic,{reason:'INVALID_JSON',httpStatus:200});
+ await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid',fetch:async()=>new Response('',{status:429}),onFailure:()=>{throw Error('secret')}})('/walletsolidity/getnowblock','{}'),/CHAIN_HTTP_FAILED/);
  console.log('Chain adapters: exact signed-byte broadcast, chain/genesis binding, abort/time/size limits; TRON solid inclusion/reorg/receipt and dual-network exact Transfer observation passed. Fixture transports only; no live signing/broadcast.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
