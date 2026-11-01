@@ -12,7 +12,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
+      # Manual dispatch on this branch is deliberately authentication-only.
+      # Scheduled runs retain their separately gated worker behavior.
+      - name: Verify worker credential without executing financial work
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
+        run: |
+          set -eu
+          test "${#WORKER_SECRET}" -ge 32 && test "${#WORKER_SECRET}" -le 512 || { echo 'Worker credential missing or invalid length.'; exit 1; }
+          status=$(curl --silent --show-error --max-time 20 --retry 0 \
+            --proto '=https' --request GET --output /dev/null --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${WORKER_SECRET}" \
+            'https://sirocash.vercel.app/api/internal/financial-worker') || { echo 'AUTH_CHECK_TRANSPORT_FAILED: no worker execution requested.'; exit 1; }
+          case "$status" in
+            204) echo 'AUTH_CHECK_PASS: GitHub credential accepted by production; no database access or financial work.' ;;
+            401) echo 'AUTH_CHECK_REJECTED: credential missing, invalid or different from deployed production.'; exit 1 ;;
+            *) echo "AUTH_CHECK_UNEXPECTED_HTTP_${status}: not accepted; no worker execution requested."; exit 1 ;;
+          esac
       - name: Invoke authenticated bounded worker
+        if: github.event_name == 'schedule'
         env:
           WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
         run: |

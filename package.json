@@ -71,7 +71,7 @@
     "test:catfee-orders": "node --conditions=react-server --import tsx tests/catfee-orders.ts && node --conditions=react-server --import tsx tests/catfee-direct.ts",
     "test:energy-delivery": "node --conditions=react-server --import tsx tests/energy-delivery.ts",
     "test:financial-worker-role": "tsx tests/financial-worker-role.ts",
-    "test:financial-worker-route": "node --conditions=react-server --import tsx tests/financial-worker-route.ts",
+    "test:financial-worker-route": "node --conditions=react-server --import tsx tests/financial-worker-route.ts && node tests/financial-worker-auth-workflow.mjs",
     "test:autonomous-financial": "node --conditions=react-server --import tsx tests/autonomous-financial.ts && node --conditions=react-server --import tsx tests/autonomous-tron.ts",
     "financial:readiness": "tsx scripts/check-financial-activation.ts",
     "test:financial-readiness": "tsx tests/financial-activation-readiness.ts",
