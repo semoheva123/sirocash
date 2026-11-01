@@ -125,6 +125,7 @@ export function createBep20DepositReadRpc(primary:Options,logs?:Options):Bep20Rp
 /** Independent read-only production gate: does not enable signing or financial writes. */
 export function productionBep20ReadRpc(signal?:AbortSignal,onFailure?:Options['onFailure']):Bep20Rpc{
  if(process.env.VERCEL_ENV!=='production'||process.env.SIRO_RPC_READ_ENABLED!=='true')throw new Error('RPC_LIVE_READ_DISABLED');
- const endpoint=process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
- return createBep20DepositReadRpc({endpoint,signal,onFailure,authorization:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,onFailure,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
+ const override=process.env.SIRO_BEP20_READ_RPC_URL;
+ const endpoint=override??process.env.SIRO_BEP20_RPC_URL;if(!endpoint)throw new Error('RPC_CONFIGURATION_MISSING');
+ return createBep20DepositReadRpc({endpoint,signal,onFailure,authorization:override?process.env.SIRO_BEP20_READ_RPC_AUTHORIZATION:process.env.SIRO_BEP20_RPC_AUTHORIZATION},process.env.SIRO_BEP20_LOG_RPC_URL?{endpoint:process.env.SIRO_BEP20_LOG_RPC_URL,signal,onFailure,authorization:process.env.SIRO_BEP20_LOG_RPC_AUTHORIZATION}:undefined);
 }
