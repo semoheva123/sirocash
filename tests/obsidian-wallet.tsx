@@ -10,6 +10,8 @@ const address='0x'+'1'.repeat(40);
 const status={userId:owner,enabled:false,readable:true,addresses:[{network:'BEP20',address}]};
 async function main(){
  assert.deepEqual(receiveDetails(status,owner,'account','TRC20'),{value:owner,qr:'sirocash:pay:'+owner});
+ assert.equal(receiveDetails({...status,capabilities:{deposits:false}},owner,'crypto','BEP20'),null);
+ assert.deepEqual(receiveDetails({...status,capabilities:{deposits:false}},owner,'account','TRC20'),{value:owner,qr:'sirocash:pay:'+owner});
  assert.equal(receiveDetails(status,'foreign-owner','account','TRC20'),null);
  assert.equal(receiveDetails(null,owner,'account','TRC20'),null);
  assert.equal(receiveDetails({...status,readable:false},owner,'crypto','BEP20'),null);

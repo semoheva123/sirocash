@@ -32,6 +32,13 @@ async function main(){const pg=new PGlite();try{
  let forbiddenCalls=0;
  const depositsOnly=await runFinancialWorkerBatch(db,{enabled:true,depositOnly:true,process:async()=>{forbiddenCalls++}});
  assert.equal(depositsOnly.processed,0);assert.equal(forbiddenCalls,0);
+ await assert.rejects(()=>runFinancialWorkerBatch(db,{enabled:true,limit:128,process}),/INPUT/);
+ await assert.rejects(()=>runFinancialWorkerBatch(db,{enabled:true,depositOnly:true,depositValuesOnly:true,limit:129,process}),/INPUT/);
+ await assert.rejects(()=>runFinancialWorkerBatch(db,{enabled:true,batchTimeoutMs:99,process}),/INPUT/);
+ await pg.exec(`ALTER TABLE "ChainDepositInbox" RENAME TO "FixtureInbox"; CREATE TABLE "ChainDepositInbox"(id UUID,state TEXT,"createdAt" TIMESTAMP(3)); INSERT INTO "ChainDepositInbox" SELECT ('00000000-0000-0000-0000-'||lpad(i::text,12,'0'))::uuid,'AWAITING_VALUATION','2027-01-02'::timestamp FROM generate_series(10,17) i;`);
+ const creditKinds:string[]=[];
+ const creditBatch=await runFinancialWorkerBatch(db,{enabled:true,depositOnly:true,depositValuesOnly:true,limit:128,batchTimeoutMs:2000,process:async job=>{creditKinds.push(job.kind)}});
+ assert.equal(creditBatch.processed,8);assert(creditKinds.every(kind=>kind==='DEPOSIT_VALUE'),'higher-capacity credit batches never dispatch saved sending jobs');
  // Lease theft/expiry fences cursor writes and cleanup must not release another worker's lease.
  await assert.rejects(()=>runFinancialWorkerBatch(db,{enabled:true,limit:1,process:async()=>{await pg.exec(`UPDATE "FinancialWorkerLease" SET "claimId"='00000000-0000-0000-0000-000000000098'`)}}),/LEASE_LOST/);
  assert.ok((await pg.query<{claimId:string}>('SELECT "claimId" FROM "FinancialWorkerLease"')).rows[0].claimId.endsWith('98'));
