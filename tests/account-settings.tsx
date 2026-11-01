@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {AccountSettings} from '../components/account-settings';
+const html=renderToStaticMarkup(<AccountSettings user={{id:'settings-test-account',email:'owner@example.test',emailVerifiedAt:'2026-10-30'}}/>);
+for(const text of ['إعدادات الحساب','بيانات الحساب','owner@example.test','settings-test-account','تم التحقق','تفضيلات العرض','أمان الحساب','تسجيل الخروج','غير متاح حالياً','هذا الجهاز فقط'])assert.ok(html.includes(text),text);
+assert.ok(html.includes('href="/dashboard"'));
+assert.ok(!html.includes('href="/"'));
+assert.ok(!/passwordHash|tokenHash|AUTH_SECRET|RESEND_API_KEY|SC-8901/.test(html));
+assert.ok(html.includes('aria-pressed="true"'));
+for(const id of ['current-password','new-password','confirm-password'])assert.ok(html.includes(`id="${id}"`));
+assert.ok(html.includes('autoComplete="current-password"')||html.includes('autocomplete="current-password"'));
+assert.ok(html.includes('إرسال رمز التحقق'));
+assert.ok(html.includes('لن تتغيّر كلمة المرور إلا بعد تأكيد الرمز'));
+const unverified=renderToStaticMarkup(<AccountSettings user={{id:'other-account',email:'other@example.test',emailVerifiedAt:''}}/>);
+assert.ok(unverified.includes('لم يتم التحقق'));
+console.log('Account settings: own identity, verification state, private navigation, actual controls, honest unsupported features and no secrets in HTML passed.');

@@ -1,0 +1,15 @@
+# Durable passkeys and payment approval — gated preparation
+
+The old process-local Map/cookie passkey prototype has been replaced by PostgreSQL-backed credential, challenge and approval storage. The route is disabled unless `SIRO_DURABLE_PASSKEY_ENABLED=true`; no prepared migration is assumed applied. Production also requires a fixed `WEBAUTHN_ORIGIN` and matching request Origin. This is not a financial activation flag.
+
+Credentials persist across auth sessions, with one credential per account/RP in this first version. Private keys remain with the authenticator; the database holds public key, credential ID, transports and signature counter. Multiple independently enrolled credentials, credential removal/recovery UX, step-up policy for adding devices and real-device browser tests are still required before deployment approval.
+
+Challenges are tied to the durable authenticated session, RP, origin, purpose and operation digest. SQL clock controls expiry. Registration/options and assertion verification use SimpleWebAuthn with required user verification. Session/account/credential row locks serialize conflicting operations. Verification consumes the challenge even on an invalid assertion; database failures roll back challenge, counter and approval together. Starting a new challenge revokes prior approvals for that session.
+
+Approvals use random 256-bit bearer tokens; only SHA256 hashes are stored, with a one-minute expiry. They bind the session and credential to the payment digest. The digest now includes supplied fee, net amount, total debit, request key, quote ID and fee policy, in addition to recipient/phone/operator/amount/network/asset. PIN is never retained. **This does not produce an authoritative quote:** a future financial command must construct the exact approved payload from validated server-side economics and require these fields rather than trusting customer quote fields.
+
+`consumeDurableApproval` is a private transaction-local primitive: consume it in the *same* transaction as a financial reservation/posting. Incorrect digest, another session/user, expiry, prior use or revoked auth session fails. Rolling back financial writes also rolls back consumption. Auth-session deletion cascades pending challenges/approvals. Credentials persist across logout, as expected.
+
+`requirePasskey` deliberately still rejects every legacy financial route. It never consumes an approval separately or lets the shared demonstration wallet mutate. No new financial DB grants exist. No real transaction, signed dispatch or valuation integration is activated.
+
+Tests use PGlite and mocked WebAuthn verification to exercise persistence, session isolation, changed economics/idempotency, failed/expired/single-use challenges, hashed tokens, single-use/expiry/invalidated approvals, database rollback and session-revocation cascade. They are not a substitute for actual device cryptographic/browser ceremonies or independent PostgreSQL connection concurrency. Migration remains prepared only; the public/auth route errors sanitize database details.

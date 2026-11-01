@@ -1,0 +1,283 @@
+/* SiroCash / Atelier
+ * Product storytelling, service clarity, and a consistent information centre.
+ * All artwork is local CSS/SVG. No mock funds, transactions or operating licenses.
+ */
+:root {
+  --atelier-paper: #eae6d7;
+  --atelier-ink: #263e34;
+  --atelier-champagne: #dac49b;
+  --atelier-hairline: #dac49b24;
+}
+button:disabled { cursor: not-allowed; }
+button[aria-busy=true] { cursor: progress; }
+main:focus { outline: none; }
+.atelier-skip { position: fixed; inset-block-start: 12px; inset-inline-start: 18px; z-index: 200; transform: translateY(-180%); background: var(--atelier-paper); color: var(--atelier-ink); border-radius: 8px; padding: 13px 20px; font-size: 13px; }
+.atelier-skip:focus { transform: translateY(0); }
+.public-workspace .hero-description { font-size: 15px; line-height: 2.05; }
+.public-workspace .hero-trust { color: #a4b2a7; }
+.public-workspace .public-preview-note { color: #baa883; }
+.atelier-chapter { display: flex; justify-content: space-between; gap: 16px; padding-block: 18px; border-block-start: 1px solid var(--atelier-hairline); font-size: 10px; color: #9eae9f; }
+.atelier-chapter > :last-child { font: 9px 'Manrope Variable', sans-serif; letter-spacing: 2px; color: #7b8b7e; }
+.atelier-experience { padding-block: 85px 35px; }
+.atelier-experience-grid { display: grid; grid-template-columns: 1fr 1.12fr; gap: 70px; align-items: center; padding-block: 50px 30px; }
+.atelier-experience-copy h2 { font-size: 39px; line-height: 1.6; font-weight: 500; letter-spacing: -.8px; margin-block: 22px; }
+.atelier-experience-copy h2 span { color: #b9c0ad; }
+.atelier-experience-copy > p { font-size: 13px; line-height: 2.1; color: var(--sc-muted); max-width: 405px; }
+.atelier-experience-copy > .text-button { margin-block-start: 27px; color: var(--atelier-champagne); font-size: 12px; }
+.atelier-view-options { margin-block-start: 27px; display: grid; }
+.atelier-view-options > button { display: flex; text-align: start; align-items: start; gap: 17px; background: transparent; border: 0; border-block-start: 1px solid var(--atelier-hairline); color: #9cae9f; padding: 20px 12px; border-inline-start: 2px solid transparent; }
+.atelier-view-options > button[aria-pressed=true] { border-inline-start-color: var(--atelier-champagne); background: linear-gradient(90deg,#dac49b05,#dac49b09); }
+.atelier-view-options > button:hover { background: #dac49b08; }
+.atelier-view-number { font: 11px 'Manrope Variable', sans-serif; color: #baa883; padding-block-start: 5px; }
+.atelier-view-options strong { display: block; color: #e1e4d7; font-size: 14px; font-weight: 550; }
+.atelier-view-options small { display: block; color: #acb6a9; font-size: 11px; line-height: 2; margin-block-start: 8px; }
+.atelier-view-options > button > svg { flex-shrink: 0; margin-inline-start: auto; margin-block-start: 5px; color: #b7a17c; }
+.atelier-product { min-width: 0; background: var(--atelier-paper); color: var(--atelier-ink); border: 1px solid #f9f2de66; border-radius: 18px; box-shadow: 0 30px 70px #0004,0 1px 0 #fff5 inset; position: relative; overflow: hidden; }
+.atelier-product::before { content: ''; position: absolute; width: 330px; height: 330px; border: 1px solid #67806717; border-radius: 50%; inset-inline-end: -120px; top: -150px; pointer-events: none; }
+.atelier-product-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 28px; border-block-end: 1px solid #53694e25; }
+.atelier-product-top > :first-child { display: flex; align-items: center; gap: 8px; font: 750 20px 'Manrope Variable', sans-serif; direction: ltr; }
+.atelier-product-top .logo-dot { color: #6c8060; margin-inline-start: -8px; }
+.atelier-product-top > :last-child { font-size: 8px; letter-spacing: 1px; color: #65725c; }
+.atelier-product-body { display: flex; min-height: 390px; }
+.atelier-product-rail { width: 65px; border-inline-end: 1px solid #53694e25; padding: 26px 12px; display: flex; flex-direction: column; align-items: center; gap: 16px; color: #7c8b72; flex-shrink: 0; }
+.atelier-product-rail > span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; }
+.atelier-product-rail > span.selected { background: #41553c13; color: #244535; border: 1px solid #41553c25; }
+.atelier-product-rail > svg { margin-block-start: auto; }
+.atelier-product-content { flex: 1; min-width: 0; padding: 30px 26px; }
+.atelier-product-kicker { font-size: 8px; letter-spacing: 1px; color: #6b775e; }
+.atelier-product-content h3 { font-size: 20px; font-weight: 650; margin-block: 12px 26px; }
+.atelier-preview-balance { padding: 25px 22px; border-radius: 12px; background: linear-gradient(120deg,#244d3b,#173a30); color: #eeecda; border: 1px solid #1d453844; box-shadow: 0 12px 24px #25412e1c; }
+.atelier-preview-balance > span { font-size: 10px; color: #ced7bb; }
+.atelier-preview-balance strong { display: block; text-align: start; font: 500 37px 'Manrope Variable', sans-serif; letter-spacing: 4px; margin-block: 23px; }
+.atelier-preview-balance small { font-size: 9px; letter-spacing: 0; color: #bdc5a4; }
+.atelier-preview-balance > div { display: flex; gap: 20px; border-block-start: 1px solid #e9e9c923; padding-block-start: 18px; font-size: 10px; color: #d2d9c4; }
+.atelier-preview-row { display: flex; align-items: center; gap: 10px; margin-block-start: 22px; font-size: 10px; color: #63735c; flex-wrap: wrap; }
+.atelier-preview-row b { margin-inline-start: auto; font: 600 10px 'Manrope Variable', sans-serif; color: #365241; }
+.atelier-security-preview > div { display: flex; gap: 14px; align-items: center; padding-block: 22px; border-block-start: 1px solid #53694e25; }
+.atelier-security-preview > div > svg { color: #617b54; flex-shrink: 0; }
+.atelier-security-preview > div > svg:last-child { margin-inline-start: auto; }
+.atelier-security-preview strong { display: block; font-size: 13px; font-weight: 650; }
+.atelier-security-preview small { display: block; font-size: 10px; color: #63735c; margin-block-start: 5px; line-height: 1.9; }
+.atelier-assets-preview > div { display: flex; align-items: center; gap: 11px; border-block-start: 1px solid #53694e25; padding-block: 24px; }
+.atelier-assets-preview strong { font: 650 13px 'Manrope Variable', sans-serif; }
+.atelier-assets-preview strong small { display: block; font-size: 9px; margin-block-start: 5px; color: #6d785f; font-weight: 400; }
+.atelier-assets-preview > div > span:last-child { margin-inline-start: auto; font: 10px/1.8 'Manrope Variable', sans-serif; color: #5e7056; text-align: end; }
+.atelier-assets-preview p { display: flex; align-items: start; gap: 8px; padding: 14px; margin-block-start: 12px; background: #53694e0a; color: #657253; font-size: 10px; line-height: 2; border-radius: 6px; }
+.atelier-assets-preview p svg { margin-top: 3px; flex-shrink: 0; }
+.atelier-product-bottom { display: flex; align-items: center; gap: 8px; padding: 16px 25px; border-block-start: 1px solid #53694e25; color: #69725a; font-size: 9px; }
+.atelier-preview-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #8f7a4e; flex-shrink: 0; }
+/* Read the terms before entering a financial flow, including an inactive one. */
+.atelier-service-brief { margin-block: 27px; border: 1px solid var(--atelier-hairline); border-radius: 13px; background: linear-gradient(110deg,#dac49b05,#20473810); overflow: hidden; }
+.atelier-brief-title { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 15px 22px; border-block-end: 1px solid var(--atelier-hairline); }
+.atelier-brief-title > span { color: #bca77e; font-size: 9px; letter-spacing: 1px; }
+.atelier-brief-title a { color: #c4cdbb; font-size: 10px; display: flex; align-items: center; gap: 8px; }
+.atelier-brief-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.atelier-brief-grid > div { display: flex; align-items: start; gap: 14px; padding: 23px; border-inline-end: 1px solid var(--atelier-hairline); }
+.atelier-brief-grid > div:last-child { border-inline-end: 0; }
+.atelier-brief-grid > div > svg { color: #bda77e; flex-shrink: 0; margin-block-start: 3px; }
+.atelier-brief-grid span { color: #a9b5a6; font-size: 10px; }
+.atelier-brief-grid strong { display: block; margin-block: 8px; color: #e5e4d7; font-size: 14px; font-weight: 550; }
+.atelier-brief-grid p { color: #a6b3a3; font-size: 10px; line-height: 2; }
+.account-workspace .service-unavailable { background: radial-gradient(ellipse at 50% 0%,#415b331c,transparent 65%),#11191a; border-color: var(--atelier-hairline); }
+.account-workspace .service-unavailable-icon { background: #dac49b09; color: #dac49b; border-color: #dac49b30; }
+.account-workspace .gateway-help { border-inline-start: 1px solid var(--atelier-hairline); padding-inline-start: 32px; }
+.account-workspace .gateway-help > svg { color: #cbb68a; }
+.account-workspace .gateway-help h2 { color: #e1e4d6; font-weight: 500; line-height: 1.8; }
+.account-workspace .gateway-help > p { font-size: 13px; color: #b1beae; line-height: 2.1; }
+.account-workspace .gateway { border-color: #dac49b30; }
+.account-workspace .gateway .crypto-selection-summary { border-color: #dac49b2e; background: #dac49b05; }
+.account-workspace .gateway .crypto-selection-summary strong { color: #dcc8a1; }
+.account-workspace .deposit-qr { background: #dac49b03; color: #96a68e; border-color: #dac49b30; min-height: 220px; }
+.account-workspace .gateway .network-buttons > button { min-height: 67px; }
+.account-workspace .gateway .asset-picker > div > button { min-height: 73px; }
+.account-workspace .gateway .withdraw-summary strong { color: #dfd4b7; }
+.modal.glass { border-color: #bca47b50; background: linear-gradient(150deg,#1c2825,#10191a); box-shadow: 0 30px 100px #0008,inset 0 1px #fff1; }
+.modal:focus { outline: none; }
+.modal .close-modal { inset-inline-end: 16px; inset-inline-start: auto; }
+.modal .close-modal:focus-visible { outline: 2px solid var(--atelier-champagne); outline-offset: 5px; }
+.toast { background: #24352e; border-color: #bca47b55; color: #ede9d9; line-height: 1.9; }
+.toast > svg { flex-shrink: 0; color: #d6c49f; }
+/* Shared information centre: status, privacy, terms and help. */
+.trust-page { padding-block: 0 30px; max-width: 1220px; }
+.trust-header { height: 102px; margin-block-end: 0; border-block-end: 1px solid var(--atelier-hairline); }
+.atelier-document-hero { display: grid; grid-template-columns: 1fr 250px; gap: 70px; align-items: center; padding-block: 48px 45px; }
+.atelier-document-breadcrumb { display: flex; align-items: center; gap: 11px; margin-block-end: 35px; color: #a7b3a3; font-size: 10px; }
+.atelier-document-breadcrumb a { font-family: 'Manrope Variable', sans-serif; color: #c6b18a; }
+.atelier-document-hero h1 { font-size: 40px; font-weight: 550; line-height: 1.65; margin-block: 20px; }
+.atelier-document-hero .trust-intro { font-size: 14px; max-width: 730px; line-height: 2.1; }
+.atelier-document-emblem { height: 215px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; color: #d4bf95; background: radial-gradient(circle,#dac49b0d,transparent 70%); }
+.atelier-document-emblem::before,.atelier-document-emblem::after { content: ''; position: absolute; width: 178px; height: 178px; border: 1px solid #dac49b25; border-radius: 50%; }
+.atelier-document-emblem::after { width: 215px; height: 215px; border-color: #dac49b0d; }
+.atelier-document-emblem span { font: 8px 'Manrope Variable', sans-serif; letter-spacing: 2px; }
+.trust-nav { margin: 0; padding: 0; border-color: var(--atelier-hairline); gap: 30px; }
+.trust-nav a { padding-block: 20px; border-block-end: 2px solid transparent; font-size: 12px; color: #aab6a6; }
+.trust-nav a[aria-current=page] { color: #ead9b3; border-block-end-color: #dac49b; }
+.atelier-document-note { display: flex; align-items: center; gap: 13px; margin-block: 25px; padding: 18px 22px; background: #dac49b05; border: 1px solid var(--atelier-hairline); border-radius: 9px; font-size: 11px; color: #b7bea8; line-height: 2; }
+.atelier-document-note > svg { flex-shrink: 0; color: #c2aa7e; }
+.atelier-document-note a { margin-inline-start: auto; color: #dac49b; }
+.trust-grid { gap: 20px; margin-block: 24px; counter-reset: info-section; }
+.trust-grid > section { position: relative; padding: 35px 32px; border-color: #dac49b25; border-radius: 12px; background: linear-gradient(130deg,#19231f,#111a1a); }
+.trust-grid > section::before { counter-increment: info-section; content: '0' counter(info-section); font: 10px 'Manrope Variable',sans-serif; color: #bba57d; display: block; margin-block-end: 24px; }
+.trust-content h2 { font-size: 21px; font-weight: 550; line-height: 1.8; }
+.trust-content p { color: #b0bbac; font-size: 13px; line-height: 2.25; }
+.trust-content a:not(.button) { color: #dcc59b; }
+/* Account recovery belongs to the same platform, not a disconnected form. */
+.recovery-page { background: radial-gradient(ellipse at 15% 45%,#31523b18,transparent 65%),#0d1415; }
+.recovery-page > .header { max-width: 1250px; }
+.atelier-recovery-layout { max-width: 1140px; width: calc(100% - 100px); margin: 65px auto 55px; display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: start; }
+.atelier-recovery-story { padding-block: 25px; }
+.atelier-recovery-story h2 { font-size: 40px; font-weight: 500; line-height: 1.7; margin-block: 25px 22px; }
+.atelier-recovery-story h2 span { color: #c5c5ad; }
+.atelier-recovery-story > p { color: #aebaa9; font-size: 13px; line-height: 2.2; max-width: 370px; }
+.atelier-recovery-steps { list-style: none; padding: 0; margin-block: 33px; }
+.atelier-recovery-steps li { display: flex; align-items: center; gap: 17px; position: relative; padding-block: 15px; }
+.atelier-recovery-steps li > span { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #dac49b26; border-radius: 11px; color: #84977f; background: #dac49b03; flex-shrink: 0; }
+.atelier-recovery-steps li.current > span { border-color: #dac49b66; color: #dac49b; background: #dac49b0b; box-shadow: 0 0 26px #dac49b08; }
+.atelier-recovery-steps li.complete > span { border-color: #93b78955; color: #b4c49f; }
+.atelier-recovery-steps small { font: 8px 'Manrope Variable',sans-serif; color: #a08e6b; }
+.atelier-recovery-steps strong { display: block; font-size: 13px; font-weight: 500; color: #cbd1c1; margin-block-start: 5px; }
+.atelier-recovery-safety { display: flex; gap: 14px; padding-block-start: 24px; border-block-start: 1px solid var(--atelier-hairline); color: #bdaa83; }
+.atelier-recovery-safety > svg { flex-shrink: 0; }
+.atelier-recovery-safety p { font-size: 11px; line-height: 2; color: #b0bca9; }
+.atelier-recovery-layout .recovery-card { width: 100%; max-width: none; margin: 0; padding: 35px; border-color: #dac49b35; border-radius: 16px; background: linear-gradient(145deg,#1c2722,#111a1b); box-shadow: 0 25px 70px #0003; }
+.atelier-recovery-layout .recovery-card h1 { font-weight: 550; font-size: 26px; }
+.atelier-recovery-layout .recovery-card input { min-height: 49px; }
+.atelier-recovery-layout .recovery-card label { font-size: 12px; }
+.atelier-recovery-layout .recovery-card input:focus { box-shadow: 0 0 0 3px #dac49b12; }
+.atelier-recovery-footer { max-width: 1140px; width: calc(100% - 100px); margin: auto; padding-block: 25px; border-block-start: 1px solid var(--atelier-hairline); display: flex; justify-content: space-between; gap: 15px; color: #a09171; }
+.atelier-recovery-footer > span { font: 9px 'Manrope Variable',sans-serif; letter-spacing: 1px; }
+.atelier-recovery-footer a { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #c5ceb9; }
+/* Resilient loading/error destinations, with the same identity and no demo fallback. */
+.atelier-route-state { min-height: 90svh; padding: 10vh 25px; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 35%,#294b3425,transparent 65%); }
+.atelier-state-card { max-width: 570px; width: 100%; text-align: center; padding: 45px 35px; border: 1px solid var(--atelier-hairline); border-radius: 17px; background: linear-gradient(145deg,#1c2722,#111a1b); }
+.atelier-state-card > .feature-icon { margin: auto; width: 58px; height: 58px; }
+.atelier-state-card .eyebrow { margin: 28px auto 15px; }
+.atelier-state-card h1 { font-size: 29px; font-weight: 550; line-height: 1.8; }
+.atelier-state-card p { font-size: 13px; line-height: 2; color: #b0bba8; margin-block: 16px; }
+.atelier-state-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-block-start: 25px; }
+@media (min-width: 761px) {
+  .premium-auth .premium-form-card { box-shadow: 0 28px 75px #0004,inset 0 1px #fff1; }
+}
+@media (max-width: 1100px) {
+  .atelier-experience-grid { gap: 35px; }
+  .atelier-experience-copy h2 { font-size: 33px; }
+  .atelier-product-content { padding: 27px 20px; }
+  .atelier-product-rail { width: 55px; padding-inline: 8px; }
+  .atelier-product-top { padding: 23px; }
+  .atelier-recovery-layout { gap: 50px; }
+  .atelier-document-hero { gap: 35px; grid-template-columns: 1fr 200px; }
+  .atelier-document-hero h1 { font-size: 35px; }
+}
+@media (max-width: 900px) {
+  .atelier-experience-grid { grid-template-columns: 1fr; gap: 40px; }
+  .atelier-experience-copy > p { max-width: 600px; }
+  .atelier-product { max-width: 620px; width: 100%; margin-inline: auto; }
+  .atelier-view-options { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+  .atelier-view-options > button { flex-direction: column; gap: 10px; }
+  .atelier-view-options > button > svg { display: none; }
+  .atelier-view-options small { font-size: 11px; }
+  .atelier-product-body { min-height: 365px; }
+  .atelier-recovery-layout { width: calc(100% - 64px); gap: 35px; }
+  .atelier-recovery-story h2 { font-size: 31px; }
+  .atelier-recovery-layout .recovery-card { padding: 28px; }
+}
+@media (max-width: 760px) {
+  .public-workspace .hero-description { font-size: 14px; }
+  .atelier-experience { padding-block: 60px 15px; }
+  .atelier-experience-grid { padding-block: 30px 15px; gap: 27px; }
+  .atelier-experience-copy h2 { font-size: 29px; line-height: 1.7; }
+  .atelier-experience-copy > p { font-size: 12px; }
+  .atelier-chapter { font-size: 9px; }
+  .atelier-chapter > :last-child { font-size: 7px; letter-spacing: 1px; }
+  .atelier-view-options { grid-template-columns: 1fr; gap: 0; }
+  .atelier-view-options > button { flex-direction: row; gap: 14px; padding-block: 17px; }
+  .atelier-view-options > button > svg { display: block; }
+  .atelier-view-options strong { font-size: 13px; }
+  .atelier-product-top { padding: 22px 18px; }
+  .atelier-product-top > :first-child { font-size: 18px; }
+  .atelier-product-top > :last-child { font-size: 7px; letter-spacing: 0; }
+  .atelier-product-content { padding: 25px 16px; }
+  .atelier-product-content h3 { font-size: 17px; }
+  .atelier-product-rail { width: 46px; padding: 25px 5px; }
+  .atelier-product-rail > span { width: 31px; height: 33px; }
+  .atelier-preview-balance { padding: 23px 17px; }
+  .atelier-preview-balance strong { font-size: 30px; letter-spacing: 3px; }
+  .atelier-security-preview > div { gap: 10px; }
+  .atelier-security-preview strong { font-size: 12px; }
+  .atelier-assets-preview > div > span:last-child { font-size: 8px; }
+  .atelier-product-bottom { font-size: 8px; padding: 16px; line-height: 1.9; }
+  .public-workspace .feature-grid { grid-template-columns: 1fr; }
+  .public-workspace .feature-card { min-height: auto; padding: 25px; border-inline-end: 0; border-block-end: 1px solid var(--atelier-hairline) !important; }
+  .public-workspace .feature-card:last-child { border-block-end: 0 !important; }
+  .public-workspace .feature-card h3 { min-height: auto; margin-block: 17px 10px; font-size: 17px; }
+  .public-workspace .feature-card p { min-height: auto; font-size: 13px; line-height: 2; }
+  .public-workspace .feature-tag { margin-block-start: 19px; font-size: 10px; }
+  .atelier-service-brief { margin-block: 22px; }
+  .atelier-brief-title { padding: 15px 18px; }
+  .atelier-brief-grid { grid-template-columns: 1fr; }
+  .atelier-brief-grid > div { padding: 19px; border-inline-end: 0; border-block-end: 1px solid var(--atelier-hairline); }
+  .atelier-brief-grid > div:last-child { border-block-end: 0; }
+  .atelier-brief-grid strong { font-size: 14px; margin-block: 6px; }
+  .atelier-brief-grid p { font-size: 11px; }
+  .account-workspace .gateway-help { border-inline-start: 0; padding: 25px 3px; }
+  .trust-header { height: 85px; }
+  .trust-header .logo { gap: 6px; font-size: 21px; }
+  .trust-header .security-actions { gap: 12px; }
+  .trust-header .button { font-size: 10px; padding: 10px 12px; min-height: 40px; }
+  .trust-header .language { font-size: 10px; gap: 5px; }
+  .atelier-document-hero { display: block; padding-block: 30px; }
+  .atelier-document-emblem { display: none; }
+  .atelier-document-breadcrumb { margin-block-end: 25px; }
+  .atelier-document-hero h1 { font-size: 29px; }
+  .atelier-document-hero .trust-intro { font-size: 13px; }
+  .trust-nav { gap: 20px; }
+  .trust-nav a { padding-block: 15px; font-size: 11px; }
+  .atelier-document-note { padding: 17px; gap: 10px; font-size: 11px; align-items: start; }
+  .atelier-document-note > svg { margin-block-start: 3px; }
+  .trust-grid > section { padding: 27px 24px; }
+  .trust-content h2 { font-size: 20px; }
+  .trust-content p { font-size: 13px; }
+  .atelier-recovery-layout { display: flex; flex-direction: column; width: calc(100% - 40px); gap: 25px; margin-block: 30px; }
+  .atelier-recovery-story { padding: 0; width: 100%; }
+  .atelier-recovery-story h2 { font-size: 29px; margin-block: 20px 15px; }
+  .atelier-recovery-story > p { max-width: none; font-size: 12px; }
+  .atelier-recovery-steps { display: flex; gap: 12px; justify-content: space-between; margin-block: 22px 0; }
+  .atelier-recovery-steps li { flex: 1; display: block; padding-block: 10px; }
+  .atelier-recovery-steps li > span { width: 34px; height: 34px; margin-block-end: 9px; }
+  .atelier-recovery-steps small { display: none; }
+  .atelier-recovery-steps strong { font-size: 10px; line-height: 2; }
+  .atelier-recovery-safety { display: none; }
+  .atelier-recovery-layout .recovery-card { padding: 27px 23px; }
+  .atelier-recovery-layout .recovery-card h1 { font-size: 24px; }
+  .atelier-recovery-footer { width: calc(100% - 40px); }
+  .atelier-recovery-footer > span { font-size: 7px; }
+  .atelier-recovery-footer a { font-size: 10px; }
+  .atelier-state-card { padding: 35px 24px; }
+  .atelier-state-card h1 { font-size: 25px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}
+/* Real section navigation. Never searches account records or transaction data. */
+.atelier-search-trigger { display: flex; align-items: center; gap: 9px; width: 100%; padding: 11px; background: #dac49b05; border: 1px solid #dac49b25; border-radius: 8px; color: #b2bea9; font-size: 10px; margin-block: 0 17px; text-align: start; }
+.atelier-search-trigger:hover { border-color: #dac49b55; background: #dac49b0b; }
+.atelier-search-trigger kbd { font: 8px 'Manrope Variable',sans-serif; color: #96886e; margin-inline-start: auto; white-space: nowrap; }
+.atelier-command > .eyebrow { font: 8px 'Manrope Variable',sans-serif; letter-spacing: 1px; }
+.atelier-command h2 { font-size: 22px; margin-block: 20px; line-height: 1.8; }
+.atelier-command-input { display: flex; align-items: center; gap: 10px; border: 1px solid #dac49b40; border-radius: 9px; padding-inline: 14px; color: #c9b58f; background: #0b1412; }
+.atelier-command-input:focus-within { border-color: #dac49b90; box-shadow: 0 0 0 3px #dac49b0c; }
+.atelier-command-input input { background: transparent; border: 0; box-shadow: none; padding-inline: 0; font-size: 12px; }
+.atelier-command-input input:focus { box-shadow: none; }
+.atelier-command [role=listbox] { margin-block: 17px; display: grid; gap: 5px; }
+.atelier-command [role=option] { display: flex; align-items: center; gap: 13px; padding: 13px; border: 1px solid transparent; border-radius: 7px; font-size: 12px; color: #b9c6af; }
+.atelier-command [role=option] > svg:last-child { margin-inline-start: auto; color: #a79979; }
+.atelier-command [role=option][aria-selected=true] { background: #dac49b09; border-color: #dac49b27; color: #e7dbbf; }
+.atelier-command-empty { padding-block: 30px; color: #b4bea9; font-size: 12px; line-height: 2; }
+.atelier-command-footer { display: flex; gap: 20px; padding-block-start: 18px; border-block-start: 1px solid var(--atelier-hairline); color: #a5987a; font-size: 9px; }
+@media (max-width: 760px) { .atelier-search-trigger { display: none; } }
+/* Keep the brand readable as a single LTR mark inside either document direction. */
+.logo { direction: ltr; }
+.atelier-skip { opacity: 0; pointer-events: none; }
+.atelier-skip:focus { opacity: 1; pointer-events: auto; }
+.atelier-assets-preview .asset-logo.usdt { color: #286348; background: #c1d7c4; }
+.atelier-assets-preview .asset-logo.usdc { color: #355b8d; background: #c3cfda; }

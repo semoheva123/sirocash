@@ -1,0 +1,483 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum KycStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+enum AccountType {
+  USER
+  AGENT
+  MERCHANT
+  MASTER_POOL
+}
+enum TransactionType {
+  P2P
+  DEPOSIT
+  WITHDRAWAL
+  SHAM_CASH
+  MOBILE_TOPUP
+}
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+enum Chain {
+  TRC20
+  BEP20
+  ETHEREUM
+  POLYGON
+}
+enum CryptoAsset {
+  USDT
+  USDC
+}
+model User {
+ usdtWithdrawalQuotes UsdtWithdrawalQuote[]
+ durablePasskeys DurablePasskeyCredential[]
+ depositAddresses UserDepositAddress[]
+  walletOperations WalletOperation[] @relation("WalletOwner")
+  walletCounterparties WalletOperation[] @relation("WalletCounterparty")
+  accountSecurityChallenges AccountSecurityChallenge[]
+  securityEvents SecurityEvent[]
+  passwordChangeChallenges PasswordChangeChallenge[]
+  id String @id @default(uuid()) @db.Uuid
+  email String? @unique
+  emailVerifiedAt DateTime?
+  passwordHash String?
+  phone String? @unique
+  pinHash String?
+  // Cached USD balance. LedgerEntry is the source of truth.
+  balance Decimal @default(0) @db.Decimal(20, 6)
+  kycStatus KycStatus @default(UNVERIFIED)
+  createdAt DateTime @default(now())
+  authSessions AuthSession[]
+  accounts LedgerAccount[]
+  sent Transaction[] @relation("Sender")
+  received Transaction[] @relation("Receiver")
+  depositAddresses DepositAddress[]
+}
+model LedgerAccount {
+ withdrawalSettlements UsdtWithdrawalQuote[] @relation("QuoteSettlement")
+ withdrawalRevenue UsdtWithdrawalQuote[] @relation("QuoteRevenue")
+ depositValuations ApprovedDepositValuation[]
+  feeOperations WalletOperation[] @relation("WalletFeeAccount")
+  id String @id @default(uuid()) @db.Uuid
+  userId String? @db.Uuid
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  accountType AccountType
+  // Updated only by database ledger trigger; never write directly.
+  balance Decimal @default(0) @db.Decimal(20, 6)
+  currency String @default("USD")
+  entries LedgerEntry[]
+  @@unique([userId, accountType, currency])
+}
+model Transaction {
+  walletOperation WalletOperation?
+  id String @id @default(uuid()) @db.Uuid
+  senderId String? @db.Uuid
+  receiverId String? @db.Uuid
+  sender User? @relation("Sender", fields: [senderId], references: [id], onDelete: Restrict)
+  receiver User? @relation("Receiver", fields: [receiverId], references: [id], onDelete: Restrict)
+  amount Decimal @db.Decimal(20, 6)
+  type TransactionType
+  txid String? @unique
+  cryptoAsset CryptoAsset?
+  cryptoChain Chain?
+  idempotencyKey String @unique
+  status TransactionStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  entries LedgerEntry[]
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+}
+model LedgerEntry {
+  id String @id @default(uuid()) @db.Uuid
+  transactionId String @db.Uuid
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  accountId String @db.Uuid
+  account LedgerAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  // Signed delta: negative debit, positive credit. Sum per transaction = 0.
+  amount Decimal @db.Decimal(20, 6)
+  createdAt DateTime @default(now())
+  @@unique([transactionId, accountId])
+  @@index([accountId, createdAt])
+}
+model DepositAddress {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  chain Chain
+  asset CryptoAsset @default(USDT)
+  address String @unique
+  derivationIndex Int
+  createdAt DateTime @default(now())
+  @@unique([chain, derivationIndex])
+  @@unique([userId, chain, asset])
+}
+
+model AuthSession {
+ passkeyChallenge DurablePasskeyChallenge?
+ paymentApprovals DurablePaymentApproval[]
+  createdAt DateTime?
+  deviceLabel String?
+  tokenHash String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+model EmailChallenge {
+  passwordHash String?
+  purpose String @default("legacy")
+  id String @id
+  email String
+  codeHash String
+  attempts Int @default(0)
+  expiresAt DateTime
+  @@index([email])
+  @@index([expiresAt])
+}
+model EmailRateLimit {
+  id String @id
+  lastSentAt DateTime @default(dbgenerated("'1970-01-01'::timestamp"))
+  windowStart DateTime @default(now())
+  count Int @default(0)
+}
+
+model PasswordChangeChallenge {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionHash String
+  oldPasswordHash String
+  newPasswordHash String
+  codeHash String
+  attempts Int @default(0)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AccountSecurityChallenge {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose String
+  oldEmail String
+  oldPasswordHash String
+  sessionHash String?
+  newEmail String?
+  codeHash String
+  secondCodeHash String?
+  attempts Int @default(0)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+model SecurityEvent {
+  id String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  kind String
+  createdAt DateTime @default(now())
+  notification SecurityNotification?
+  @@index([userId, createdAt])
+}
+model SecurityNotification {
+  id String @id
+  event SecurityEvent @relation(fields: [id], references: [id], onDelete: Restrict)
+  recipient String
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  deliveredAt DateTime?
+  @@index([nextAttemptAt])
+}
+
+model WalletOperation {
+ signedWithdrawal SignedWithdrawalOutbox?
+ usdtWithdrawalQuote UsdtWithdrawalQuote?
+ depositValuation ApprovedDepositValuation?
+ energyRentalIntent EnergyRentalIntent?
+ feeAmount Decimal @default(0) @db.Decimal(20,6)
+ feeAccountId String? @db.Uuid
+ feeAccount LedgerAccount? @relation("WalletFeeAccount", fields: [feeAccountId], references: [id], onDelete: Restrict)
+ id String @id @db.Uuid
+ ownerId String @db.Uuid
+ owner User @relation("WalletOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+ requestKey String
+ fingerprint String
+ kind String
+ amount Decimal @db.Decimal(20,6)
+ counterpartyId String? @db.Uuid
+ counterparty User? @relation("WalletCounterparty", fields: [counterpartyId], references: [id], onDelete: Restrict)
+ destination String?
+ externalReference String? @unique
+ state String @default("PENDING")
+ transactionId String? @unique @db.Uuid
+ transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @default(now())
+ @@unique([ownerId,requestKey])
+ @@index([ownerId,state])
+}
+
+// Private staging table; no runtime financial privileges or provider dispatch.
+model EnergyRentalIntent {
+ id String @id @db.Uuid
+ withdrawalId String? @unique @db.Uuid
+ withdrawal WalletOperation? @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+ sweepAddressId String? @db.Uuid
+ sweepAddress UserDepositAddress? @relation(fields: [sweepAddressId], references: [id], onDelete: Restrict)
+ recipientAddress String?
+ amountBaseUnits Decimal? @db.Decimal(78,0)
+ senderAddress String
+ requestKey String @unique
+ fingerprint String
+ energyAmount Int
+ durationMinutes Int
+ maxRentalSun BigInt
+ state String @default("PREPARED")
+ providerOrderId String? @unique
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ updatedAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+
+model DepositAddressVault {
+ id String @id @db.Uuid
+ network String
+ accountXpub String @unique
+ originVerified Boolean @default(false)
+ nextIndex BigInt @default(0)
+ enabled Boolean @default(false)
+ addresses UserDepositAddress[]
+ @@unique([id,network], map: "deposit_vault_network")
+}
+model UserDepositAddress {
+ energyIntents EnergyRentalIntent[]
+ signedSweeps SignedSweepOutbox[]
+ deposits ChainDepositInbox[]
+ id String @id @db.Uuid
+ ownerId String @db.Uuid
+ owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+ vaultId String @db.Uuid
+ vault DepositAddressVault @relation(fields: [vaultId,network], references: [id,network], onDelete: Restrict)
+ network String
+ address String @unique
+ derivationIndex BigInt
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([ownerId,network])
+ @@unique([vaultId,derivationIndex])
+ @@unique([id,network])
+}
+
+model ChainDepositInbox {
+ valuation ApprovedDepositValuation?
+ id String @id @db.Uuid
+ eventKey String @unique
+ addressId String @db.Uuid
+ network String
+ address UserDepositAddress @relation(fields: [addressId,network], references: [id,network], onDelete: Restrict)
+ txId String
+ logIndex Int
+ blockNumber BigInt
+ blockHash String
+ amountBaseUnits Decimal @db.Decimal(78,0)
+ fingerprint String
+ state String @default("AWAITING_VALUATION")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([network,txId,logIndex])
+}
+
+model PlatformWithdrawalGuard {
+ id Int @id
+}
+
+model SignedSweepOutbox {
+ confirmation SweepConfirmation?
+ id String @id @db.Uuid
+ addressId String @db.Uuid
+ address UserDepositAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+ requestKey String
+ network String
+ fingerprint String
+ txId String @unique
+ signedPayload String
+ senderNonce BigInt?
+ state String @default("SIGNED")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([addressId,requestKey])
+}
+
+model SweepConfirmation {
+ sweepId String @id @db.Uuid
+ sweep SignedSweepOutbox @relation(fields: [sweepId], references: [id], onDelete: Restrict)
+ fingerprint String
+ evidence Json
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model DurablePasskeyCredential {
+ id String @id
+ userId String @db.Uuid
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ rpId String
+ publicKey String
+ counter BigInt
+ transports Json @default("[]")
+ approvals DurablePaymentApproval[]
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@unique([userId,rpId])
+}
+model DurablePasskeyChallenge {
+ sessionHash String @id
+ session AuthSession @relation(fields: [sessionHash], references: [tokenHash], onDelete: Cascade)
+ kind String
+ challenge String
+ rpId String
+ origin String
+ digest String?
+ expiresAt DateTime @db.Timestamptz(6)
+}
+model DurablePaymentApproval {
+ tokenHash String @id
+ sessionHash String
+ session AuthSession @relation(fields: [sessionHash], references: [tokenHash], onDelete: Cascade)
+ credentialId String
+ credential DurablePasskeyCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+ digest String
+ expiresAt DateTime @db.Timestamptz(6)
+ consumedAt DateTime? @db.Timestamptz(6)
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ @@index([sessionHash],map: "durable_approval_session")
+}
+
+model ApprovedDepositValuation {
+ inboxId String @id @db.Uuid
+ inbox ChainDepositInbox @relation(fields: [inboxId], references: [id], onDelete: Restrict)
+ inboxFingerprint String
+ quoteReference String
+ rateUsdMicrosPerToken Decimal @db.Decimal(30,0)
+ policy String
+ settlementAccountId String @db.Uuid
+ settlement LedgerAccount @relation(fields: [settlementAccountId], references: [id], onDelete: Restrict)
+ approvedAt DateTime @db.Timestamptz(6)
+ expiresAt DateTime @db.Timestamptz(6)
+ operationId String? @unique @db.Uuid
+ operation WalletOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+}
+
+model UsdtWithdrawalQuote {
+ signedWithdrawal SignedWithdrawalOutbox?
+ id String @id @db.Uuid
+ ownerId String @db.Uuid
+ owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+ requestKey String
+ fingerprint String
+ network String
+ recipient String
+ grossTokens Decimal @db.Decimal(20,6)
+ feeTokens Decimal @db.Decimal(20,6)
+ netTokens Decimal @db.Decimal(20,6)
+ grossUsd Decimal @db.Decimal(20,6)
+ feeUsd Decimal @db.Decimal(20,6)
+ netUsd Decimal @db.Decimal(20,6)
+ rateUsdMicrosPerToken Decimal @db.Decimal(30,0)
+ rateReference String
+ settlementAccountId String @db.Uuid
+ settlement LedgerAccount @relation("QuoteSettlement", fields: [settlementAccountId], references: [id], onDelete: Restrict)
+ feeAccountId String @db.Uuid
+ feeAccount LedgerAccount @relation("QuoteRevenue", fields: [feeAccountId], references: [id], onDelete: Restrict)
+ expiresAt DateTime @db.Timestamptz(6)
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ operationId String? @unique @db.Uuid
+ operation WalletOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+ @@unique([ownerId,requestKey])
+}
+
+model WithdrawalSigningGuard {
+ expensePolicy PayoutExpensePolicy?
+ network String @id
+ payouts SignedWithdrawalOutbox[]
+}
+model SignedWithdrawalOutbox {
+ expenseReservation PayoutExpenseReservation?
+ confirmation PayoutConfirmation?
+ dispatchApproval PayoutDispatchApproval?
+ id String @id @db.Uuid
+ quoteId String @unique @db.Uuid
+ quote UsdtWithdrawalQuote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+ operationId String @unique @db.Uuid
+ operation WalletOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+ network String
+ guard WithdrawalSigningGuard @relation(fields: [network], references: [network])
+ sender String
+ recipient String
+ amountBaseUnits Decimal @db.Decimal(78,0)
+ fingerprint String
+ txId String @unique
+ signedPayload String
+ senderNonce BigInt?
+ state String @default("SIGNED")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model PayoutDispatchApproval {
+ payoutId String @id @db.Uuid
+ payout SignedWithdrawalOutbox @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+ txId String
+ payloadHash String
+ authorityReference String @unique
+ maxNativeFeeBaseUnits Decimal @db.Decimal(78,0)
+ approvedAt DateTime @db.Timestamptz(6)
+ expiresAt DateTime @db.Timestamptz(6)
+ consumedAt DateTime? @db.Timestamptz(6)
+ attempt PayoutDispatchAttempt?
+}
+model PayoutDispatchAttempt {
+ payoutId String @id @db.Uuid
+ approval PayoutDispatchApproval @relation(fields: [payoutId], references: [payoutId], onDelete: Restrict)
+ claimId String @unique @db.Uuid
+ state String @default("UNKNOWN")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ acknowledgedAt DateTime? @db.Timestamptz(6)
+}
+
+model PayoutConfirmation {
+ payoutId String @id @db.Uuid
+ payout SignedWithdrawalOutbox @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+ fingerprint String
+ evidence Json
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model PayoutExpensePolicy {
+ network String @id
+ guard WithdrawalSigningGuard @relation(fields: [network], references: [network])
+ enabled Boolean @default(false)
+ perPayoutCap Decimal @default(0) @db.Decimal(78,0)
+ dailyCap Decimal @default(0) @db.Decimal(78,0)
+ reservations PayoutExpenseReservation[]
+}
+model PayoutExpenseReservation {
+ payoutId String @id @db.Uuid
+ payout SignedWithdrawalOutbox @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+ network String
+ policy PayoutExpensePolicy @relation(fields: [network], references: [network])
+ amountBaseUnits Decimal @db.Decimal(78,0)
+ evidenceHash String
+ evidence Json
+ state String @default("HELD")
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ settledAt DateTime? @db.Timestamptz(6)
+ @@index([network,state],map: "payout_expense_network_state")
+}

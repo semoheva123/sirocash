@@ -1,0 +1,32 @@
+name: Financial worker
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: financial-worker
+  cancel-in-progress: false
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Invoke authenticated bounded worker
+        env:
+          WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
+        run: |
+          set -eu
+          test "${#WORKER_SECRET}" -ge 32 || { echo 'Financial worker credential is not configured.'; exit 1; }
+          curl --fail --silent --show-error --max-time 175 --retry 0 \
+            --request POST --header "Authorization: Bearer ${WORKER_SECRET}" \
+            --header 'Content-Length: 0' \
+            'https://sirocash.vercel.app/api/internal/financial-worker' > worker-result.json
+          python3 - <<'PYTHON'
+          import json, sys
+          with open('worker-result.json') as f:
+              result = json.load(f)
+          if result.get('healthy') is False or result.get('held', 0):
+              sys.exit('Deposit watcher unhealthy or work held; customer reception is gated by scanner liveness.')
+          print('Authenticated worker completed; no credentials or customer data logged.')
+          PYTHON

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {reconcile,reconciliationSchema} from '../lib/reconciliation';
+const a={reference:'external-ref-1',asset:'USDT' as const,network:'TRC20',amountMicros:'9876543210987654321'};
+assert.equal(reconcile({ledger:[a],provider:[{...a}]}).matched,true);
+for(const provider of [[{...a,amountMicros:'9876543210987654320'}],[{...a,asset:'USDC' as const}],[{...a,network:'BEP20'}],[]])assert.equal(reconcile({ledger:[a],provider}).matched,false);
+assert.equal(reconcile({ledger:[],provider:[a]}).errors[0].reason,'missing_ledger');
+assert.equal(reconcile({ledger:[a,a],provider:[a]}).errors[0].reason,'duplicate_reference');
+assert.equal(reconciliationSchema.safeParse({ledger:[{...a,amountMicros:'1.5'}],provider:[]}).success,false);
+assert.equal(reconciliationSchema.safeParse({ledger:[{...a,amountMicros:'NaN'}],provider:[]}).success,false);
+console.log('Offline reconciliation: exact bigint micros, missing entries, duplicate references, asset/network/amount mismatches, and invalid export rejection passed. No financial writes or provider connection.');

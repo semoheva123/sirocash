@@ -1,0 +1,122 @@
+name: Security and offline financial checks
+on:
+  push:
+    branches: [main, arena/b6ad75ac-sirocash]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SIRO_SIGNER_ENABLED: 'false'
+      SIRO_CUSTODY_PREFLIGHT: 'false'
+      SIRO_RPC_READ_ENABLED: 'false'
+      SIRO_DURABLE_PASSKEY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6, verified official ref
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6, verified official ref
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=low
+      - name: Run offline regression suite
+        run: |
+          mkdir -p .cache
+          set -o pipefail
+          npm test 2>&1 | tee .cache/regression.log
+      - name: Surface offline regression failure in check annotations
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          log = Path('.cache/regression.log')
+          if log.exists():
+              tail = log.read_text(errors='replace')[-8000:]
+              escaped = tail.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::error title=Offline regression failure::' + escaped)
+      - run: npm run build
+  scheduler-credential-check:
+    # Never expose a repository secret to pull-request code or invoke the POST worker.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/arena/b6ad75ac-sirocash'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    permissions: {}
+    steps:
+      - name: Verify GitHub credential against authentication-only production probe
+        env:
+          WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
+        shell: python
+        run: |
+          import http.client, os, sys, time
+          secret = os.environ.get('WORKER_SECRET', '')
+          if not 32 <= len(secret) <= 512 or any(ord(c) < 33 or ord(c) > 126 for c in secret):
+              sys.exit('Scheduler secret is missing or malformed; no value printed.')
+          def request(headers):
+              connection = http.client.HTTPSConnection('sirocash.vercel.app', timeout=15)
+              try:
+                  connection.request('GET', '/api/internal/financial-worker', headers=headers)
+                  response = connection.getresponse()
+                  response.read()
+                  return response.status
+              finally:
+                  connection.close()
+          try:
+              for attempt in range(30):
+                  status = request({})
+                  if status == 401:
+                      break
+                  if status not in (404, 405, 502, 503, 504):
+                      sys.exit('Unexpected unauthenticated probe response; verification failed.')
+                  time.sleep(10)
+              else:
+                  sys.exit('Authentication-only probe deployment is not ready.')
+              if request({'Authorization': 'Bearer ' + secret}) != 204:
+                  sys.exit('Credential verification failed; check the same secret is saved in both stores.')
+              print('PASS: GitHub secret accepted by Vercel; unauthenticated request denied. GET only; no financial execution.')
+          except Exception:
+              sys.exit('Credential probe connection failed; no request headers or secret values printed.')
+  postgres-concurrency-and-restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '17']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: isolated-fixture-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Independent-session financial races and actual backup/restore
+        run: npm run test:postgres-financial
+        env:
+          SIRO_ALLOW_ISOLATED_POSTGRES_TESTS: 'true'
+          SIRO_TEST_POSTGRES_URL: postgresql://postgres:isolated-fixture-only@127.0.0.1:5432/postgres
+          SIRO_TEST_RESTORE_DRILL: 'true'
+          SIRO_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          SIRO_TEST_PG_DUMP: ./tests/bin/pg-dump-fixture.sh
+          SIRO_TEST_PG_RESTORE: ./tests/bin/pg-restore-fixture.sh

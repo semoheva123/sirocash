@@ -1,0 +1,46 @@
+/** Email-safe presentation only: no remote assets, tracking, or user-provided HTML. */
+export function verificationEmail(code:string,purpose:'signup'|'login'|'password_change'|'recovery'|'email_change_old'|'email_change_new'){
+ if(!/^\d{6}$/.test(code))throw new Error('Invalid verification code');
+ const signup=purpose==='signup';
+ const changing=purpose==='password_change';
+ let heading=changing?'تأكيد تغيير كلمة المرور':signup?'تأكيد بريدك الإلكتروني':'تأكيد تسجيل الدخول';
+ let englishHeading=changing?'Confirm your password change':signup?'Verify your email address':'Confirm your sign-in';
+ let description=changing?'لتأكيد تغيير كلمة المرور، أدخل الرمز التالي في صفحة إعدادات الحساب. لن تتغيّر كلمة المرور قبل اعتماد الرمز. إذا لم تطلب ذلك، فلا تشارك الرمز وراجع أمان حسابك.':signup?'لإتمام إنشاء حسابك في سيرو كاش، أدخل رمز التحقق التالي في صفحة التسجيل.':'لإتمام تسجيل الدخول إلى حسابك في سيرو كاش، أدخل رمز التحقق التالي في صفحة تسجيل الدخول.';
+ let englishDescription=changing?'Enter this code in account settings to authorize your password change. Your password will not change until confirmed. If you did not request this, do not share the code and review your account security.':signup?'Enter this verification code on the registration page to complete your SiroCash account setup.':'Enter this verification code on the sign-in page to continue to your SiroCash account.';
+ const extra=purpose==='recovery'?{ar:'استعادة كلمة المرور',en:'Recover your password',desc:'أدخل هذا الرمز في صفحة استعادة الحساب، ثم عيّن كلمة مرور جديدة. لا تشارك الرمز مع أي طرف.',enDesc:'Enter this code on the account recovery page, then choose a new password. Never share it.'}:purpose==='email_change_old'?{ar:'الموافقة على تغيير بريد الحساب',en:'Approve account email change',desc:'هذا رمز البريد الحالي. أدخله في إعدادات الحساب للموافقة على تغيير البريد. يلزم أيضاً رمز مستقل من البريد الجديد.',enDesc:'This is the current-email approval code. A separate code from the new email is also required.'}:purpose==='email_change_new'?{ar:'تأكيد البريد الجديد للحساب',en:'Verify the new account email',desc:'هذا رمز البريد الجديد. أدخله في إعدادات الحساب مع رمز البريد الحالي. إذا لم تطلب هذا الإجراء، تجاهل الرسالة.',enDesc:'This is the new-email verification code. Enter it together with the current-email code in account settings. Ignore this message if you did not request it.'}:null;
+ if(extra){heading=extra.ar;englishHeading=extra.en;description=extra.desc;englishDescription=extra.enDesc}
+ const text=`SiroCash | سيرو كاش\n\n${heading}\n${description}\n\n${code}\n\nصالح لمدة 10 دقائق ولمرة واحدة فقط.\nلا تشارك هذا الرمز مع أي شخص. لن يطلب منك فريق سيرو كاش تزويده به.\nإذا لم تطلب هذا الإجراء، فلا تشارك الرمز ولا تستخدمه، ويمكنك تجاهل الرسالة.\n\n${englishHeading}\n${englishDescription}\n\n${code}\n\nValid for 10 minutes and a single use. Never share this code, including with anyone claiming to represent SiroCash. If you did not request this action, do not use or share the code. You can ignore this message.\n\nهذه رسالة تلقائية؛ يُرجى عدم الرد عليها.\nThis is an automated message. Please do not reply.`;
+ const html=`<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><title>${heading} — SiroCash</title>
+<style>body{margin:0!important;padding:0!important}table{border-collapse:collapse}a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}@media only screen and (max-width:600px){.outer{padding:24px 12px!important}.content{padding:30px 22px!important}.email-title{font-size:26px!important}.otp{font-size:34px!important;letter-spacing:8px!important}.brand-cell{padding:24px 22px!important}}</style></head>
+<body style="margin:0;padding:0;background-color:#080c10;color:#f3f5f6;font-family:Tahoma,Arial,sans-serif;">
+<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${heading} في سيرو كاش. رمزك صالح لمدة 10 دقائق. SiroCash verification — valid for 10 minutes.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#080c10" style="width:100%;background-color:#080c10;"><tr><td class="outer" align="center" style="padding:48px 20px;">
+<!--[if mso]><table role="presentation" width="580" align="center"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:580px;">
+<tr><td class="brand-cell" style="padding:0 36px 26px;" align="center"><p dir="ltr" lang="en" style="margin:0;font-family:Arial,sans-serif;font-size:29px;letter-spacing:-1px;font-weight:bold;color:#f3f5f6;">SiroCash<span style="color:#91e8cb;">.</span></p><p style="margin:9px 0 0;font-size:11px;color:#91a69e;letter-spacing:1px;">سيرو كاش</p></td></tr>
+<tr><td style="height:3px;line-height:3px;font-size:1px;background-color:#91e8cb;border-radius:18px 18px 0 0;">&nbsp;</td></tr>
+<tr><td class="content" bgcolor="#121c20" style="padding:40px 38px;background-color:#121c20;background-image:linear-gradient(145deg,#182924,#10171c);border:1px solid #2b3e39;border-top:0;border-radius:0 0 18px 18px;" dir="rtl" align="right">
+<p style="margin:0 0 22px;color:#a9e6ce;font-size:11px;line-height:1.8;">التحقق من الحساب &nbsp; / &nbsp; <span lang="en" dir="ltr">ACCOUNT VERIFICATION</span></p>
+<h1 class="email-title" style="margin:0 0 15px;font-size:30px;font-weight:bold;line-height:1.6;color:#f3f5f6;">${heading}</h1>
+<p style="margin:0;color:#b5c7c1;font-size:14px;line-height:2.1;">${description}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin-top:28px;margin-bottom:25px;"><tr><td align="center" bgcolor="#0a1415" style="padding:24px 12px;border:1px solid #406453;border-radius:12px;background-color:#0a1415;">
+<p style="margin:0 0 12px;color:#a3bdb2;font-size:12px;line-height:1.8;">رمز التحقق <span lang="en" dir="ltr" style="font-size:10px;">/ VERIFICATION CODE</span></p>
+<p class="otp" dir="ltr" style="margin:0;color:#b2f3d6;font-family:'Courier New',monospace;font-size:42px;line-height:1.4;font-weight:bold;letter-spacing:10px;white-space:nowrap;">${code}</p>
+<p style="margin:13px 0 0;color:#a3bdb2;font-size:11px;line-height:1.9;">صالح لمدة <strong style="color:#d3e8dc;">10 دقائق</strong> · للاستخدام مرة واحدة</p>
+</td></tr></table>
+<p style="margin:0 0 10px;color:#d8e8df;font-size:13px;font-weight:bold;line-height:1.9;">حافظ على سرية رمز التحقق</p>
+<p style="margin:0;color:#a2b7ad;font-size:12px;line-height:2;">لا تشارك هذا الرمز مع أي شخص. لن يطلب منك فريق سيرو كاش تزويده به. إذا لم تطلب هذا الإجراء، فلا تشارك الرمز ولا تستخدمه، ويمكنك تجاهل الرسالة.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;"><tr><td style="padding-top:28px;padding-bottom:28px;"><div style="height:1px;line-height:1px;background-color:#30443b;font-size:1px;">&nbsp;</div></td></tr></table>
+<div lang="en" dir="ltr" style="text-align:left;font-family:Arial,sans-serif;">
+<h2 style="margin:0 0 12px;font-size:19px;font-weight:normal;line-height:1.5;color:#d9ebe2;">${englishHeading}</h2>
+<p style="margin:0 0 12px;color:#a2b7ad;font-size:13px;line-height:1.9;">${englishDescription}</p>
+<p style="margin:0 0 12px;color:#b2f3d6;font-size:12px;line-height:1.9;">Valid for 10 minutes · Single use</p>
+<p style="margin:0;color:#a2b7ad;font-size:12px;line-height:1.9;">Never share your code, including with anyone claiming to represent SiroCash. If you did not request this action, do not use or share the code. You can ignore this message.</p>
+</div>
+</td></tr>
+<tr><td align="center" style="padding:24px 18px 0;"><p style="margin:0;color:#93a99e;font-size:11px;line-height:2;">هذه رسالة تلقائية؛ يُرجى عدم الرد عليها.</p><p lang="en" dir="ltr" style="margin:3px 0 18px;color:#93a99e;font-size:11px;line-height:1.8;">This is an automated message. Please do not reply.</p><p dir="ltr" style="margin:0;font-size:10px;letter-spacing:2px;color:#9ab6a7;">SIROCASH <span style="color:#91e8cb;">/</span> ACCOUNT SECURITY</p></td></tr>
+</table><!--[if mso]></td></tr></table><![endif]-->
+</td></tr></table></body></html>`;
+ return {subject:`SiroCash — ${heading} / ${englishHeading}`,html,text};
+}

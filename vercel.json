@@ -1,0 +1,3 @@
+{
+  "crons": [{"path":"/api/internal/identity-lifecycle","schedule":"37 2 * * *"}]
+}

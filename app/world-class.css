@@ -1,0 +1,90 @@
+/* SiroCash / Clarity — bright premium fintech. Logical properties preserve RTL. */
+:root{--world-ink:#142b49;--world-blue:#2859b0;--world-hairline:#dee6ef;--world-muted:#5a6d83}
+body{font-feature-settings:'ss01' on;font-optical-sizing:auto}
+.public-workspace{background:radial-gradient(ellipse at 15% 7%,#edf3fc85,transparent 30%),#fff}
+.public-workspace>.header{background:#ffffffeb;border-bottom-color:#e4eaf2;backdrop-filter:blur(18px)}
+.public-workspace .header .nav a{position:relative;padding-block:14px}
+.public-workspace .header .nav a:after{content:'';position:absolute;inset-inline:0;bottom:6px;height:2px;border-radius:2px;background:var(--world-blue);transform:scaleX(0);transition:transform .2s}
+.public-workspace .header .nav a:hover:after{transform:scaleX(1)}
+.button{box-shadow:inset 0 1px #ffffff24,0 3px 7px #18365e08;transition:background .2s,box-shadow .2s,transform .2s}
+.button:active{transform:translateY(0) scale(.98)}
+.button:disabled{transform:none;box-shadow:none;cursor:not-allowed}
+.fintech-hero{padding-block:55px 48px;gap:45px}
+.fintech-hero-copy>p{font-size:16px;line-height:2.1;max-width:490px}
+.premium-hero-index{letter-spacing:2.4px}
+.fintech-hero h1{color:var(--world-ink);text-wrap:balance}
+.fintech-hero-assurances{padding-block:18px;border-block:1px solid #e4eaf1;width:fit-content}
+.fintech-preview-label{max-width:450px}
+.fintech-principles{padding-block:32px;background:#fff}
+.fintech-principles>div{min-width:0}
+.fintech-principles strong{font-size:14px}
+.fintech-principles small{font-size:12px}
+.fintech-section-heading h2,.fintech-security h2,.fintech-final h2{text-wrap:balance}
+.fintech-bento>a{border-radius:28px;transition:box-shadow .25s,transform .25s,border-color .25s}
+.fintech-bento>a:hover{box-shadow:0 18px 42px #183a6214;transform:translateY(-5px)}
+.fintech-bento-sham,.fintech-bento-mobile{border:1px solid #dfe7f1}
+.fintech-onboarding-grid>div{border-radius:22px;background:linear-gradient(145deg,#fff,#f7f9fd);padding:28px;border:1px solid #e1e8f2}
+.fintech-step-top b{font-variant-numeric:tabular-nums;opacity:.7}
+.fintech-security{border-radius:30px}
+.world-overline{font-size:11px;font-weight:700;letter-spacing:1.8px;color:var(--world-blue);display:block}
+[dir=rtl] .world-overline{letter-spacing:0;font-size:12px}
+.world-control{display:grid;grid-template-columns:1fr 1fr;gap:90px;align-items:center;padding-block:85px}
+.world-control h2,.world-faq h2{font-size:clamp(29px,3vw,43px);line-height:1.55;font-weight:650;letter-spacing:-1px;margin-block:18px}
+.world-control h2 span{color:#718197}
+.world-control-intro>p{font-size:14px;line-height:2.1;color:var(--world-muted);max-width:425px;margin-bottom:28px}
+.world-control-panel{border:1px solid var(--world-hairline);border-radius:26px;background:linear-gradient(140deg,#fff,#f7faff);padding:27px;box-shadow:0 24px 60px -26px #24477535,inset 0 1px #fff;position:relative}
+.world-panel-heading{display:flex;gap:12px;align-items:center;padding-bottom:25px;border-bottom:1px solid var(--world-hairline)}
+.world-panel-mark{width:43px;height:43px;display:grid;place-items:center;background:#e9f0fc;color:#365f99;border:1px solid #d9e4f6;border-radius:14px;flex-shrink:0}
+.world-panel-heading strong{font-size:14px;font-weight:650;color:var(--world-ink)}
+.world-panel-heading small{display:block;font:9px 'Manrope Variable',sans-serif;letter-spacing:1.5px;color:#687f9d;margin-top:7px}
+.world-outline-tag{margin-inline-start:auto;color:#5a6d83;border:1px solid #d8e2ef;background:#fff;border-radius:20px;font-size:10px;padding:6px 10px;white-space:nowrap}
+.world-control-row{display:flex;align-items:center;gap:15px;padding-block:24px;border-bottom:1px solid #e6ecf4}
+.world-row-icon{display:grid;place-items:center;flex-shrink:0;color:#446d9d;width:39px;height:39px;background:white;border:1px solid #e0e8f3;border-radius:12px}
+.world-control-row h3{font-size:14px;font-weight:650;line-height:1.7;color:var(--world-ink)}
+.world-control-row p{font-size:12px;line-height:1.9;color:var(--world-muted);margin-top:3px}
+.world-row-index{margin-inline-start:auto;font:11px 'Manrope Variable',sans-serif;color:#7d8da3}
+.world-panel-foot{display:flex;gap:8px;align-items:center;margin-top:20px;font-size:11px;line-height:1.8;color:#5a6d83}
+.world-panel-foot>span{width:6px;height:6px;background:#587ca9;border-radius:50%;flex-shrink:0}
+.world-faq{display:grid;grid-template-columns:.8fr 1.2fr;gap:80px;padding-block:45px 95px;border-top:1px solid #e3eaf3}
+.world-faq h2{font-size:32px;margin-block:18px 12px}
+.world-faq>div>p{font-size:14px;color:var(--world-muted);line-height:2;margin-bottom:25px}
+.world-faq-list details{border-bottom:1px solid #e0e7f1}
+.world-faq-list summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:17px;min-height:80px;padding-block:20px;font-size:14px;font-weight:600;color:var(--world-ink)}
+.world-faq-list summary::-webkit-details-marker{display:none}
+.world-faq-list summary>svg{margin-inline-start:auto;flex-shrink:0;color:#5576a1;transition:transform .2s}
+.world-faq-list details[open] summary>svg{transform:rotate(45deg)}
+.world-question-index{font:10px 'Manrope Variable',sans-serif;color:#71849c;flex-shrink:0}
+.world-faq-list details>p{font-size:13px;line-height:2.1;color:var(--world-muted);padding:0 30px 24px;margin:0;max-width:640px}
+.world-faq-list summary:focus-visible{outline:2px solid var(--world-blue);outline-offset:4px;border-radius:5px}
+.fintech-final{border-radius:30px;margin-block:0 70px}
+.footer{padding-block:35px!important}
+/* Account surfaces use the same visual hierarchy without changing financial states. */
+.account-workspace .app-heading h1{font-weight:650;text-wrap:balance;color:var(--world-ink)}
+.account-workspace .workspace-subtitle{line-height:1.9;color:var(--world-muted)}
+.account-workspace .dashboard-balance{border-radius:26px;box-shadow:0 18px 40px -18px #1f395c55,inset 0 1px #cbdaf447}
+.account-workspace .glass,.account-workspace .workspace-service,.account-workspace .fintech-assets-grid>a{transition:border-color .2s,box-shadow .2s}
+.account-workspace .workspace-service:hover,.account-workspace .fintech-assets-grid>a:hover{border-color:#b4c8e4;box-shadow:0 10px 25px #2645680a}
+.account-workspace .transactions{border-radius:24px}
+.account-workspace .app-tabs{scrollbar-width:thin;scrollbar-color:#c3d1e4 transparent}
+@media(min-width:1100px){.world-control-intro{padding-inline-end:20px}.fintech-hero{min-height:740px}}
+@media(max-width:1000px){.world-control{gap:35px}.world-faq{gap:35px}.fintech-hero{gap:20px}.fintech-principles{gap:18px}}
+@media(max-width:760px){
+ .fintech-hero{padding-block:28px 38px;gap:5px;min-height:0}
+ .fintech-hero-copy>p{font-size:14px;line-height:2}
+ .fintech-hero-assurances{gap:16px;width:100%;font-size:11px}
+ .fintech-principles{padding-block:24px;gap:22px 14px}
+ .fintech-principles strong{font-size:12px}.fintech-principles small{font-size:10px}
+ .fintech-bento>a{border-radius:23px}.fintech-onboarding-grid>div{padding:22px}
+ .world-control,.world-faq{grid-template-columns:1fr;gap:30px;padding-block:45px}
+ .world-control h2{font-size:32px}.world-control-intro>p{max-width:none}
+ .world-control-panel{padding:21px;border-radius:23px}
+ .world-panel-heading strong{font-size:12px}.world-panel-heading{gap:9px}
+ .world-control-row{padding-block:20px;gap:11px}.world-control-row h3{font-size:13px}
+ .world-control-row p{font-size:11px}.world-panel-foot{font-size:10px}
+ .world-faq h2{font-size:29px}.world-faq-list summary{font-size:13px;gap:12px;min-height:74px}
+ .world-faq-list details>p{padding-inline:22px;font-size:12px}
+ .fintech-final{margin-bottom:35px;border-radius:24px}
+ .account-workspace .dashboard-balance{border-radius:22px}
+ .public-workspace .header .nav.open{background:#fff;box-shadow:0 18px 35px #213e6614}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

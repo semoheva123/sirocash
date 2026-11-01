@@ -1,0 +1,10 @@
+import {readFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const auth=await readFile('components/email-auth.tsx','utf8');
+for(const label of ['إنشاء حساب جديد','التحقق من البريد الإلكتروني','الانتقال إلى المحفظة','12 خانة على الأقل','يجب الحفاظ على سرية كلمة المرور ورموز التحقق وعدم الإفصاح عنها.'])assert.ok(auth.includes(label),label);
+for(const phrase of ['ابدأ حكايتك المالية','لفصل جديد من حريتك المالية','محرفاً','تأكيد البريد عبر Resend','بخطوات بسيطة.','أهلاً بعودتك.'])assert.equal(auth.includes(phrase),false,phrase);
+const services=await readFile('components/payment-services.tsx','utf8');
+assert.ok(services.includes('تحديد المبلغ التجريبي بالدولار الأمريكي'));
+assert.ok(services.includes('لا يترتّب على هذا الطلب تحويل أموال أو شحن رصيد فعلي.'));
+assert.equal(services.includes('مبلغ المبلغ'),false);
+console.log('Arabic copy checks passed: clear account labels, verification instructions, no provider branding, and preserved demo warnings.');
