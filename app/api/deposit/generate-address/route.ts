@@ -1,3 +1,4 @@
+import {depositOnlyMode} from '@/lib/deposit-only-mode';
 import {NextResponse} from 'next/server';
 import {sameOrigin} from '@/lib/api';
 import {readJson} from '@/lib/request-body';
@@ -18,6 +19,6 @@ export async function POST(request:Request){try{
  const db=financialDatabase(),discovery=productionDepositDiscovery(db);
  const historical=process.env[`SIRO_${chain}_DEPOSIT_START_BLOCK`];
  if(historical!==undefined&&!/^\d{1,15}$/.test(historical))throw Error('INVALID_HISTORICAL_START');
- const result=await customerDepositAddress(db,{userId:user.id,sessionHash,origin,rpID:new URL(origin).hostname},input,{vaultId:process.env[`SIRO_${chain}_DEPOSIT_VAULT_ID`]??'',finalHeight:discovery.finalHeight,historicalStart:historical===undefined?undefined:Number(historical)});
+ const result=await customerDepositAddress(db,{userId:user.id,sessionHash,origin,rpID:new URL(origin).hostname},input,{vaultId:process.env[`SIRO_${chain}_DEPOSIT_VAULT_ID`]??'',finalHeight:discovery.finalHeight,requireScannerHealth:depositOnlyMode(),historicalStart:historical===undefined?undefined:Number(historical)});
  return NextResponse.json(result,{headers:securityHeaders});
 }catch{return securityFailure('تعذّر تخصيص عنوان إيداع موثوق. لا ترسل أموالًا قبل ظهور عنوان حسابك.',400)}}

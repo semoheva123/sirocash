@@ -1,3 +1,5 @@
+> **2026-11-01 repair update:** the old per-address scanner limitations below are superseded by [the shared-scanner repair](deposit-reception-repair.md). This historical deployment note is not proof of present activation.
+
 # Deposit-only reception (requested 2026-11-01)
 
 The owner explicitly approved leaving funds in assigned customer subaddresses and deferring collection. CatFee resources, native funding, signing, sweeping, payout and internal transfers are **not prerequisites** for this narrower mode. Their full-execution restrictions are unchanged.

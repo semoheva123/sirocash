@@ -1,11 +1,12 @@
 /** Presentation only. This module never authorizes or executes a payment. */
-export type ReceiveSnapshot={userId:string;enabled:boolean;readable?:boolean;addresses?:{network:string;address:string}[]};
+export type ReceiveSnapshot={userId:string;enabled:boolean;readable?:boolean;capabilities?:{deposits?:boolean};addresses?:{network:string;address:string}[]};
 export type SendNetwork='TRC20'|'BEP20';
 export function walletAddressShape(value:string,network:SendNetwork){
  return network==='TRC20'?/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value):/^0x[0-9a-fA-F]{40}$/.test(value);
 }
 export function receiveDetails(status:ReceiveSnapshot|null,ownerId:string,method:'account'|'crypto',network:SendNetwork){
  if(!status||status.userId!==ownerId||!(status.readable===true||status.enabled))return null;
+ if(method==='crypto'&&status.capabilities?.deposits===false)return null;
  if(method==='account')return {value:ownerId,qr:`sirocash:pay:${ownerId}`};
  const address=status.addresses?.find(item=>item.network===network)?.address;
  return address&&walletAddressShape(address,network)?{value:address,qr:address}:null;

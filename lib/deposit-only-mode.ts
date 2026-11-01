@@ -5,12 +5,12 @@ export const depositOnlyForbiddenFlags=['SIRO_SIGNER_ENABLED','SIRO_BROADCAST_EN
 export function assertDepositOnlyIsolation(env:Readonly<Record<string,string|undefined>>=process.env){
  if(!depositOnlyMode(env)||depositOnlyForbiddenFlags.some(key=>env[key]==='true'))throw Error('DEPOSIT_ONLY_ISOLATION_REQUIRED');
 }
-export function depositOnlyConfiguration(env:Readonly<Record<string,string|undefined>>=process.env){
+export function depositOnlyConfiguration(env:Readonly<Record<string,string|undefined>>=process.env,options:{workerOnly?:boolean}={}){
  const blockers:string[]=[];
  if(env.VERCEL_ENV!=='production')blockers.push('VERCEL_ENV');
  if(!depositOnlyMode(env))blockers.push('SIRO_DEPOSIT_ONLY_ENABLED');
  for(const key of depositOnlyForbiddenFlags)if(env[key]==='true')blockers.push(key);
- for(const key of ['SIRO_CUSTOMER_DEPOSITS_ENABLED','SIRO_DEPOSIT_DISCOVERY_ENABLED','SIRO_DEPOSIT_VALUATION_ENABLED','SIRO_RPC_READ_ENABLED','SIRO_OUTBOX_WORKER_ENABLED'])if(env[key]!=='true')blockers.push(key);
+ for(const key of ['SIRO_CUSTOMER_DEPOSITS_ENABLED','SIRO_DEPOSIT_DISCOVERY_ENABLED','SIRO_DEPOSIT_VALUATION_ENABLED','SIRO_RPC_READ_ENABLED','SIRO_OUTBOX_WORKER_ENABLED'])if(!(options.workerOnly&&key==='SIRO_CUSTOMER_DEPOSITS_ENABLED')&&env[key]!=='true')blockers.push(key);
  if(env.SIRO_PRICING_PROVIDER!=='coinbase-spot-v1')blockers.push('SIRO_PRICING_PROVIDER');
  if(!/^0{16}[a-f0-9]{48}$/.test(env.SIRO_TRON_GENESIS_ID??''))blockers.push('SIRO_TRON_GENESIS_ID');
  for(const network of ['TRC20','BEP20']){

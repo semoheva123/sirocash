@@ -18,7 +18,7 @@ async function main(){
  }finally{for(const k of Object.keys(process.env))if(!(k in original))delete process.env[k];Object.assign(process.env,original)}
  const runtime=await readFile('lib/deposit-only-runtime.ts','utf8');
  for(const forbidden of ['productionChainBroadcaster','createFinancialPreparation','catFee','signSweep','createNativeGasWorker'])assert(!runtime.includes(forbidden));
- assert(runtime.includes('depositOnly:true'));assert(runtime.includes("job.kind==='DEPOSIT_SCAN'"));assert(runtime.includes("job.kind==='DEPOSIT_VALUE'"));
+ assert(runtime.includes('depositOnly:true'));assert(runtime.includes("createNetworkDepositScanner"));assert(runtime.includes("job.kind!=='DEPOSIT_VALUE'"));
  const full=await readFile('lib/outbox-network-runtime.ts','utf8');assert(full.indexOf('if(depositOnlyMode())')<full.indexOf('const dispatchEnabled='));
  console.log('Deposit-only PASS: independent readiness, unsafe flags denied, all customer debits blocked, scanner/valuation composition only; no I/O, keys, payments or activation.');
 }

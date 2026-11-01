@@ -82,8 +82,9 @@
     "test:customer-financial": "node --conditions=react-server --import tsx tests/customer-financial-boundaries.ts",
     "test:deposit-discovery": "node --conditions=react-server --import tsx tests/deposit-discovery.ts",
     "test:financial-connection": "tsx tests/financial-connection.ts",
-    "test:deposit-only": "node --conditions=react-server --import tsx tests/deposit-only.ts",
-    "deposit:probe": "node --conditions=react-server --import tsx scripts/probe-deposit-reception.ts"
+    "test:deposit-only": "node --conditions=react-server --import tsx tests/deposit-only.ts && npm run test:deposit-network",
+    "deposit:probe": "node --conditions=react-server --import tsx scripts/probe-deposit-reception.ts",
+    "test:deposit-network": "node --conditions=react-server --import tsx tests/deposit-network-scanner.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

@@ -1,7 +1,7 @@
 name: Security and offline financial checks
 on:
   push:
-    branches: [arena/b6ad75ac-sirocash]
+    branches: [main, arena/b6ad75ac-sirocash]
   pull_request:
 permissions:
   contents: read

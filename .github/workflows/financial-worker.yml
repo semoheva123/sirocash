@@ -1,7 +1,7 @@
 name: Financial worker
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '2-59/5 * * * *'
   workflow_dispatch:
 permissions: {}
 concurrency:
@@ -21,4 +21,12 @@ jobs:
           curl --fail --silent --show-error --max-time 175 --retry 0 \
             --request POST --header "Authorization: Bearer ${WORKER_SECRET}" \
             --header 'Content-Length: 0' \
-            'https://sirocash.vercel.app/api/internal/financial-worker'
+            'https://sirocash.vercel.app/api/internal/financial-worker' > worker-result.json
+          python3 - <<'PYTHON'
+          import json, sys
+          with open('worker-result.json') as f:
+              result = json.load(f)
+          if result.get('healthy') is False or result.get('held', 0):
+              sys.exit('Deposit watcher unhealthy or work held; customer reception is gated by scanner liveness.')
+          print('Authenticated worker completed; no credentials or customer data logged.')
+          PYTHON

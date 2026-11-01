@@ -9,6 +9,9 @@ async function main(){
  const rpc=createBep20ReadRpc({endpoint,authorization:'Bearer secret',fetch:good});
  assert.equal(await rpc('eth_chainId',[]),'0x38');
  for(const [method,params] of [['eth_sendRawTransaction',['0xab']],['eth_sign',[]],['eth_getBlockByNumber',['latest',false]],['eth_getBlockByNumber',['0x01',false]],['eth_getTransactionReceipt',['0xab']],['eth_chainId',['extra']]] as [string,unknown[]][])await assert.rejects(()=>rpc(method,params),/READ_METHOD_NOT_ALLOWED/);
+ const filter={address:'0x55d398326f99059fF775485246999027B3197955',fromBlock:'0x1',toBlock:'0x3e8',topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',null,['0x'+'0'.repeat(64)]]};
+ await rpc('eth_getLogs',[filter]);
+ for(const bad of [{...filter,toBlock:'0x3e9'},{...filter,toBlock:'0x0'},{...filter,address:'0x'+'1'.repeat(40)},{...filter,topics:[filter.topics[0],null,[]]},{...filter,topics:[filter.topics[0],null,Array(65).fill('0x'+'0'.repeat(64))]}])await assert.rejects(()=>rpc('eth_getLogs',[bad]),/READ_METHOD_NOT_ALLOWED/);
  for(const url of ['http://rpc.example.invalid','https://user:password@rpc.example.invalid','https://localhost','https://127.0.0.1','https://[::1]','https://rpc.example.invalid/#secret'])assert.throws(()=>createBep20ReadRpc({endpoint:url}));
  const cases:Handler[]=[
   ()=>new Response('provider secret',{status:401}),
