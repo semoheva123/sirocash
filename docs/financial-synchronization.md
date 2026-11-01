@@ -21,6 +21,9 @@ financial credential or cross-customer channel is exposed to it.
    ledger activity appears without page reloads. Intermediate state changes can be coalesced;
    the stream is latest-state reconciliation, not an immutable notification/event replay log.
 
+Migration `20261101010000_financial_event_function_isolation` also revokes direct function
+permissions granted by hosted default privileges; production preflight checks this isolation.
+
 ## Safety and lifecycle
 
 - No GET interval, background balance polling, WebSocket provider or extra hosting service.

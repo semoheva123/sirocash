@@ -15,8 +15,8 @@ export function financialEvents(){
    await c.connect();
    const {rows:[role]}=await c.query(`SELECT current_user='sirocash_financial_worker' AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreaterole AND NOT rolcreatedb AND NOT pg_has_role(current_user,'sirocash_app','MEMBER') AND NOT has_table_privilege(current_user,'"AuthSession"','SELECT') AS safe FROM pg_roles WHERE rolname=current_user`);
    if(!role?.safe)throw Error('FINANCIAL_EVENTS_UNSAFE_ROLE');
-   const {rows:[schema]}=await c.query("SELECT count(*)::int AS n FROM pg_trigger WHERE tgname IN ('financial_balance_event','financial_operation_event','financial_transaction_event','financial_session_event') AND tgenabled='O'");
-   if(schema?.n!==4)throw Error('FINANCIAL_EVENTS_MIGRATION_REQUIRED');
+   const {rows:[schema]}=await c.query("SELECT count(*)::int AS n,NOT has_function_privilege('anon','public.financial_notify_change()','EXECUTE') AND NOT has_function_privilege('authenticated','public.financial_notify_change()','EXECUTE') AND NOT has_function_privilege('sirocash_app','public.financial_notify_change()','EXECUTE') AS isolated FROM pg_trigger WHERE tgname IN ('financial_balance_event','financial_operation_event','financial_transaction_event','financial_session_event') AND tgenabled='O'");
+   if(schema?.n!==4||schema?.isolated!==true)throw Error('FINANCIAL_EVENTS_MIGRATION_REQUIRED');
    await c.query('LISTEN siro_financial_changes');
    return close;
   }catch(e){await close().catch(()=>{});throw e}

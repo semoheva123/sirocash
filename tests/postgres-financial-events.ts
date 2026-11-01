@@ -3,6 +3,7 @@ import {Client,type Pool} from 'pg';
 import {randomUUID} from 'node:crypto';
 /** Actual PostgreSQL LISTEN over a separate session, never production. */
 export async function financialNotificationFixture(pool:Pool,url:string,ownerId:string){
+ const privileges=await pool.query("SELECT has_function_privilege('anon','public.financial_notify_change()','EXECUTE') OR has_function_privilege('authenticated','public.financial_notify_change()','EXECUTE') OR has_function_privilege('sirocash_app','public.financial_notify_change()','EXECUTE') AS exposed");assert.equal(privileges.rows[0].exposed,false);
  const listener=new Client({connectionString:url});await listener.connect();
  const seen:string[]=[];let signal:((owner:string)=>void)|undefined;
  listener.on('notification',event=>{const payload=JSON.parse(event.payload!);assert.deepEqual(Object.keys(payload),['ownerId']);seen.push(payload.ownerId);signal?.(payload.ownerId)});
