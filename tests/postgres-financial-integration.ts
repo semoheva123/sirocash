@@ -1,3 +1,4 @@
+import {schedulerHttpAcceptance} from './postgres-scheduler-http';
 import {dualResourceBudgetAcceptance} from './dual-resource-budget';
 import assert from 'node:assert/strict';
 import {financialReadTransactions} from '../lib/financial-read-transactions';
@@ -44,6 +45,15 @@ async function main(){
    try{pids.add(Number((await c.query('SELECT pg_backend_pid() AS pid')).rows[0].pid));await c.query('BEGIN');await c.query('SET LOCAL ROLE sirocash_financial_worker');const result=await run(c);await c.query('COMMIT');return result}
    catch(error){await c.query('ROLLBACK');throw error}finally{c.release()}
   }};
+  await schedulerHttpAcceptance(pool);
+  // Independent-session scheduler capability race: exactly one committed consumer.
+  const monitorHash=createHash('sha256').update(randomUUID()).digest('hex');
+  await pool.query('UPDATE "DepositMonitorSchedule" SET enabled=true WHERE id=1');
+  await pool.query('INSERT INTO "DepositMonitorTicket" ("tokenHash","expiresAt") VALUES ($1,clock_timestamp()+interval \'2 minutes\')',[monitorHash]);
+  const ticketRace=await Promise.all(Array.from({length:16},()=>db.transaction(async tx=>
+   (await tx.query('SELECT public.consume_deposit_monitor_ticket($1) AS accepted',[monitorHash])).rows[0].accepted)));
+  assert.equal(ticketRace.filter(Boolean).length,1,'Only one independent session may consume a scheduler ticket');
+  await pool.query('UPDATE "DepositMonitorSchedule" SET enabled=false WHERE id=1');
   const alice=randomUUID(),bob=randomUUID(),settlement=randomUUID(),revenue=randomUUID();
   await pool.query('INSERT INTO "User" (id,email,"emailVerifiedAt","kycStatus") VALUES ($1,\'race-alice@example.test\',now(),\'VERIFIED\'),($2,\'race-bob@example.test\',now(),\'VERIFIED\')',[alice,bob]);
   await pool.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[settlement,revenue]);
