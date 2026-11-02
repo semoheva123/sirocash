@@ -17,3 +17,14 @@ export function displayLedgerBalance(status:{userId:string;balance?:{posted?:unk
  const posted=status?.balance?.posted;
  return status?.userId===ownerId&&typeof posted==='string'&&/^\d+(\.\d+)?$/.test(posted)?displayAccountBalance(posted):'—';
 }
+
+/** Customer-visible balance = posted minus active holds, using exact USD micros.
+ * Display only: reservation, posting and authorization stay server-side. */
+export function displayAvailableBalance(status:{userId:string;balance?:{posted?:unknown;held?:unknown}}|null|undefined,ownerId:string){
+ if(!status||status.userId!==ownerId)return '—';
+ const parse=(v:unknown)=>{if(typeof v!=='string'||!/^\d{1,20}(\.\d{1,6})?$/.test(v))return null;const [whole,fraction='']=v.split('.');return BigInt(whole)*1000000n+BigInt(fraction.padEnd(6,'0'))};
+ const posted=parse(status.balance?.posted),held=parse(status.balance?.held);
+ if(posted===null||held===null||held>posted)return '—';
+ const available=posted-held;
+ return displayAccountBalance(`${available/1000000n}.${String(available%1000000n).padStart(6,'0')}`);
+}

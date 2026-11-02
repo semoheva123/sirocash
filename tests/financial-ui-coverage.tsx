@@ -9,7 +9,7 @@ async function main(){
  for(const ar of [true,false]){
   const html=renderToStaticMarkup(<FinancialHistory status={status} ar={ar}/>);
   for(const id of ['incoming-transfer','withdrawal-command','incoming-chain-tx','outgoing-chain-tx','assigned-address'])assert(html.includes(id));
-  assert(html.includes(ar?'بانتظار التقييم المالي':'Awaiting valuation'));assert(html.includes(ar?'نتيجة الإرسال غير مؤكدة':'Broadcast outcome unknown'));
+  assert(html.includes(ar?'قيد المعالجة':'Processing'));assert(html.includes(ar?'نتيجة الإرسال غير مؤكدة':'Broadcast outcome unknown'));
   const updated=renderToStaticMarkup(<FinancialHistory status={{...status,payouts:status.payouts!.map(p=>({...p,state:'CONFIRMED'}))}} ar={ar}/>);
   assert(updated.includes(ar?'مؤكدة على الشبكة':'Confirmed on chain'));assert(!updated.includes(ar?'نتيجة الإرسال غير مؤكدة':'Broadcast outcome unknown'));
  }

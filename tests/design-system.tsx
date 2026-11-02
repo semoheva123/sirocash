@@ -7,14 +7,15 @@ import {SignatureVisual} from '../components/signature-visual';
 import {AccountSettings} from '../components/account-settings';
 import {SiroApp} from '../components/siro-app';
 async function main(){
-const routes=['/dashboard','/deposit','/withdraw','/sham-cash','/mobile-topup','/settings'];
+const routes=['/dashboard','/wallet','/activity','/deposit','/withdraw','/sham-cash','/mobile-topup','/settings'];
 for(const ar of [true,false])for(const active of routes){
  const html=renderToStaticMarkup(<AccountNavigation ar={ar} active={active}/>);
  const navs=[...html.matchAll(/<nav\b[^>]*>([\s\S]*?)<\/nav>/g)].map(m=>m[1]);
  assert.equal((navs[0].match(/aria-current="page"/g)||[]).length,1);
- assert.equal((navs[1].match(/aria-current="page"/g)||[]).length,['/dashboard','/payments','/deposit','/withdraw','/settings'].includes(active)?1:0);
+ assert.equal((navs[1].match(/aria-current="page"/g)||[]).length,1);
  for(const href of routes)assert.ok(html.includes(`href="${href}"`));
- assert.ok(html.includes(ar?'بيئة تجريبية':'Preview environment'));
+ assert.ok(html.includes('SIRO CASH'));
+ assert.ok(!html.includes('No real funds'),'Member navigation must not misrepresent real funded deposits');
  assert.ok(html.includes(ar?'التنقّل الرئيسي للحساب':'Main account navigation'));
 }
 for(const ar of [true,false]){
@@ -25,7 +26,7 @@ for(const ar of [true,false]){
  assert.ok(!art.includes('2,450.75'));
 }
 const settings=renderToStaticMarkup(<AccountSettings user={{id:'11111111-2222-4333-8444-555555555555',email:'design@example.test',emailVerifiedAt:'2026-10-30'}}/>);
-for(const id of ['profile','preferences','account-security']){
+for(const id of ['preferences','password-change','active-sessions','identity-verification']){
  assert.ok(settings.includes(`href="#${id}"`));
  assert.ok(settings.includes(`id="${id}"`));
 }

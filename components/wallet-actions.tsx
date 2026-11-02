@@ -2,14 +2,14 @@
 import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {QRCodeSVG} from 'qrcode.react';
-import {ArrowUpRight,ArrowDownLeft,Plus,ExternalLink,Copy,Check,ShieldCheck,ScanLine,Wallet,Layers} from 'lucide-react';
+import {ArrowUpRight,ArrowDownLeft,Plus,ExternalLink,ArrowLeftRight,Copy,Check,ShieldCheck,ScanLine,Wallet,Layers} from 'lucide-react';
 import {DialogFrame} from './dialog-frame';
 import {ToastNotice,useToastNotice} from './toast-notice';
 import type {FinancialStatus} from './use-financial-status';
 import {receiveDetails,withdrawalReviewHref,internalTransferReviewHref,type SendNetwork} from '@/lib/wallet-presentation';
 
 /** Read-only dialogs; execution stays on the existing device-approved payments flow. */
-export function WalletActions({ar,ownerId,status,current}:{ar:boolean;ownerId:string;status:FinancialStatus|null;current:boolean}){
+export function WalletActions({ar,ownerId,status,current,mobileWallet=false}:{mobileWallet?:boolean;ar:boolean;ownerId:string;status:FinancialStatus|null;current:boolean}){
  const [dialog,setDialog]=useState<'send'|'receive'|null>(null),[network,setNetwork]=useState<SendNetwork>('TRC20');
  const [sendMethod,setSendMethod]=useState<'account'|'crypto'>('account');
  const [method,setMethod]=useState<'account'|'crypto'>('account'),[recipient,setRecipient]=useState(''),[amount,setAmount]=useState(''),[error,setError]=useState(''),[copied,setCopied]=useState(false),[copying,setCopying]=useState(false);
@@ -40,10 +40,10 @@ export function WalletActions({ar,ownerId,status,current}:{ar:boolean;ownerId:st
   catch(e){const message=e instanceof Error&&e.message==='INVALID_AMOUNT'?t('Enter a positive amount, up to six decimal places.','أدخل مبلغًا موجبًا، بحد أقصى ست خانات عشرية.'):sendMethod==='account'?t('Enter a valid recipient account ID.','أدخل معرّف حساب مستفيد صالحًا.'):t('Check the address and selected network.','تحقّق من العنوان والشبكة المحدّدة.');setError(message);notify('error',message)}
  }
  return <><div className="wallet-actions obsidian-wallet-actions">
-  <button type="button" onClick={()=>{setError('');setDialog('send')}}><span><ArrowUpRight size={19}/></span>{t('Send','إرسال')}</button>
+  {mobileWallet?<Link href="/send"><span><ArrowUpRight size={19}/></span>{t('Send','إرسال')}</Link>:<button type="button" onClick={()=>{setError('');setDialog('send')}}><span><ArrowUpRight size={19}/></span>{t('Send','إرسال')}</button>}
   <button type="button" onClick={openReceive}><span><ArrowDownLeft size={19}/></span>{t('Receive','استلام')}</button>
   <Link href="/deposit"><span><Plus size={19}/></span>{t('Deposit','إيداع')}</Link>
-  <Link href="/withdraw"><span><ExternalLink size={19}/></span>{t('Withdraw','سحب')}</Link>
+  {mobileWallet?<Link href="/exchange"><span><ArrowLeftRight size={19}/></span>{t('Exchange','تبديل')}</Link>:<Link href="/withdraw"><span><ExternalLink size={19}/></span>{t('Withdraw','سحب')}</Link>}
  </div>
  {dialog&&<DialogFrame label={dialog==='send'?t('Send funds','إرسال الأموال'):t('Receive funds','استلام الأموال')} closeLabel={t('Close dialog','إغلاق النافذة')} onClose={close} initialFocus={dialog==='send'?'#wallet-recipient':undefined}>
   <div className={`obsidian-dialog-icon ${dialog==='receive'?'receive':''}`}>{dialog==='send'?<ArrowUpRight size={26}/>:<ScanLine size={26}/>}</div>

@@ -13,10 +13,10 @@ const states: Record<string, [string, string, string]> = {
     "Broadcast outcome unknown",
     "warning",
   ],
-  RESERVED: ["المبلغ محجوز", "Funds reserved", "warning"],
+  RESERVED: ["قيد المعالجة", "Processing", "warning"],
   AWAITING_VALUATION: [
-    "بانتظار التقييم المالي",
-    "Awaiting valuation",
+    "قيد المعالجة",
+    "Processing",
     "warning",
   ],
   SIGNED: [

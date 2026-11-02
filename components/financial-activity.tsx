@@ -6,6 +6,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
+import {displayAvailableBalance} from "@/lib/account-overview";
 import type { FinancialStatus } from "./use-financial-status";
 import {
   FinancialDate,
@@ -18,10 +19,12 @@ export function FinancialActivity({
   status,
   ar,
   hideBalance = false,
+  showBalance = true,
 }: {
   status: FinancialStatus;
   ar: boolean;
   hideBalance?: boolean;
+  showBalance?: boolean;
 }) {
   const [search, setSearch] = useState(""),
     [filter, setFilter] = useState("ALL");
@@ -54,26 +57,7 @@ export function FinancialActivity({
           {status.activity?.length ?? 0} {t("حركة معروضة", "displayed entries")}
         </span>
       </div>
-      <div className="pro-balance-summary">
-        <div>
-          <span>{t("الرصيد الدفتري · USD", "Posted balance · USD")}</span>
-          <strong dir="ltr">
-            {hideBalance ? "••••••" : (status.balance?.posted ?? "—")}
-          </strong>
-        </div>
-        <div>
-          <span>{t("المبالغ المحجوزة · USD", "Held funds · USD")}</span>
-          <strong dir="ltr">
-            {hideBalance ? "••••••" : (status.balance?.held ?? "—")}
-          </strong>
-        </div>
-        <p>
-          {t(
-            "البيانات من دفتر الحسابات. تأكيد الشبكة ليس لحظيًا.",
-            "Ledger-backed data. Network confirmation is not instantaneous.",
-          )}
-        </p>
-      </div>
+      {showBalance&&<div className="pro-balance-summary"><div><span>{t('إجمالي الرصيد · USD','Total balance · USD')}</span><strong dir="ltr">{hideBalance?'••••••':displayAvailableBalance(status,status.userId)}</strong></div></div>}
       <div className="pro-table-tools">
         <label className="pro-search">
           <Search size={17} />

@@ -13,7 +13,8 @@ assert.throws(()=>quoteUsdtWithdrawal('ETHEREUM','20'));
 for(const ar of [true,false]){
  const html=renderToStaticMarkup(<WithdrawalFeeSummary asset="USDT" network="TRC20" amount="20" ar={ar}/>);
  assert.ok(html.includes('15.000000'));assert.ok(html.includes('5 USDT'));
- assert.ok(html.includes(ar?'غير مفعّل':'not activated'));
+ assert.ok(html.includes(ar?'صافي المبلغ للمستلم':'Recipient receives'));
+ assert.ok(!html.includes(ar?'السحب الفعلي غير مفعّل':'live withdrawals are not activated'),'Capability state belongs to the live form, not the fee calculator');
 }
 assert.equal(renderToStaticMarkup(<WithdrawalFeeSummary asset="USDC" network="ETHEREUM" amount="20" ar/>),'');
 console.log('Fixed gross-deducted USDT withdrawal tariffs and bilingual summaries passed.');
