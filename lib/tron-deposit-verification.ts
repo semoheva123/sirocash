@@ -5,7 +5,7 @@ import {base58} from '@scure/base';
 import {sha256} from '@noble/hashes/sha256';
 import {validTronAddress} from './tron-addresses';
 const transferTopic='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-export const tronUsdtContract='TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj';
+export const tronUsdtContract='TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 function hex(value:string,length:number){
  if(typeof value!=='string'||!new RegExp(`^[a-fA-F0-9]{${length}}$`).test(value))throw new Error('INVALID_CHAIN_ENCODING');
  return value.toLowerCase();

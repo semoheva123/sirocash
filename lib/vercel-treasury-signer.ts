@@ -2,9 +2,10 @@ import 'server-only';
 import {Wallet,Interface,getAddress,Transaction} from 'ethers';
 import {TronWeb,utils as tronUtils} from 'tronweb';
 import {treasuryAddresses} from './treasury-addresses';
+import {tronUsdtContract} from './tron-deposit-verification';
 
 const evmUsdt='0x55d398326f99059fF775485246999027B3197955';
-const tronUsdt='TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj';
+const tronUsdt=tronUsdtContract;
 const token=new Interface(['function transfer(address to,uint256 amount) returns (bool)']);
 type Policy={expectedSender:string;maxAmountBaseUnits:bigint;maxNetworkFeeBaseUnits:bigint};
 type EvmIntent={destination:string;amountBaseUnits:bigint;nonce:number;gasLimit:bigint;gasPrice:bigint};
