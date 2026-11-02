@@ -113,16 +113,62 @@ jobs:
           WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
         run: |
           set -eu
-          test "${#WORKER_SECRET}" -ge 32 || { echo 'Financial worker credential is not configured.'; exit 1; }
-          curl --fail --silent --show-error --max-time 175 --retry 0 \
-            --request POST --header "Authorization: Bearer ${WORKER_SECRET}" \
-            --header 'Content-Length: 0' \
-            'https://sirocash.vercel.app/api/internal/financial-worker' > worker-result.json
-          python3 - <<'PYTHON'
+          trap 'rm -f worker-result.json' EXIT
+          test "${#WORKER_SECRET}" -ge 32 && test "${#WORKER_SECRET}" -le 512 || { echo 'Financial worker credential is not configured.'; exit 1; }
+          # Retry no transport errors or financial outcomes. Continue only a completed,
+          # zero-held deposit-only scan whose per-network evidence proves progress.
+          for batch in $(seq 1 32); do
+          echo "SCHEDULED_WORKER_BATCH_${batch}"
+          status=$(curl --silent --show-error --max-time 175 --retry 0 \
+            --proto '=https' --request POST --output worker-result.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${WORKER_SECRET}" --header 'Content-Length: 0' \
+            'https://sirocash.vercel.app/api/internal/financial-worker') || { echo 'SCHEDULED_WORKER_TRANSPORT_FAILED: inspect state before another run.'; exit 1; }
+          test "$status" = 200 || { echo "SCHEDULED_WORKER_HTTP_${status}: completion not confirmed."; exit 1; }
+          if python3 - <<'PYTHON'
           import json, sys
-          with open('worker-result.json') as f:
-              result = json.load(f)
-          if result.get('healthy') is False or result.get('held', 0):
-              sys.exit('Deposit watcher unhealthy or work held; customer reception is gated by scanner liveness.')
-          print('Authenticated worker completed; no credentials or customer data logged.')
+          def count(value):
+              return type(value) is int and 0 <= value <= 1000000000
+          try:
+              with open('worker-result.json') as f:
+                  result = json.load(f)
+              if not isinstance(result, dict) or result.get('state') != 'COMPLETED' or type(result.get('held')) is not int or result['held'] != 0:
+                  raise ValueError()
+              if 'healthy' not in result:
+                  # Full financial mode is single-shot. Never loop signing/purchase work.
+                  if not count(result.get('processed')) or any(k in result for k in ['checks', 'scans', 'staged', 'valuations']):
+                      raise ValueError()
+                  print('SCHEDULED_FINANCIAL_WORKER_COMPLETED: single batch; no replay requested.')
+                  sys.exit(0)
+              if type(result['healthy']) is not bool or not all(count(result.get(k)) for k in ['scans', 'staged', 'valuations']):
+                  raise ValueError()
+              checks = result.get('checks')
+              if not isinstance(checks, dict):
+                  raise ValueError()
+              states = []
+              for network in ['BEP20', 'TRC20']:
+                  check = checks.get(network)
+                  if not isinstance(check, dict) or check.get('state') not in ['PROGRESSED', 'WAITING_FINALITY']:
+                      raise ValueError()
+                  state = check['state']
+                  if state == 'PROGRESSED' and (not count(check.get('blocks')) or check['blocks'] == 0):
+                      raise ValueError()
+                  states.append(state)
+                  metrics = {k: check[k] for k in ['blocks', 'lagBlocks', 'elapsedMs'] if count(check.get(k))}
+                  print(network + '_PROGRESS: ' + json.dumps(metrics, sort_keys=True), flush=True)
+              if result['healthy']:
+                  print('SCHEDULED_DEPOSIT_MONITOR_PASS: scanners healthy; no external execution.')
+                  sys.exit(0)
+              if result['scans'] > 0 and 'PROGRESSED' in states:
+                  print('SCHEDULED_DEPOSIT_CATCHING_UP: confirmed progress; reception remains gated.', flush=True)
+                  sys.exit(75)
+              raise ValueError()
+          except Exception:
+              sys.exit('SCHEDULED_WORKER_STOPPED: no safe completed progress; inspect health. No raw response logged.')
           PYTHON
+          then exit 0
+          else code=$?
+          fi
+          test "$code" = 75 || exit "$code"
+          done
+          echo 'SCHEDULED_DEPOSIT_CATCHUP_LIMIT: bounded scan ended; reception remains gated.'
+          exit 1
