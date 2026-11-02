@@ -1,0 +1,22 @@
+/** Local-only test renderer; no production credentials or upstream network calls. */
+import {build} from 'esbuild';
+import {createServer} from 'node:http';
+import {readFile} from 'node:fs/promises';
+import {resolve,extname} from 'node:path';
+const root=process.cwd(),out=resolve('.cache/visual-wallet');
+await build({entryPoints:['tests/visual/entry.tsx'],bundle:true,outdir:out,format:'esm',jsx:'automatic',loader:{'.woff2':'file','.woff':'file'},assetNames:'fonts/[name]-[hash]',alias:{'next/link':resolve('tests/visual/link.tsx')},define:{'process.env.NODE_ENV':'"development"'}});
+const owner='11111111-2222-4333-8444-555555555555';
+const snapshot={enabled:true,readable:true,userId:owner,capabilities:{transfers:true,withdrawals:true,deposits:true},balance:{posted:'1480.000000',held:'20.000000'},activity:[{id:'fixture-deposit',type:'DEPOSIT',amount:'49.916750',status:'COMPLETED',createdAt:'2026-11-03T09:24:00Z'},{id:'fixture-transfer',type:'P2P',amount:'25.000000',status:'COMPLETED',createdAt:'2026-11-02T18:10:00Z'},{id:'fixture-withdraw',type:'WITHDRAWAL',amount:'20.000000',status:'PENDING',createdAt:'2026-11-02T12:06:00Z'}],operations:[],payouts:[],deposits:[],addresses:[]};
+const json=(res,data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data))};
+createServer(async(req,res)=>{
+ const url=new URL(req.url,'http://fixture.local');
+ if(url.pathname==='/api/financial/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});res.write(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`);const timer=setInterval(()=>res.write('event: heartbeat\ndata: {}\n\n'),15000);req.on('close',()=>clearInterval(timer));return}
+ if(url.pathname==='/api/deposit/generate-address'){let body='';for await(const chunk of req)body+=chunk;const {chain}=JSON.parse(body);return json(res,{chain,asset:'USDT',demo:false,address:chain==='BEP20'?'0x'+'a'.repeat(40):'T'+'A'.repeat(33)})}
+ if(url.pathname==='/api/financial/prepare'){let body='';for await(const chunk of req)body+=chunk;const data=JSON.parse(body);return json(res,{kind:'TRANSFER',path:'/api/financial/transfer',payload:{recipient:data.recipient,amount:data.amount,fee:'1.000000',totalDebit:'101.000000'}})}
+ if(req.method!=='GET')return json(res,{error:'VISUAL_FIXTURE_EXECUTION_DISABLED'},503);
+ if(url.pathname==='/api/auth/sessions')return json(res,{sessions:[]});
+ if(url.pathname==='/api/auth/security-events')return json(res,{events:[]});
+ if(url.pathname==='/api/identity')return json(res,{available:false,request:null});
+ if(url.pathname==='/entry.js'||url.pathname==='/entry.css'||url.pathname.startsWith('/fonts/')){try{const file=resolve(out,'.'+url.pathname);if(!file.startsWith(out+'/'))throw Error();res.setHeader('Content-Type',extname(file)==='.css'?'text/css':extname(file)==='.js'?'text/javascript':'font/woff2');res.end(await readFile(file))}catch{res.writeHead(404);res.end()}return}
+ res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html lang="ar" dir="rtl" data-theme="obsidian"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Siro Cash • LOCAL VISUAL FIXTURE • Not live</title><link rel="stylesheet" href="/entry.css"></head><body style="padding-top:22px"><aside style="position:fixed;top:0;left:0;right:0;z-index:9999;text-align:center;font:10px sans-serif;line-height:20px;background:#202023;color:#fff">LOCAL VISUAL FIXTURE / TEST DATA ONLY / DO NOT SEND FUNDS</aside><div id="root"></div><script type="module" src="/entry.js"></script></body></html>');
+}).listen(4173,'0.0.0.0',()=>console.log('Local visual fixtures (synthetic data, execution disabled): http://0.0.0.0:4173'));
