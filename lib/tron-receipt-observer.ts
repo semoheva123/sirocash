@@ -1,7 +1,7 @@
 import 'server-only';
 import {chainJsonPost,type ChainHttpOptions} from './chain-http';
 import {verifyTronUsdtDeposit,type TronReceiptEvidence} from './tron-deposit-verification';
-export type TronRead=(path:'/wallet/gettransactioninfobyblocknum'|'/walletsolidity/getblockbynum'|'/walletsolidity/getnowblock'|'/walletsolidity/gettransactioninfobyid',body:Record<string,unknown>)=>Promise<unknown>;
+export type TronRead=(path:'/walletsolidity/getblockbylimitnext'|'/wallet/gettransactioninfobyblocknum'|'/walletsolidity/getblockbynum'|'/walletsolidity/getnowblock'|'/walletsolidity/gettransactioninfobyid',body:Record<string,unknown>)=>Promise<unknown>;
 function object(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw new Error('TRON_INVALID_OBJECT');return v as Record<string,unknown>}
 function hash(v:unknown){if(typeof v!=='string'||! /^[a-f0-9]{64}$/.test(v))throw new Error('TRON_INVALID_HASH');return v}
 function height(v:unknown){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<0)throw new Error('TRON_INVALID_HEIGHT');return v}
@@ -10,7 +10,12 @@ export function createTronRead(options:ChainHttpOptions&{signal?:AbortSignal}):T
  const post=chainJsonPost(options);
  return async(path,body)=>{
   const keys=Object.keys(body);
-  if(path==='/walletsolidity/getblockbynum'||path==='/wallet/gettransactioninfobyblocknum'){if(keys.length!==1||keys[0]!=='num')throw new Error('TRON_READ_NOT_ALLOWED');height(body.num)}
+  if(path==='/walletsolidity/getblockbylimitnext'){
+   if(keys.sort().join(',')!=='endNum,startNum')throw new Error('TRON_READ_NOT_ALLOWED');
+   const start=height(body.startNum),end=height(body.endNum);
+   if(end<=start||end-start>4)throw new Error('TRON_READ_NOT_ALLOWED');
+  }
+  else if(path==='/walletsolidity/getblockbynum'||path==='/wallet/gettransactioninfobyblocknum'){if(keys.length!==1||keys[0]!=='num')throw new Error('TRON_READ_NOT_ALLOWED');height(body.num)}
   else if(path==='/walletsolidity/getnowblock'){if(keys.length)throw new Error('TRON_READ_NOT_ALLOWED')}
   else if(path==='/walletsolidity/gettransactioninfobyid'){if(keys.length!==1||keys[0]!=='value')throw new Error('TRON_READ_NOT_ALLOWED');hash(body.value)}
   else throw new Error('TRON_READ_NOT_ALLOWED');

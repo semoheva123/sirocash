@@ -67,7 +67,23 @@ async function main(){const pg=new PGlite();try{
  const corrupt=async(path:string,body:Record<string,unknown>)=>path==='/wallet/gettransactioninfobyblocknum'&&body.num===nextBefore+4?[{id:hex(9999),blockNumber:body.num}]:read(path,body);
  await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:corrupt,tronWindow:16}).scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);
  assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore);
- const multi=await createNetworkDepositScanner(worker,{...options,tronWindow:16}).scan('TRC20',signal());
+ let rangeCalls=0;
+ const ranged=async(path:string,body:Record<string,unknown>)=>{
+  if(path==='/walletsolidity/getblockbylimitnext'){
+   rangeCalls++;assert(Number(body.endNum)-Number(body.startNum)<=2);
+   return {block:await Promise.all(Array.from({length:Number(body.endNum)-Number(body.startNum)},(_,i)=>read('/walletsolidity/getblockbynum',{num:Number(body.startNum)+i})))};
+  }
+  return read(path,body);
+ };
+ const missingRange=async(path:string,body:Record<string,unknown>)=>path==='/walletsolidity/getblockbylimitnext'?{block:[]}:read(path,body);
+ await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:missingRange,tronWindow:16,tronBlockBatch:2}).scan('TRC20',signal()),/BLOCK_MISMATCH/);
+ assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore);
+ const corruptRangeReceipts=async(path:string,body:Record<string,unknown>)=>path==='/wallet/gettransactioninfobyblocknum'&&body.num===nextBefore+4?[{id:hex(9999),blockNumber:body.num}]:ranged(path,body);
+ await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:corruptRangeReceipts,tronWindow:16,tronBlockBatch:2}).scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);
+ assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore);
+ rangeCalls=0;
+ const multi=await createNetworkDepositScanner(worker,{...options,tron:ranged,tronWindow:16,tronBlockBatch:2}).scan('TRC20',signal());
+ assert.equal(rangeCalls,8,'16 blocks use eight bounded range calls');
  assert.equal(multi.state,'PROGRESSED');assert.equal('blocks' in multi&&multi.blocks,16);
  assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore+16);
  assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4,'batch catch-up cannot duplicate credits');

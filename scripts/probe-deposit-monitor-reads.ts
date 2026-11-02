@@ -24,6 +24,7 @@ async function main(){
     if(cursor?.height!==null&&cursor?.height!==undefined){
      const firstHeight=Number(cursor.height);if(!Number.isSafeInteger(firstHeight)||firstHeight<0)throw Error('SCAN_INVALID_HEIGHT');
      let previousHash:string|undefined;
+     const hashes=new Map<number,string>();
      for(let height=firstHeight;height<=Math.min(head,firstHeight+15);height++){
       stage='CURSOR_BLOCK';
       const block=await tron('/walletsolidity/getblockbynum',{num:height}) as {blockID?:string;block_header?:{raw_data?:{number?:number;parentHash?:string}};transactions?:{txID:string}[]};
@@ -34,7 +35,13 @@ async function main(){
       if(!Array.isArray(receipts))throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
       const ids=new Set((block.transactions??[]).map(t=>t.txID));
       if(ids.size!==(block.transactions??[]).length||receipts.length!==ids.size||new Set(receipts.map(r=>r.id)).size!==ids.size||receipts.some(r=>!ids.has(r.id)||r.blockNumber!==height))throw Error('SCAN_INCOMPLETE_RECEIPTS');
-      previousHash=block.blockID;
+      previousHash=block.blockID;hashes.set(height,block.blockID);
+     }
+     if(hashes.size){
+      stage='CURSOR_BLOCK_RANGE';
+      const endNum=Math.min(head+1,firstHeight+2);
+      const range=await tron('/walletsolidity/getblockbylimitnext',{startNum:firstHeight,endNum}) as {block?:{blockID?:string;block_header?:{raw_data?:{number?:number}}}[]};
+      if(!Array.isArray(range.block)||range.block.length!==endNum-firstHeight||range.block.some((b,i)=>b.blockID!==hashes.get(firstHeight+i)||b.block_header?.raw_data?.number!==firstHeight+i))throw Error('SCAN_BLOCK_MISMATCH');
      }
     }
    }

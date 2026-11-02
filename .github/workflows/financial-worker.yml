@@ -74,6 +74,13 @@ jobs:
                           state = check.get('state') if isinstance(check, dict) else None
                           allowed = ['PROGRESSED', 'WAITING_FINALITY', 'BUSY_OR_PAUSED', 'FAILED']
                           print(network + '_STATE: ' + (state if state in allowed else 'UNKNOWN'), flush=True)
+                          if isinstance(check, dict):
+                              metrics = {}
+                              for key in ['blocks', 'elapsedMs', 'lagBlocks']:
+                                  value = check.get(key)
+                                  if type(value) is int and 0 <= value <= 1000000000:
+                                      metrics[key] = value
+                              print(network + '_PROGRESS: ' + json.dumps(metrics, sort_keys=True), flush=True)
               if not valid or result['held'] != 0:
                   checks = result.get('checks', {})
                   if isinstance(checks, dict):

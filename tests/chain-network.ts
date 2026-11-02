@@ -96,6 +96,9 @@ async function main(){
  const adapter=createTronRead({endpoint:'https://tron.example.invalid',fetch:mock});
  await assert.rejects(()=>adapter('/wallet/broadcasttransaction' as never,{}),/NOT_ALLOWED/);
  await assert.rejects(()=>adapter('/walletsolidity/getblockbynum',{num:-1}),/HEIGHT/);
+ for(const body of [{startNum:1,endNum:6},{startNum:1,endNum:1},{startNum:2,endNum:1},{startNum:1,endNum:3,visible:true}])await assert.rejects(()=>adapter('/walletsolidity/getblockbylimitnext',body),/NOT_ALLOWED/);
+ await assert.rejects(()=>adapter('/walletsolidity/getblockbylimitnext',{startNum:-1,endNum:1}),/HEIGHT/);
+ await adapter('/walletsolidity/getblockbylimitnext',{startNum:1,endNum:3});
  const obOptions={tron:read(),bep20:async()=>{throw Error('unused')},tronGenesisId:genesis,minimumBep20Confirmations:15};
  const row={network:'TRC20',txId,sender:from,recipient:to,amountBaseUnits:'15000000'};
  assert.equal((await observeOutboxTransfer(obOptions,row)).network,'TRC20');

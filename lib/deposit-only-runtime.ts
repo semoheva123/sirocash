@@ -22,10 +22,11 @@ export function productionDepositOnlyWorkers(db:WalletDb){
   const deadline=Date.now()+110000;
   const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),110000);
   let tronHttpFailureCode:string|undefined;
-  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal,info=>{tronHttpFailureCode=depositTronHttpFailureCode(info)}),genesisId:process.env.SIRO_TRON_GENESIS_ID!,bep20Window:Number(window),tronWindow:16,tronConcurrency:1,minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
+  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal,info=>{tronHttpFailureCode=depositTronHttpFailureCode(info)}),genesisId:process.env.SIRO_TRON_GENESIS_ID!,bep20Window:Number(window),tronWindow:16,tronConcurrency:1,tronBlockBatch:2,minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
   let scans=0,held=0,staged=0;
-  const checks:Record<string,{state:string;failureCode?:string}>={};
+  const checks:Record<string,{state:string;failureCode?:string;blocks?:number;elapsedMs?:number;lagBlocks?:number}>={};
   const stopped=new Set<string>();
+  const progress={BEP20:{blocks:0,elapsedMs:0},TRC20:{blocks:0,elapsedMs:0}};
   try{
    // Shared reads: a BEP20 job covers <=1000 blocks for <=2048 addresses; a TRON job
    // verifies up to 16 consecutive blocks with bounded read concurrency, for all addresses.
@@ -34,7 +35,8 @@ export function productionDepositOnlyWorkers(db:WalletDb){
      if(stopped.has(network)||abort.signal.aborted)continue;
      assertDepositOnlyIsolation();
      if(network==='TRC20')tronHttpFailureCode=undefined;
-     try{const result=await scanner.scan(network,abort.signal);scans++;checks[network]={state:result.state};staged+='staged' in result?result.staged??0:0;if(result.state!=='PROGRESSED')stopped.add(network)}catch(error){checks[network]={state:'FAILED',failureCode:network==='TRC20'&&error instanceof Error&&error.message==='CHAIN_HTTP_FAILED'&&tronHttpFailureCode?tronHttpFailureCode:depositMonitorFailureCode(error)};held++;stopped.add(network)}
+     const began=Date.now();
+     try{const result=await scanner.scan(network,abort.signal);scans++;progress[network].blocks+='blocks' in result?result.blocks??0:0;progress[network].elapsedMs+=Date.now()-began;checks[network]={state:result.state,...progress[network],...('lagBlocks' in result?{lagBlocks:result.lagBlocks}:{})};staged+='staged' in result?result.staged??0:0;if(result.state!=='PROGRESSED')stopped.add(network)}catch(error){checks[network]={state:'FAILED',failureCode:network==='TRC20'&&error instanceof Error&&error.message==='CHAIN_HTTP_FAILED'&&tronHttpFailureCode?tronHttpFailureCode:depositMonitorFailureCode(error)};held++;stopped.add(network)}
     }
    }
    const credit=await runFinancialWorkerBatch(db,{enabled:true,depositOnly:true,depositValuesOnly:true,limit:128,jobTimeoutMs:5000,batchTimeoutMs:Math.max(100,Math.min(25000,deadline-Date.now()-1000)),process:async(job,signal)=>{
