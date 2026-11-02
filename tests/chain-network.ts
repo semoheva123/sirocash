@@ -93,6 +93,18 @@ async function main(){
   (p:string,b:Record<string,unknown>,v:unknown)=>b.num===100?{...block,transactions:[]}:v,
   (p:string,b:Record<string,unknown>,v:unknown,n:number)=>n===5?{...block,blockID:hash(100,'ef')}:v,
  ])await assert.rejects(()=>observeTronUsdtReceipt(read(change),input));
+ let throttleCalls=0;
+ const throttled=createTronRead({endpoint:'https://tron.example.invalid',throttleRetries:1,fetch:(async()=>++throttleCalls===1?new Response('private',{status:429}):new Response('{}',{headers:{'content-type':'application/json'}})) as typeof fetch});
+ await throttled('/walletsolidity/getnowblock',{});assert.equal(throttleCalls,2);
+ for(const status of [403,500]){
+  let calls=0;const r=createTronRead({endpoint:'https://tron.example.invalid',throttleRetries:2,fetch:(async()=>{calls++;return new Response('private',{status})}) as typeof fetch});
+  await assert.rejects(()=>r('/walletsolidity/getnowblock',{}));assert.equal(calls,1);
+ }
+ let failures=0,attempts=0;
+ const persistent=createTronRead({endpoint:'https://tron.example.invalid',throttleRetries:1,onFailure:()=>{failures++},fetch:(async()=>{attempts++;return new Response('private',{status:429})}) as typeof fetch});
+ await assert.rejects(()=>persistent('/walletsolidity/getnowblock',{}));assert.equal(attempts,2);assert.equal(failures,1);
+ const paceAbort=new AbortController();const paced=createTronRead({endpoint:'https://tron.example.invalid',readIntervalMs:500,signal:paceAbort.signal,fetch:mock});
+ await paced('/walletsolidity/getnowblock',{});const waiting=paced('/walletsolidity/getnowblock',{});paceAbort.abort();await assert.rejects(()=>waiting);
  const adapter=createTronRead({endpoint:'https://tron.example.invalid',fetch:mock});
  await assert.rejects(()=>adapter('/wallet/broadcasttransaction' as never,{}),/NOT_ALLOWED/);
  await assert.rejects(()=>adapter('/walletsolidity/getblockbynum',{num:-1}),/HEIGHT/);
