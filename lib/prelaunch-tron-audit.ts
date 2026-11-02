@@ -28,7 +28,10 @@ export async function auditUnusedTronAddress(address:string,options:{apiKey:stri
  // Conservatively refuse even an activated zero-balance account.
  if(!account||Array.isArray(account)||typeof account!=='object'||Object.keys(account).length!==0)throw Error('PRELAUNCH_ACCOUNT_NOT_EMPTY');
  const contract=Buffer.from(base58.decode(tronUsdtContract)).subarray(0,21).toString('hex');
- const result=await post('/wallet/triggerconstantcontract',JSON.stringify({owner_address:hex,contract_address:contract,function_selector:'balanceOf(address)',parameter:hex.slice(2).padStart(64,'0'),visible:false}),options.signal) as {result?:{result?:boolean};constant_result?:unknown[]};
- if(result?.result?.result!==true||!Array.isArray(result.constant_result)||result.constant_result.length!==1||typeof result.constant_result[0]!=='string'||!/^0{64}$/.test(result.constant_result[0]))throw Error('PRELAUNCH_USDT_BALANCE_NOT_ZERO');
+ // Use the deployed token contract as the simulation caller, not an inactive child.
+ // balanceOf still targets the child via its ABI parameter; no transaction is signed.
+ const result=await post('/wallet/triggerconstantcontract',JSON.stringify({owner_address:contract,contract_address:contract,function_selector:'balanceOf(address)',parameter:hex.slice(2).padStart(64,'0'),visible:false}),options.signal) as {result?:{result?:boolean};constant_result?:unknown[]};
+ if(result?.result?.result!==true||!Array.isArray(result.constant_result)||result.constant_result.length!==1||typeof result.constant_result[0]!=='string'||! /^[a-f0-9]{64}$/i.test(result.constant_result[0]))throw Error('PRELAUNCH_USDT_BALANCE_UNAVAILABLE');
+ if(!/^0{64}$/.test(result.constant_result[0]))throw Error('PRELAUNCH_USDT_BALANCE_NOT_ZERO');
  return {indexedTrc20HistoryEmpty:true,nativeBalanceZero:true,usdtBalanceZero:true,source:'TRONGRID' as const};
 }
