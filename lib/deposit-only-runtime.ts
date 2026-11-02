@@ -21,13 +21,13 @@ export function productionDepositOnlyWorkers(db:WalletDb){
   const value=createDepositValuationWorker(db,{enabled:true,settlementAccountId:process.env.SIRO_SETTLEMENT_ACCOUNT_ID??'',price:async()=>{if(!price||Date.now()-Date.parse(price.observedAt)>10000)price=await observeUsdtUsdPrice();return price}});
   const deadline=Date.now()+110000;
   const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),110000);
-  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal),genesisId:process.env.SIRO_TRON_GENESIS_ID!,bep20Window:Number(window),minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
+  const scanner=createNetworkDepositScanner(db,{bep20:productionBep20ReadRpc(abort.signal),tron:productionTronRead(abort.signal),genesisId:process.env.SIRO_TRON_GENESIS_ID!,bep20Window:Number(window),tronWindow:16,minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:network=>BigInt(process.env[`SIRO_${network}_MAX_TOKEN_BASE_UNITS`]!)});
   let scans=0,held=0,staged=0;
   const checks:Record<string,{state:string;failureCode?:string}>={};
   const stopped=new Set<string>();
   try{
    // Shared reads: a BEP20 job covers <=1000 blocks for <=2048 addresses; a TRON job
-   // reads one complete receipt batch for all addresses, not 3 transactions per user.
+   // verifies up to 16 consecutive blocks with bounded read concurrency, for all addresses.
    for(let round=0;round<1000&&Date.now()+25000<deadline&&!abort.signal.aborted&&stopped.size<2;round++){
     for(const network of ['BEP20','TRC20'] as const){
      if(stopped.has(network)||abort.signal.aborted)continue;

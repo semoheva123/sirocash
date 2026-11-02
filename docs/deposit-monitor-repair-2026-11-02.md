@@ -18,3 +18,11 @@
 ## Next acceptance step
 
 Restore GitHub Actions dispatch permissions, run the isolated deposit monitor on this branch, inspect sanitized failure categories if it fails, and verify genuine cursor advancement and fresh scanner timestamps over successive executions. Only then evaluate the separate bounded custody/resource/liquidity and withdrawal acceptance gates.
+
+## Catch-up repair
+
+Read-only database inspection at 16:19:13 UTC confirmed the actual blocker: TRC20 had progressed to block 87633566 but was 20636 blocks behind its recorded finalized head. BEP20 lag was zero. No cursor was moved manually.
+
+The scanner now supports bounded TRON ranges (production: 16 blocks; hard maximum: 32). Complete receipts are checked for every block, parent links are checked across the entire range, and at most four block/receipt pairs are processed concurrently. A missing middle-block receipt prevents the entire range checkpoint from committing. Candidate receipt verification, partial event replay, cursor locks, reorg pauses, and ledger idempotency remain enforced.
+
+Manual Actions runs can select 1, 8, or 32 sequential monitor batches (default 32). Continuation requires a known COMPLETED response, zero held work, valid counters, no failed/busy/paused/unknown network state, and actual PROGRESSED state. HTTP errors or unknown transport outcomes stop immediately without retry. The job remains failed if the bounded catch-up limit ends before health is established. This is watch-only scanning, not withdrawal/resource execution. Initial catch-up may consume significant Actions runtime and chain read quota; successful local tests do not establish live throughput or sustained scanner health.

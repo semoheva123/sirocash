@@ -3,6 +3,12 @@ on:
   schedule:
     - cron: '2-59/5 * * * *'
   workflow_dispatch:
+    inputs:
+      max_batches:
+        description: 'Maximum sequential watch-only catch-up batches; stops on any error'
+        type: choice
+        options: ['1', '8', '32']
+        default: '32'
 permissions: {}
 concurrency:
   group: financial-worker
@@ -10,7 +16,7 @@ concurrency:
 jobs:
   execute:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 100
     steps:
       # Manual dispatch first verifies authentication, then runs the isolated deposit monitor.
       # No external execution is composed by the deposit-monitor endpoint.
@@ -33,16 +39,21 @@ jobs:
       - name: Run isolated deposit monitor
         if: github.event_name == 'workflow_dispatch'
         env:
+          MONITOR_MAX_BATCHES: ${{ inputs.max_batches || '1' }}
           WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
         run: |
           set -eu
           trap 'rm -f deposit-monitor-result.json' EXIT
+          limit=${MONITOR_MAX_BATCHES:-1}
+          case "$limit" in 1|8|32) ;; *) echo 'INVALID_BATCH_LIMIT'; exit 1 ;; esac
+          for batch in $(seq 1 "$limit"); do
+          echo "DEPOSIT_MONITOR_BATCH_${batch}"
           status=$(curl --silent --show-error --max-time 175 --retry 0 \
             --proto '=https' --request POST --output deposit-monitor-result.json --write-out '%{http_code}' \
             --header "Authorization: Bearer ${WORKER_SECRET}" --header 'Content-Length: 0' \
             'https://sirocash.vercel.app/api/internal/deposit-monitor') || { echo 'DEPOSIT_MONITOR_TRANSPORT_FAILED: inspect scanner health before another run.'; exit 1; }
           test "$status" = 200 || { echo "DEPOSIT_MONITOR_HTTP_${status}: monitor did not confirm completion."; exit 1; }
-          python3 - <<'PYTHON'
+          if python3 - <<'PYTHON'
           import json, sys
           try:
               with open('deposit-monitor-result.json') as f:
@@ -72,11 +83,23 @@ jobs:
                           if isinstance(check, dict) and check.get('state') == 'FAILED':
                               code = check.get('failureCode')
                               print(network + ': ' + (code if isinstance(code, str) and code in safe else 'SCAN_FAILED'), flush=True)
+                  counts_valid = all(type(result.get(k)) is int and result[k] >= 0 for k in ['scans', 'staged', 'held', 'valuations'])
+                  states = [checks.get(n, {}).get('state') if isinstance(checks.get(n), dict) else None for n in ['BEP20', 'TRC20']] if isinstance(checks, dict) else []
+                  if result.get('state') == 'COMPLETED' and result.get('healthy') is False and counts_valid and result['held'] == 0 and len(states) == 2 and all(s in ['PROGRESSED', 'WAITING_FINALITY'] for s in states) and 'PROGRESSED' in states:
+                      print('DEPOSIT_MONITOR_CATCHING_UP: verified progress; reception remains gated.', flush=True)
+                      sys.exit(75)
                   raise ValueError()
           except Exception:
               sys.exit('DEPOSIT_MONITOR_NOT_HEALTHY: no customer reception readiness established.')
           print('DEPOSIT_MONITOR_PASS: scanners healthy; no signing, purchases or broadcasts.')
           PYTHON
+          then exit 0
+          else code=$?
+          fi
+          test "$code" = 75 || exit "$code"
+          done
+          echo 'DEPOSIT_MONITOR_CATCHUP_LIMIT: not healthy yet; inspect real lag before continuing.'
+          exit 1
       - name: Invoke authenticated bounded worker
         if: github.event_name == 'schedule'
         env:

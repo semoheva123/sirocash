@@ -62,6 +62,16 @@ async function main(){const pg=new PGlite();try{
  head=130;incomplete=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),100);
  incomplete=false;await scan.scan('TRC20',signal());await scan.scan('TRC20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4);assert.equal(bulkReads,3,'one full receipt request per network block, not per transaction/customer');
  assert.equal(await depositScannerHealthy(worker),true);
+ // Multi-block catch-up must be atomic on an incomplete middle block.
+ const nextBefore=Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock);
+ const corrupt=async(path:string,body:Record<string,unknown>)=>path==='/wallet/gettransactioninfobyblocknum'&&body.num===nextBefore+4?[{id:hex(9999),blockNumber:body.num}]:read(path,body);
+ await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:corrupt,tronWindow:16}).scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);
+ assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore);
+ const multi=await createNetworkDepositScanner(worker,{...options,tronWindow:16}).scan('TRC20',signal());
+ assert.equal(multi.state,'PROGRESSED');assert.equal('blocks' in multi&&multi.blocks,16);
+ assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore+16);
+ assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4,'batch catch-up cannot duplicate credits');
+ assert.throws(()=>createNetworkDepositScanner(worker,{...options,tronWindow:33}),/CONFIGURATION/);
  const pool=randomUUID();await sql('INSERT INTO "LedgerAccount"(id,"accountType") VALUES($1,\'MASTER_POOL\')',[pool]);
  const valuer=createDepositValuationWorker(worker,{enabled:true,settlementAccountId:pool,price:()=>observeUsdtUsdPrice(async()=>new Response(JSON.stringify({data:{base:'USDT',currency:'USD',amount:'0.998'}})))});
  for(const row of (await sql('SELECT id FROM "ChainDepositInbox"')).rows){await valuer(String(row.id),signal());await valuer(String(row.id),signal())}

@@ -41,6 +41,18 @@ require('fs').writeFileSync(value('--output'),process.env.MOCK_BODY);process.std
   if(status==='200'&&body.healthy===false){assert(r.stdout.includes('DEPOSIT_MONITOR_SUMMARY:'));assert(r.stdout.includes('BEP20_STATE:'));assert(r.stdout.includes('TRC20_STATE:'));}
   if(status==='200'&&body.checks?.TRC20?.state==='PROGRESSED'){assert(r.stdout.includes('TRC20_STATE: PROGRESSED'));assert(r.stdout.includes('BEP20_STATE: WAITING_FINALITY'));}
  }
+ // Bounded continuation is allowed only for a completed, zero-held, progressing response.
+ for(const [body,expectedCalls] of [
+  [{...good,healthy:false,checks:{TRC20:{state:'PROGRESSED'},BEP20:{state:'WAITING_FINALITY'}}},8],
+  [{...good,healthy:false,checks:{TRC20:{state:'FAILED',failureCode:'RPC_RATE_LIMITED'},BEP20:{state:'WAITING_FINALITY'}}},1],
+  [{...good,healthy:false,held:1,checks:{TRC20:{state:'PROGRESSED'},BEP20:{state:'WAITING_FINALITY'}}},1],
+  [{...good,healthy:false,checks:{TRC20:{state:'BUSY_OR_PAUSED'},BEP20:{state:'WAITING_FINALITY'}}},1],
+  [good,1],
+ ]){
+  const r=spawnSync('bash',['-c',monitorScript],{cwd:dir,encoding:'utf8',timeout:10000,env:{PATH:dir+':'+process.env.PATH,WORKER_SECRET:'synthetic-not-real-'.repeat(3),MOCK_STATUS:'200',MOCK_BODY:JSON.stringify(body),MONITOR_MAX_BATCHES:'8'}});
+  assert.equal(r.error,undefined);assert.equal((r.stdout.match(/DEPOSIT_MONITOR_BATCH_/g)||[]).length,expectedCalls);
+  assert.equal(r.status===0,body.healthy===true);
+ }
  console.log('Isolated monitor workflow PASS: dedicated endpoint only, exact 200 plus healthy/no-held schema, reject errors/redirects/partial results, no raw bodies or credentials.');
  console.log('Worker authentication workflow PASS: auth step GET only, scheduled worker POST only, exact 204 required, rejected redirects/errors/missing secrets, bounded no-retry transport and no secret output. Mocked curl only; no network or financial effects.');
 }finally{await rm(dir,{recursive:true,force:true})}
