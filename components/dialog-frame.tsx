@@ -2,7 +2,7 @@
 import {useEffect,useRef} from 'react';
 import {X} from 'lucide-react';
 import {createPortal} from 'react-dom';
-export function DialogFrame({label,closeLabel,onClose,busy=false,initialFocus,children}:{label:string;closeLabel:string;onClose:()=>void;busy?:boolean;initialFocus?:string;children:React.ReactNode}){
+export function DialogFrame({label,closeLabel,onClose,busy=false,initialFocus,children,variant='dialog'}:{variant?:'dialog'|'sheet';label:string;closeLabel:string;onClose:()=>void;busy?:boolean;initialFocus?:string;children:React.ReactNode}){
  const panel=useRef<HTMLElement>(null);const close=useRef(onClose);const pending=useRef(busy);close.current=onClose;pending.current=busy;
  useEffect(()=>{
   const previous=document.activeElement as HTMLElement|null;const oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
@@ -14,5 +14,5 @@ export function DialogFrame({label,closeLabel,onClose,busy=false,initialFocus,ch
   }
   document.addEventListener('keydown',keyboard);return()=>{document.removeEventListener('keydown',keyboard);document.body.style.overflow=oldOverflow;previous?.focus()};
  },[initialFocus]);
- return typeof document==='undefined'?null:createPortal(<div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget&&!busy)onClose()}}><section ref={panel} tabIndex={-1} className="modal glass" role="dialog" aria-modal="true" aria-label={label}><button type="button" disabled={busy} className="close-modal" aria-label={closeLabel} onClick={onClose}><X size={20}/></button>{children}</section></div>,document.body);
+ return typeof document==='undefined'?null:createPortal(<div className={`modal-backdrop${variant==='sheet'?' wallet-sheet-backdrop':''}`} onMouseDown={event=>{if(event.target===event.currentTarget&&!busy)onClose()}}><section ref={panel} tabIndex={-1} className={`modal glass${variant==='sheet'?' wallet-bottom-sheet':''}`} role="dialog" aria-modal="true" aria-label={label}><button type="button" disabled={busy} className="close-modal" aria-label={closeLabel} onClick={onClose}><X size={20}/></button>{children}</section></div>,document.body);
 }

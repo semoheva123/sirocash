@@ -45,7 +45,7 @@ async function main(){
  await act(async()=>Source.current.snapshot('100','0'));assert.equal(balance(),'100.00 USD','Release restores spendable total');
  assert.equal(document.querySelectorAll('.mobile-balance').length,1);
  await act(async()=>eye().click());assert(balance().includes('••••••'));
- await act(async()=>root.render(<MobileWallet ownerId="owner" view="wallet"/>));assert(document.querySelector('.mobile-menu a[href="/withdraw"]'));
+ await act(async()=>root.render(<MobileWallet ownerId="owner" view="wallet"/>));assert(document.querySelector('.wallet-service-grid a[href="/withdraw"]'));
  await act(async()=>root.render(<MobileWallet ownerId="owner" view="exchange"/>));assert(document.body.textContent!.includes('coming soon'));assert.equal(document.querySelectorAll('form').length,0);
  await act(async()=>root.render(<MobileWallet ownerId="owner"/>));await act(async()=>eye().click());
  await act(async()=>Source.current.snapshot('900000','0','someone-else'));assert.equal(balance(),'— USD','Owner replacement cannot display another balance');
@@ -59,6 +59,6 @@ async function main(){
   const html=renderToStaticMarkup(<AccountNavigation active="/settings" ar={ar}/>);const page=new JSDOM(html).window.document;
   assert.equal(page.querySelectorAll('.pro-mobile-nav a').length,4);assert.equal(page.querySelector('.pro-mobile-nav [aria-current="page"]')!.getAttribute('href'),'/settings');
  }
- console.log('Mobile wallet PASS: four-tab routing, exact quick-action order, default privacy, live available balance and release/settlement, owner isolation, real activity, disabled delivery/exchange rails, bilingual navigation, exact preview/server fee parity. Mock only; no funds.');
+ console.log('Mobile wallet PASS: four destinations plus send-sheet action, exact quick-action order, default privacy, live available balance and release/settlement, owner isolation, real activity, disabled delivery/exchange rails, bilingual navigation, exact preview/server fee parity. Mock only; no funds.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
