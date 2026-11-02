@@ -759,7 +759,7 @@ select:focus {
   font-size: 11px;
   color: #7b899d;
 }
-.fintech-assets-grid > a {
+.fintech-assets-grid > :is(a,.fintech-asset-coming-soon) {
   border-radius: 12px;
   border: 1px solid var(--pro-line);
   background: #fff;
@@ -1841,7 +1841,7 @@ select:focus {
     max-width: 150px;
     text-align: end;
   }
-  .fintech-assets-grid > a {
+  .fintech-assets-grid > :is(a,.fintech-asset-coming-soon) {
     padding: 15px;
   }
   .workspace-service {
@@ -2226,7 +2226,7 @@ body { -webkit-font-smoothing: antialiased; }
 ::selection { background: #dce8ff; color: #172c4b; }
 :where(button, a) { -webkit-tap-highlight-color: #2455d61a; }
 .button, .language, .premium-input, .account-rail nav > a,
-.fintech-assets-grid > a, .workspace-service, .world-faq summary {
+.fintech-assets-grid > :is(a,.fintech-asset-coming-soon), .workspace-service, .world-faq summary {
   transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 .button {
@@ -2336,8 +2336,8 @@ input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 
 .dashboard-balance .wallet-actions button:disabled { opacity: .68; }
 .fintech-account-essentials { border-radius: 22px; padding: 27px; box-shadow: var(--pro-surface-shadow); }
 .fintech-account-check { min-height: 45px; color: #526984; }
-.fintech-assets-grid > a { border-radius: 17px; padding: 23px; box-shadow: var(--pro-surface-shadow); }
-.fintech-assets-grid > a:hover, .workspace-service:hover { border-color: #b4c8ee; background: #fbfcff; }
+.fintech-assets-grid > :is(a,.fintech-asset-coming-soon) { border-radius: 17px; padding: 23px; box-shadow: var(--pro-surface-shadow); }
+.fintech-assets-grid > :is(a,.fintech-asset-coming-soon):hover, .workspace-service:hover { border-color: #b4c8ee; background: #fbfcff; }
 .fintech-assets-heading > span, .signature-services-heading > span { color: #596e89; }
 .workspace-service { border-radius: 18px; padding: 25px; box-shadow: var(--pro-surface-shadow); }
 .workspace-service > small, .service-state, .app-security { color: #5a708d; }
@@ -2443,7 +2443,7 @@ input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 
   .dashboard-balance .big-balance { font-size: 43px; }
   .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
   .fintech-account-essentials { padding: 22px; }
-  .fintech-assets-grid > a { padding: 18px; }
+  .fintech-assets-grid > :is(a,.fintech-asset-coming-soon) { padding: 18px; }
   .settings-card { padding: 22px; border-radius: 17px !important; }
   .signature-settings-index a { font-size: 11px; padding-inline: 10px; }
   .service-unavailable { padding: 28px 20px !important; }

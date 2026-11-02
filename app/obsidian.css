@@ -34,7 +34,7 @@
 :root[data-theme="obsidian"] :is(h1,h2,h3,h4,h5,strong) { color: inherit; }
 :root[data-theme="obsidian"] :is(a,button,input,select,summary,textarea):focus-visible { outline: 2px solid var(--obs-cyan); outline-offset: 4px; }
 :root[data-theme="obsidian"] :is(.muted,.workspace-subtitle,.settings-description,.settings-note,.pro-payment-description,.pro-card-caption,.pro-eyebrow,.pro-count,.eyebrow,.pro-balance-summary span,.rail-caption,.rail-environment,.app-security,.service-state,.premium-nav-group) { color: #a1a1aa; }
-:root[data-theme="obsidian"] :is(.glass,.card,.settings-card,.account-context,.fintech-account-essentials,.fintech-assets-grid>a,.workspace-service,.financial-history,.pro-availability,.world-control-panel,.atelier-product,.premium-form-card,.atelier-state-card,.atelier-recovery-card) {
+:root[data-theme="obsidian"] :is(.glass,.card,.settings-card,.account-context,.fintech-account-essentials,.fintech-assets-grid>:is(a,.fintech-asset-coming-soon),.workspace-service,.financial-history,.pro-availability,.world-control-panel,.atelier-product,.premium-form-card,.atelier-state-card,.atelier-recovery-card) {
   background: #141419d9;
   border: 1px solid var(--obs-border);
   color: var(--obs-text);
@@ -73,7 +73,7 @@
 :root[data-theme="obsidian"] .account-rail nav>a[aria-current="page"] i { background: var(--obs-cyan); box-shadow: 0 0 8px #22d3ee55; }
 :root[data-theme="obsidian"] :is(.rail-security,.account-avatar,.context-icon,.pro-heading-icon,.pro-lock-emblem,.feature-icon,.settings-card>.feature-icon,.service-tile-icon) { background: #67e8f90a; border-color: #67e8f91c; color: #a5f3fc; }
 :root[data-theme="obsidian"] :is(.rail-security p,.premium-rail-help,.rail-environment,.account-context span,.settings-details dt,.settings-description) { color: #b4b4c0; }
-:root[data-theme="obsidian"] :is(.premium-rail-help:hover,.fintech-assets-grid>a:hover,.workspace-service:hover) { background: #1a1a23; border-color: #67e8f92e; color: #e4e4e7; }
+:root[data-theme="obsidian"] :is(.premium-rail-help:hover,.fintech-assets-grid>:is(a,.fintech-asset-coming-soon):hover,.workspace-service:hover) { background: #1a1a23; border-color: #67e8f92e; color: #e4e4e7; }
 :root[data-theme="obsidian"] .account-workspace .dashboard-balance {
   position: relative;
   overflow: hidden;
@@ -262,3 +262,8 @@
 @media (prefers-reduced-transparency: reduce) {
   :root[data-theme="obsidian"] .atelier-service-brief { background: var(--obs-surface); backdrop-filter: none; }
 }
+
+/* Deferred assets remain visible, never executable deposit/withdrawal choices. */
+.asset-coming-soon { display: block; font-size: .75rem; line-height: 1.6; color: #a1a1aa; }
+.premium-asset-switch > button:disabled, .asset-picker button:disabled { cursor: not-allowed; opacity: .6; }
+.fintech-asset-coming-soon { cursor: default; }
