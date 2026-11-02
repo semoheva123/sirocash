@@ -1,3 +1,4 @@
+import {depositTronHttpFailureCode} from '../lib/deposit-monitor-diagnostics';
 import assert from 'node:assert/strict';
 import {Wallet} from 'ethers';
 import {TronWeb} from 'tronweb';
@@ -116,3 +117,14 @@ async function main(){
  console.log('Chain adapters: exact signed-byte broadcast, chain/genesis binding, abort/time/size limits; TRON solid inclusion/reorg/receipt and dual-network exact Transfer observation passed. Fixture transports only; no live signing/broadcast.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
+
+for(const [failure,code] of [
+ [{reason:'HTTP',httpStatus:429},'CHAIN_HTTP_429'],
+ [{reason:'HTTP',httpStatus:403},'CHAIN_HTTP_403'],
+ [{reason:'HTTP',httpStatus:401},'CHAIN_HTTP_401'],
+ [{reason:'HTTP',httpStatus:503},'CHAIN_HTTP_5XX'],
+ [{reason:'HTTP',httpStatus:418},'CHAIN_HTTP_OTHER_STATUS'],
+ [{reason:'BODY_LIMIT',httpStatus:200},'CHAIN_HTTP_BODY_LIMIT'],
+ [{reason:'TIMEOUT_OR_ABORT'},'CHAIN_HTTP_TIMEOUT_OR_ABORT'],
+ [{reason:'TRANSPORT'},'CHAIN_HTTP_TRANSPORT'],
+] as const)assert.equal(depositTronHttpFailureCode(failure),code);

@@ -22,16 +22,19 @@ async function main(){
     stage='CURSOR_LOOKUP';
     const cursor=await financialReadDatabase().transaction(async tx=>(await tx.query('SELECT MIN(s."nextBlock") AS height FROM "DepositScanCursor" s JOIN "UserDepositAddress" a ON a.id=s."addressId" WHERE a.network=\'TRC20\' AND NOT s.paused')).rows[0]);
     if(cursor?.height!==null&&cursor?.height!==undefined){
-     const height=Number(cursor.height);if(!Number.isSafeInteger(height)||height<0)throw Error('SCAN_INVALID_HEIGHT');
-     if(height<=head){
+     const firstHeight=Number(cursor.height);if(!Number.isSafeInteger(firstHeight)||firstHeight<0)throw Error('SCAN_INVALID_HEIGHT');
+     let previousHash:string|undefined;
+     for(let height=firstHeight;height<=Math.min(head,firstHeight+15);height++){
       stage='CURSOR_BLOCK';
       const block=await tron('/walletsolidity/getblockbynum',{num:height}) as {blockID?:string;block_header?:{raw_data?:{number?:number;parentHash?:string}};transactions?:{txID:string}[]};
       if(block.block_header?.raw_data?.number!==height||typeof block.blockID!=='string'||! /^[a-f0-9]{64}$/.test(block.blockID)||block.blockID.slice(0,16)!==height.toString(16).padStart(16,'0')||typeof block.block_header.raw_data.parentHash!=='string')throw Error('SCAN_BLOCK_MISMATCH');
+      if(previousHash&&block.block_header.raw_data.parentHash!==previousHash)throw Error('SCAN_BLOCK_MISMATCH');
       stage='CURSOR_RECEIPTS';
       const receipts=await tron('/wallet/gettransactioninfobyblocknum',{num:height});
       if(!Array.isArray(receipts))throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
       const ids=new Set((block.transactions??[]).map(t=>t.txID));
       if(ids.size!==(block.transactions??[]).length||receipts.length!==ids.size||new Set(receipts.map(r=>r.id)).size!==ids.size||receipts.some(r=>!ids.has(r.id)||r.blockNumber!==height))throw Error('SCAN_INCOMPLETE_RECEIPTS');
+      previousHash=block.blockID;
      }
     }
    }

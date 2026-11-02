@@ -9,7 +9,7 @@ import {stageBep20Deposit,stageTronDeposit} from './deposit-inbox';
 import {bep20UsdtContract} from './bep20-deposit-verification';
 import {tronUsdtContract} from './tron-deposit-verification';
 type Network='TRC20'|'BEP20';
-type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;tronWindow?:number;maxEvents?:number};
+type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;tronWindow?:number;tronConcurrency?:number;maxEvents?:number};
 type Address={id:string;address:string;next:number;offset:number;previous:string|null;partial:string|null};
 const transfer='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 function obj(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw Error('SCAN_INVALID_OBJECT');return v as Record<string,unknown>}
@@ -21,8 +21,8 @@ const tronHex=(address:string)=>Buffer.from(base58.decode(address)).subarray(1,2
  * Progress + inbox staging commit together; newly allocated addresses retain their own start.
  */
 export function createNetworkDepositScanner(db:WalletDb,o:Options){
- const window=o.bep20Window??1000,tronWindow=o.tronWindow??1,maxEvents=o.maxEvents??32;
- if(!Number.isSafeInteger(tronWindow)||tronWindow<1||tronWindow>32||!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
+ const window=o.bep20Window??1000,tronWindow=o.tronWindow??1,tronConcurrency=o.tronConcurrency??1,maxEvents=o.maxEvents??32;
+ if(!Number.isSafeInteger(tronConcurrency)||tronConcurrency<1||tronConcurrency>4||!Number.isSafeInteger(tronWindow)||tronWindow<1||tronWindow>32||!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
  async function block(network:Network,n:number){
   if(network==='BEP20'){
    const b=obj(await o.bep20('eth_getBlockByNumber',['0x'+n.toString(16),false]));
@@ -97,9 +97,9 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
     // At most four block/receipt pairs are resident at once. Each complete batch
     // is reduced to candidates before fetching more; never skip receipt validation.
     let previous=first.parent;
-    for(let base=start;base<=end;base+=4){
+    for(let base=start;base<=end;base+=tronConcurrency){
      check();
-     const batch=await Promise.all(Array.from({length:Math.min(4,end-base+1)},async(_,i)=>{
+     const batch=await Promise.all(Array.from({length:Math.min(tronConcurrency,end-base+1)},async(_,i)=>{
       const n=base+i,current=n===start?first:await block(network,n);
       for(const a of selected.filter(a=>a.next===n)){
        if(a.partial&&a.partial!==current.hash||a.previous&&a.previous!==current.parent)throw Error('CHAIN_REORG');
