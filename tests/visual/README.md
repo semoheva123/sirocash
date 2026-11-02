@@ -26,3 +26,13 @@ send-sheet Escape/focus restoration, visible service cards, blocked external del
 methods without financial requests, and amount → recipient → server-quote review. It never
 clicks device approval. PNGs and bundles go to `.cache/visual-wallet/` (ignored).
 These are fixture screenshots, not proof of an authenticated production-device test.
+
+## Long-reference scoped history regression
+
+`node tests/visual/records-review.mjs` checks 28 deposit/withdrawal renders at
+320/360/375/390/430/768/1440 px in both languages. Fixtures include 64/66-character
+TRON/BSC transaction references, large exact amounts and real status/date shapes.
+Checks cover card/document overflow before and after expanding the full reference,
+exact full-value clipboard copy and copy-failure/manual fallback. No real addresses
+or transactions are read. Use the same local fixture server and browser library
+setup above.
