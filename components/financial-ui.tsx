@@ -59,16 +59,18 @@ export function FinancialEmpty({
 export function FinancialReference({
   value,
   ar,
+  compact = false,
 }: {
   value: string;
   ar: boolean;
+  compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false),
     [failed, setFailed] = useState(false);
   return (
     <span className="pro-reference">
       <code dir="ltr" title={value}>
-        {value}
+        {compact && value.length > 24 ? `${value.slice(0, 10)}…${value.slice(-8)}` : value}
       </code>
       <button
         type="button"

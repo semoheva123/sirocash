@@ -16,11 +16,11 @@ export function FinancialRecords({status,ar,scope}:{status:FinancialStatus;ar:bo
   return {id:o.id,amount:o.amount+' USD',network:payout?.network??'',reference:payout?.txId||'',state:payout?.state??o.state,date:o.createdAt};
  });
  return <section className="card financial-records" aria-label={deposits?t('سجل الإيداعات','Deposit history'):t('سجل السحوبات','Withdrawal history')} data-financial-source="shared-sse">
-  <h2>{deposits?t('سجل الإيداعات','Deposit history'):t('سجل السحوبات','Withdrawal history')}</h2>
-  {rows.length?<ul className="pro-records">{rows.map(row=><li key={row.id}>
+  <h2 className="financial-records-title">{deposits?t('سجل الإيداعات','Deposit history'):t('سجل السحوبات','Withdrawal history')}</h2>
+  {rows.length?<ul className="pro-records" aria-label={deposits?t('الإيداعات المسجلة','Recorded deposits'):t('السحوبات المسجلة','Recorded withdrawals')}>{rows.map(row=><li key={row.id} className="financial-record-card">
    <div className="pro-record-heading"><strong dir="ltr">{row.amount}</strong><FinancialState state={row.state} ar={ar}/></div>
-   <div className="pro-record-footer"><span dir="ltr">{row.network}</span><FinancialDate value={row.date} ar={ar}/></div>
-   {row.reference&&<FinancialReference value={row.reference} ar={ar}/>}
+   <div className="pro-record-footer"><span className="financial-record-network" dir="ltr">{row.network||t('الشبكة غير متاحة','Network unavailable')}</span><FinancialDate value={row.date} ar={ar}/></div>
+   {row.reference&&<div className="financial-record-reference"><span className="financial-record-reference-label">{t('مرجع المعاملة','Transaction reference')}</span><FinancialReference value={row.reference} ar={ar} compact/>{row.reference.length>24&&<details className="financial-record-reference-details"><summary>{t('عرض المرجع كاملًا','View full reference')}</summary><code dir="ltr">{row.reference}</code></details>}</div>}
   </li>)}</ul>:<FinancialEmpty title={deposits?t('لا توجد إيداعات بعد','No deposits yet'):t('لا توجد سحوبات بعد','No withdrawals yet')}/>}
  </section>;
 }

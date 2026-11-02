@@ -67,3 +67,30 @@
 @media(prefers-reduced-motion:reduce){.wallet-bottom-sheet{animation:none;transition:none}}
 
 .wallet-service-grid>h2{font-size:15px;font-weight:600;color:#fff}.wallet-service-grid{margin-bottom:24px}.wallet-feed-compact{margin-top:16px}.wallet-bottom-sheet :is(a,button):focus-visible{outline:2px solid #fff;outline-offset:3px}.wallet-bottom-sheet .close-modal{min-height:44px;min-width:44px;top:8px;right:8px;color:#fff}
+
+/* Scoped records are outside .financial-history: constrain hashes here as well. */
+:root[data-theme="obsidian"] .account-workspace .financial-records{min-width:0;max-width:100%;margin-block:28px;padding:0;background:transparent;border:0;box-shadow:none}
+.financial-records .financial-records-title{font-size:17px;font-weight:650;line-height:1.8;margin:0 0 16px;padding:0;letter-spacing:0}
+.financial-records .pro-records{display:grid;gap:14px;margin:0;padding:0;list-style:none;min-width:0}
+.financial-records .pro-records>.financial-record-card{min-width:0;max-width:100%;padding:20px 18px;border:1px solid #2c2c2e;border-radius:18px;background:#121214;box-shadow:none}
+.financial-records .pro-record-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-width:0}
+.financial-records .pro-record-heading>strong{font-size:18px;line-height:1.6;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:0;min-width:0;overflow-wrap:anywhere}
+.financial-records .pro-record-heading .pro-state{font-size:11px;max-width:100%;white-space:normal;line-height:1.8;padding:3px 8px}
+.financial-records .pro-record-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:14px;min-width:0}
+.financial-records .financial-record-network{font-size:11px;line-height:1.7;padding:4px 9px;border:1px solid #2c2c2e;border-radius:7px;color:#d4d4d8;overflow-wrap:anywhere}
+.financial-records .pro-record-footer time{font-size:11px;line-height:1.9;color:#8e8e93;min-width:0;overflow-wrap:anywhere}
+.financial-record-reference{border-top:1px solid #2c2c2e;margin-top:16px;padding-top:14px;min-width:0;max-width:100%}
+.financial-record-reference-label{display:block;font-size:11px;line-height:1.8;color:#8e8e93;margin-bottom:6px}
+.financial-records .pro-reference{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%;margin:0;flex-wrap:wrap}
+.financial-records .pro-reference>code{flex:1;min-width:0;max-width:100%;font-family:monospace;font-size:12px;line-height:1.8;color:#e4e4e7;direction:ltr;unicode-bidi:isolate;text-align:start;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.financial-records .pro-reference>.pro-icon-button{width:44px;height:44px;min-width:44px;flex:0 0 44px;border:1px solid #2c2c2e;border-radius:10px;background:#202023;color:#fff}
+.financial-records .pro-reference>.pro-icon-button:hover{background:#2c2c2e;border-color:#55555c;transform:none}
+.financial-records .pro-copy-feedback{position:static;flex-basis:100%;background:transparent;color:#b4b4c0;box-shadow:none;font-size:11px;line-height:1.8;overflow-wrap:anywhere;padding:0}
+.financial-records .pro-copy-feedback:empty{display:none}
+.financial-record-reference-details{margin-top:8px;min-width:0;font-size:11px;color:#8e8e93}
+.financial-record-reference-details>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;width:fit-content;max-width:100%;list-style:none}
+.financial-record-reference-details>summary::-webkit-details-marker{display:none}
+.financial-record-reference-details>summary::before{content:'+';font-size:17px;color:#d4d4d8}
+.financial-record-reference-details[open]>summary::before{content:'−'}
+.financial-record-reference-details>code{display:block;direction:ltr;unicode-bidi:isolate;text-align:start;font:12px/1.9 monospace;white-space:normal;overflow-wrap:anywhere;word-break:break-word;padding:12px;border:1px solid #2c2c2e;border-radius:10px;color:#e4e4e7;user-select:text;-webkit-user-select:text}
+@media(max-width:380px){.financial-records .pro-records>.financial-record-card{padding:18px 14px}.financial-records .pro-record-heading>strong{font-size:16px}}
