@@ -34,10 +34,24 @@ if(process.env.MOCK_STATUS==='transport')process.exit(7);
 require('fs').writeFileSync(value('--output'),process.env.MOCK_BODY);process.stdout.write(process.env.MOCK_STATUS);
 `);
  const good={state:'COMPLETED',healthy:true,scans:2,staged:0,held:0,valuations:0};
- for(const [status,body,expected] of [['200',good,true],['401',good,false],['302',good,false],['503',good,false],['transport',good,false],['200',{...good,healthy:false},false],['200',{...good,healthy:false,checks:{BEP20:{state:'FAILED',failureCode:'PRIVATE_PROVIDER_RESPONSE_MUST_NOT_LOG'}}},false],['200',{...good,healthy:false,checks:{BEP20:{state:'FAILED',failureCode:{private:'PRIVATE_PROVIDER_RESPONSE_MUST_NOT_LOG'}}}},false],['200',{...good,held:1},false],['200',{...good,scans:'2'},false],['200',{},false]]){
+ for(const [status,body,expected] of [['200',good,true],['401',good,false],['302',good,false],['503',good,false],['transport',good,false],['200',{...good,healthy:false},false],['200',{...good,healthy:false,checks:{BEP20:{state:'FAILED',failureCode:'PRIVATE_PROVIDER_RESPONSE_MUST_NOT_LOG'}}},false],['200',{...good,healthy:false,checks:{BEP20:{state:'FAILED',failureCode:{private:'PRIVATE_PROVIDER_RESPONSE_MUST_NOT_LOG'}}}},false],['200',{...good,healthy:false,checks:{TRC20:{state:'PRIVATE_PROVIDER_RESPONSE_MUST_NOT_LOG'}}},false],['200',{...good,healthy:false,checks:{TRC20:{state:'PROGRESSED'},BEP20:{state:'WAITING_FINALITY'}}},false],['200',{...good,held:1},false],['200',{...good,scans:'2'},false],['200',{},false]]){
   const secret='synthetic-not-real-'.repeat(3);
   const r=spawnSync('bash',['-c',monitorScript],{cwd:dir,encoding:'utf8',timeout:5000,env:{PATH:dir+':'+process.env.PATH,WORKER_SECRET:secret,MOCK_STATUS:status,MOCK_BODY:JSON.stringify(body)}});
   assert.equal(r.error,undefined);assert(!(r.stdout+r.stderr).includes('PRIVATE_PROVIDER_RESPONSE_MUST_NOT_LOG'));assert.equal(r.status===0,expected);assert(!(r.stdout+r.stderr).includes(secret));assert.equal(r.stdout.includes('DEPOSIT_MONITOR_PASS'),expected);
+  if(status==='200'&&body.healthy===false){assert(r.stdout.includes('DEPOSIT_MONITOR_SUMMARY:'));assert(r.stdout.includes('BEP20_STATE:'));assert(r.stdout.includes('TRC20_STATE:'));}
+  if(status==='200'&&body.checks?.TRC20?.state==='PROGRESSED'){assert(r.stdout.includes('TRC20_STATE: PROGRESSED'));assert(r.stdout.includes('BEP20_STATE: WAITING_FINALITY'));}
+ }
+ // Bounded continuation is allowed only for a completed, zero-held, progressing response.
+ for(const [body,expectedCalls] of [
+  [{...good,healthy:false,checks:{TRC20:{state:'PROGRESSED'},BEP20:{state:'WAITING_FINALITY'}}},8],
+  [{...good,healthy:false,checks:{TRC20:{state:'FAILED',failureCode:'RPC_RATE_LIMITED'},BEP20:{state:'WAITING_FINALITY'}}},1],
+  [{...good,healthy:false,held:1,checks:{TRC20:{state:'PROGRESSED'},BEP20:{state:'WAITING_FINALITY'}}},1],
+  [{...good,healthy:false,checks:{TRC20:{state:'BUSY_OR_PAUSED'},BEP20:{state:'WAITING_FINALITY'}}},1],
+  [good,1],
+ ]){
+  const r=spawnSync('bash',['-c',monitorScript],{cwd:dir,encoding:'utf8',timeout:10000,env:{PATH:dir+':'+process.env.PATH,WORKER_SECRET:'synthetic-not-real-'.repeat(3),MOCK_STATUS:'200',MOCK_BODY:JSON.stringify(body),MONITOR_MAX_BATCHES:'8'}});
+  assert.equal(r.error,undefined);assert.equal((r.stdout.match(/DEPOSIT_MONITOR_BATCH_/g)||[]).length,expectedCalls);
+  assert.equal(r.status===0,body.healthy===true);
  }
  console.log('Isolated monitor workflow PASS: dedicated endpoint only, exact 200 plus healthy/no-held schema, reject errors/redirects/partial results, no raw bodies or credentials.');
  console.log('Worker authentication workflow PASS: auth step GET only, scheduled worker POST only, exact 204 required, rejected redirects/errors/missing secrets, bounded no-retry transport and no secret output. Mocked curl only; no network or financial effects.');

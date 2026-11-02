@@ -20,6 +20,7 @@ async function main(){
  const now=1700000000000;
  const tronIntent={destination:tronTo,amountBaseUnits:15000000n,refBlockBytes:'1234',refBlockHash:'ab'.repeat(8),timestamp:now,expiration:now+60000,feeLimitSun:4000000};
  const trc=signTrc20Usdt(key,tronPolicy,tronIntent,now);
+ assert.equal((trc.transaction.raw_data.contract[0].parameter.value as {contract_address:string}).contract_address.toLowerCase(),'41a614f803b6fd780986a42c78ec9c7f77e6ded13c','Signer must target mainnet USDT');
  assert.ok(tronUtils.transaction.txCheck(trc.transaction));assert.equal(trc.transaction.signature.length,1);
  assert.equal(tronUtils.crypto.ecRecover(trc.txId,trc.transaction.signature[0]).toLowerCase(),TronWeb.address.toHex(tronSender).toLowerCase());
  assert.equal(signTrc20Usdt(key,tronPolicy,tronIntent,now).txId,trc.txId);

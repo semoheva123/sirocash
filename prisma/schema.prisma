@@ -62,7 +62,7 @@ model User {
   accounts LedgerAccount[]
   sent Transaction[] @relation("Sender")
   received Transaction[] @relation("Receiver")
-  depositAddresses DepositAddress[]
+  legacyDepositAddresses DepositAddress[]
 }
 model LedgerAccount {
  withdrawalSettlements UsdtWithdrawalQuote[] @relation("QuoteSettlement")

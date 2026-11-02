@@ -21,10 +21,12 @@ async function main(){
   for(const anchor of ['main-content','business','how-it-works','security'])assert.ok(landing.includes(`id="${anchor}"`));
   for(const href of ['/auth','/dashboard','/deposit','/sham-cash','/mobile-topup','/trust'])assert.ok(landing.includes(`href="${href}"`));
   assert.ok(landing.includes(ar?'كل ما تحتاجه.':'Your whole world.'));
+  assert.ok(landing.includes(ar?'سيتوفر قريباً':'coming soon'));
   assert.ok(landing.includes(ar?'السحوبات الخارجية غير مفعّلة':'External withdrawals are not activated'));
   assert.ok(!/SC-8901|2,450.75|\$12.50|Visa|Mastercard/.test(landing));
   const art=renderToStaticMarkup(<SignatureVisual ar={ar}/>);
   assert.ok(art.includes('fintech-phone'));
+  assert.ok(art.includes(ar?'سيتوفر قريباً':'Coming soon'));
   assert.equal((art.match(/aria-pressed="true"/g)||[]).length,1);
   assert.ok(!art.includes('signature-metal-card'));
   const spotlight=renderToStaticMarkup(<AssetSpotlight ar={ar}/>);
@@ -35,7 +37,10 @@ async function main(){
   assert.ok(spotlight.includes(ar?'خيارات تجريبية':'Preview only'));
   assert.ok(!/APR|APY|0%|Visa|Mastercard/.test(spotlight));
   const assets=renderToStaticMarkup(<AccountAssetCards ar={ar}/>);
-  assert.ok(assets.includes('/deposit?asset=USDC'));
+  assert.ok(!assets.includes('/deposit?asset=USDC'));
+  assert.ok(assets.includes(ar?'سيتوفر قريباً':'Coming soon'));
+  assert.ok(assets.includes('aria-disabled="true"'));
+  assert.ok(/<button[^>]*disabled=""[^>]*aria-pressed="false"/.test(spotlight));
   assert.ok(assets.includes('/deposit?asset=USDT'));
   assert.ok(assets.includes(ar?'لا تمثّل حيازات حسابك':'Not account holdings'));
   for(const state of [{verified:true,loading:false,error:false},{verified:false,loading:false,error:false},{verified:true,loading:true,error:false},{verified:true,loading:false,error:true}]){

@@ -1,3 +1,4 @@
+import {depositTronHttpFailureCode} from '../lib/deposit-monitor-diagnostics';
 import assert from 'node:assert/strict';
 import {Wallet} from 'ethers';
 import {TronWeb} from 'tronweb';
@@ -92,9 +93,24 @@ async function main(){
   (p:string,b:Record<string,unknown>,v:unknown)=>b.num===100?{...block,transactions:[]}:v,
   (p:string,b:Record<string,unknown>,v:unknown,n:number)=>n===5?{...block,blockID:hash(100,'ef')}:v,
  ])await assert.rejects(()=>observeTronUsdtReceipt(read(change),input));
+ let throttleCalls=0;
+ const throttled=createTronRead({endpoint:'https://tron.example.invalid',throttleRetries:1,fetch:(async()=>++throttleCalls===1?new Response('private',{status:429}):new Response('{}',{headers:{'content-type':'application/json'}})) as typeof fetch});
+ await throttled('/walletsolidity/getnowblock',{});assert.equal(throttleCalls,2);
+ for(const status of [403,500]){
+  let calls=0;const r=createTronRead({endpoint:'https://tron.example.invalid',throttleRetries:2,fetch:(async()=>{calls++;return new Response('private',{status})}) as typeof fetch});
+  await assert.rejects(()=>r('/walletsolidity/getnowblock',{}));assert.equal(calls,1);
+ }
+ let failures=0,attempts=0;
+ const persistent=createTronRead({endpoint:'https://tron.example.invalid',throttleRetries:1,onFailure:()=>{failures++},fetch:(async()=>{attempts++;return new Response('private',{status:429})}) as typeof fetch});
+ await assert.rejects(()=>persistent('/walletsolidity/getnowblock',{}));assert.equal(attempts,2);assert.equal(failures,1);
+ const paceAbort=new AbortController();const paced=createTronRead({endpoint:'https://tron.example.invalid',readIntervalMs:500,signal:paceAbort.signal,fetch:mock});
+ await paced('/walletsolidity/getnowblock',{});const waiting=paced('/walletsolidity/getnowblock',{});paceAbort.abort();await assert.rejects(()=>waiting);
  const adapter=createTronRead({endpoint:'https://tron.example.invalid',fetch:mock});
  await assert.rejects(()=>adapter('/wallet/broadcasttransaction' as never,{}),/NOT_ALLOWED/);
  await assert.rejects(()=>adapter('/walletsolidity/getblockbynum',{num:-1}),/HEIGHT/);
+ for(const body of [{startNum:1,endNum:6},{startNum:1,endNum:1},{startNum:2,endNum:1},{startNum:1,endNum:3,visible:true}])await assert.rejects(()=>adapter('/walletsolidity/getblockbylimitnext',body),/NOT_ALLOWED/);
+ await assert.rejects(()=>adapter('/walletsolidity/getblockbylimitnext',{startNum:-1,endNum:1}),/HEIGHT/);
+ await adapter('/walletsolidity/getblockbylimitnext',{startNum:1,endNum:3});
  const obOptions={tron:read(),bep20:async()=>{throw Error('unused')},tronGenesisId:genesis,minimumBep20Confirmations:15};
  const row={network:'TRC20',txId,sender:from,recipient:to,amountBaseUnits:'15000000'};
  assert.equal((await observeOutboxTransfer(obOptions,row)).network,'TRC20');
@@ -105,6 +121,25 @@ async function main(){
  const evmLog={address:bep20UsdtContract,topics,data:'0x'+(10n**18n).toString(16).padStart(64,'0'),transactionHash:evmTx,transactionIndex:'0x0',blockNumber:'0x64',blockHash:bh,logIndex:'0x7',removed:false};
  const bep20=async(m:string,p:unknown[])=>m==='eth_chainId'?'0x38':m==='eth_blockNumber'?'0x78':m==='eth_getTransactionReceipt'?{transactionHash:evmTx,transactionIndex:'0x0',blockNumber:'0x64',blockHash:bh,status:'0x1',logs:[evmLog]}:p[0]==='finalized'?{number:'0x73',hash:bh}:{number:'0x64',hash:bh,transactions:[evmTx]};
  assert.equal((await observeOutboxTransfer({...obOptions,bep20},{network:'BEP20',txId:evmTx,sender:evmFrom,recipient:evmTo,amountBaseUnits:(10n**18n).toString()})).event.amountBaseUnits,(10n**18n).toString());
+ let diagnostic:unknown;
+ for(const status of [403,429,503]){
+  await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid/private-key',apiKey:'private',fetch:async()=>new Response('private body',{status}),onFailure:info=>{diagnostic=info}})('/walletsolidity/getnowblock','{}'),/CHAIN_HTTP_FAILED/);
+  assert.deepEqual(diagnostic,{reason:'HTTP',httpStatus:status});assert(!JSON.stringify(diagnostic).includes('private'));
+ }
+ await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid',fetch:async()=>new Response('secret',{headers:{'content-type':'application/json'}}),onFailure:info=>{diagnostic=info}})('/walletsolidity/getnowblock','{}'),/CHAIN_HTTP_FAILED/);
+ assert.deepEqual(diagnostic,{reason:'INVALID_JSON',httpStatus:200});
+ await assert.rejects(()=>chainJsonPost({endpoint:'https://rpc.example.invalid',fetch:async()=>new Response('',{status:429}),onFailure:()=>{throw Error('secret')}})('/walletsolidity/getnowblock','{}'),/CHAIN_HTTP_FAILED/);
  console.log('Chain adapters: exact signed-byte broadcast, chain/genesis binding, abort/time/size limits; TRON solid inclusion/reorg/receipt and dual-network exact Transfer observation passed. Fixture transports only; no live signing/broadcast.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
+
+for(const [failure,code] of [
+ [{reason:'HTTP',httpStatus:429},'CHAIN_HTTP_429'],
+ [{reason:'HTTP',httpStatus:403},'CHAIN_HTTP_403'],
+ [{reason:'HTTP',httpStatus:401},'CHAIN_HTTP_401'],
+ [{reason:'HTTP',httpStatus:503},'CHAIN_HTTP_5XX'],
+ [{reason:'HTTP',httpStatus:418},'CHAIN_HTTP_OTHER_STATUS'],
+ [{reason:'BODY_LIMIT',httpStatus:200},'CHAIN_HTTP_BODY_LIMIT'],
+ [{reason:'TIMEOUT_OR_ABORT'},'CHAIN_HTTP_TIMEOUT_OR_ABORT'],
+ [{reason:'TRANSPORT'},'CHAIN_HTTP_TRANSPORT'],
+] as const)assert.equal(depositTronHttpFailureCode(failure),code);

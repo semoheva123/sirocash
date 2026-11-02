@@ -4,7 +4,7 @@
 
 `lib/vercel-treasury-signer.ts` is server-only and builds narrowly scoped USDT transfer transactions locally:
 - BNB Smart Chain chain56, fixed USDT contract 0x55d398326f99059fF775485246999027B3197955 (18 token decimals), zero native value, fixed transfer selector, explicit nonce/gas caps. Does not support Ethereum USDT or arbitrary token contracts.
-- TRON mainnet USDT contract TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj (6 token decimals), one TriggerSmartContract transfer, no native value, TAPOS reference fields, bounded expiry and fee_limit, protobuf-derived transaction ID checked before signature. TRON raw transaction does not contain an EVM-style chain ID: trusted caller must verify mainnet RPC/block provenance.
+- TRON mainnet USDT contract TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t (6 token decimals), one TriggerSmartContract transfer, no native value, TAPOS reference fields, bounded expiry and fee_limit, protobuf-derived transaction ID checked before signature. TRON raw transaction does not contain an EVM-style chain ID: trusted caller must verify mainnet RPC/block provenance.
 - Derived signing address must equal the configured operating sender. Amount/fee limits required. No arbitrary calldata, token approvals, native transfers, reserve-key load, mnemonic import, RPC call or broadcast implementation.
 - `vercelSignerConfiguration` refuses unless VERCEL_ENV=production and SIRO_SIGNER_ENABLED=true; flag absent by default. The low-level offline primitives accept explicit key/policy for testing; caller policy is NOT authorization by itself. No HTTP route imports them and no deployment/secret change was made.
 

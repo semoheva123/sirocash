@@ -3,6 +3,12 @@ on:
   schedule:
     - cron: '2-59/5 * * * *'
   workflow_dispatch:
+    inputs:
+      max_batches:
+        description: 'Maximum sequential watch-only catch-up batches; stops on any error'
+        type: choice
+        options: ['1', '8', '32']
+        default: '32'
 permissions: {}
 concurrency:
   group: financial-worker
@@ -10,7 +16,7 @@ concurrency:
 jobs:
   execute:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 100
     steps:
       # Manual dispatch first verifies authentication, then runs the isolated deposit monitor.
       # No external execution is composed by the deposit-monitor endpoint.
@@ -33,52 +39,136 @@ jobs:
       - name: Run isolated deposit monitor
         if: github.event_name == 'workflow_dispatch'
         env:
+          MONITOR_MAX_BATCHES: ${{ inputs.max_batches || '1' }}
           WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
         run: |
           set -eu
           trap 'rm -f deposit-monitor-result.json' EXIT
+          limit=${MONITOR_MAX_BATCHES:-1}
+          case "$limit" in 1|8|32) ;; *) echo 'INVALID_BATCH_LIMIT'; exit 1 ;; esac
+          for batch in $(seq 1 "$limit"); do
+          echo "DEPOSIT_MONITOR_BATCH_${batch}"
           status=$(curl --silent --show-error --max-time 175 --retry 0 \
             --proto '=https' --request POST --output deposit-monitor-result.json --write-out '%{http_code}' \
             --header "Authorization: Bearer ${WORKER_SECRET}" --header 'Content-Length: 0' \
             'https://sirocash.vercel.app/api/internal/deposit-monitor') || { echo 'DEPOSIT_MONITOR_TRANSPORT_FAILED: inspect scanner health before another run.'; exit 1; }
           test "$status" = 200 || { echo "DEPOSIT_MONITOR_HTTP_${status}: monitor did not confirm completion."; exit 1; }
-          python3 - <<'PYTHON'
+          if python3 - <<'PYTHON'
           import json, sys
           try:
               with open('deposit-monitor-result.json') as f:
                   result = json.load(f)
               valid = isinstance(result, dict) and result.get('state') == 'COMPLETED' and result.get('healthy') is True
               valid = valid and all(type(result.get(k)) is int and result[k] >= 0 for k in ['scans', 'staged', 'held', 'valuations'])
+              if isinstance(result, dict):
+                  summary = {'state': result.get('state') if result.get('state') == 'COMPLETED' else 'UNKNOWN',
+                             'healthy': result.get('healthy') if type(result.get('healthy')) is bool else None}
+                  for key in ['scans', 'staged', 'held', 'valuations']:
+                      value = result.get(key)
+                      summary[key] = value if type(value) is int and 0 <= value <= 1000000000 else None
+                  print('DEPOSIT_MONITOR_SUMMARY:' + json.dumps(summary, sort_keys=True), flush=True)
+                  checks = result.get('checks', {})
+                  if isinstance(checks, dict):
+                      for network in ['BEP20', 'TRC20']:
+                          check = checks.get(network)
+                          state = check.get('state') if isinstance(check, dict) else None
+                          allowed = ['PROGRESSED', 'WAITING_FINALITY', 'BUSY_OR_PAUSED', 'FAILED']
+                          print(network + '_STATE: ' + (state if state in allowed else 'UNKNOWN'), flush=True)
+                          if isinstance(check, dict):
+                              metrics = {}
+                              for key in ['blocks', 'elapsedMs', 'lagBlocks']:
+                                  value = check.get(key)
+                                  if type(value) is int and 0 <= value <= 1000000000:
+                                      metrics[key] = value
+                              print(network + '_PROGRESS: ' + json.dumps(metrics, sort_keys=True), flush=True)
               if not valid or result['held'] != 0:
                   checks = result.get('checks', {})
                   if isinstance(checks, dict):
-                      safe = {'RPC_HTTP_FAILURE', 'RPC_RATE_LIMITED', 'RPC_CONTENT_TYPE_INVALID', 'RPC_RESPONSE_TOO_LARGE', 'RPC_EMPTY_RESPONSE', 'RPC_TIMEOUT', 'RPC_INVALID_JSON', 'RPC_INVALID_ENVELOPE', 'RPC_TRANSPORT_FAILURE', 'RPC_LOG_WRONG_CHAIN', 'RPC_LOG_HEIGHT_INVALID', 'RPC_LOG_PROVIDER_LAG', 'RPC_LOG_CHAIN_MISMATCH', 'SCAN_WRONG_CHAIN', 'SCAN_INVALID_FINALITY', 'SCAN_INVALID_HEIGHT', 'SCAN_INVALID_HASH', 'SCAN_INVALID_OBJECT', 'SCAN_BULK_RECEIPTS_UNAVAILABLE', 'SCAN_ADDRESS_CAPACITY', 'SCAN_ABORTED', 'SCAN_LEASE_LOST', 'SCAN_ASSIGNMENTS_CHANGED', 'CHAIN_REORG', 'DEPOSIT_EVIDENCE_CONFLICT', 'SCAN_FAILED'}
+                      safe = {'RPC_HTTP_FAILURE', 'RPC_RATE_LIMITED', 'RPC_CONTENT_TYPE_INVALID', 'RPC_RESPONSE_TOO_LARGE', 'RPC_EMPTY_RESPONSE', 'RPC_TIMEOUT', 'RPC_INVALID_JSON', 'RPC_INVALID_ENVELOPE', 'RPC_TRANSPORT_FAILURE', 'RPC_LOG_WRONG_CHAIN', 'RPC_LOG_HEIGHT_INVALID', 'RPC_LOG_PROVIDER_LAG', 'RPC_LOG_CHAIN_MISMATCH', 'SCAN_WRONG_CHAIN', 'SCAN_INVALID_FINALITY', 'SCAN_INVALID_HEIGHT', 'SCAN_INVALID_HASH', 'SCAN_INVALID_OBJECT', 'CHAIN_HTTP_FAILED','CHAIN_HTTP_429','CHAIN_HTTP_401','CHAIN_HTTP_403','CHAIN_HTTP_5XX','CHAIN_HTTP_OTHER_STATUS','CHAIN_HTTP_CONTENT_TYPE','CHAIN_HTTP_BODY_LIMIT','CHAIN_HTTP_TIMEOUT_OR_ABORT','CHAIN_HTTP_INVALID_JSON','CHAIN_HTTP_TRANSPORT', 'SCAN_BLOCK_MISMATCH', 'SCAN_INCOMPLETE_RECEIPTS', 'SCAN_RECEIPT_CONTEXT', 'SCAN_LOG_CONTEXT', 'SCAN_BLOCK_LIMIT', 'SCAN_LOG_LIMIT', 'SCAN_BULK_RECEIPTS_UNAVAILABLE', 'SCAN_ADDRESS_CAPACITY', 'SCAN_ABORTED', 'SCAN_LEASE_LOST', 'SCAN_ASSIGNMENTS_CHANGED', 'CHAIN_REORG', 'DEPOSIT_EVIDENCE_CONFLICT', 'SCAN_FAILED'}
                       for network in ['BEP20', 'TRC20']:
                           check = checks.get(network)
                           if isinstance(check, dict) and check.get('state') == 'FAILED':
                               code = check.get('failureCode')
                               print(network + ': ' + (code if isinstance(code, str) and code in safe else 'SCAN_FAILED'), flush=True)
+                  counts_valid = all(type(result.get(k)) is int and result[k] >= 0 for k in ['scans', 'staged', 'held', 'valuations'])
+                  states = [checks.get(n, {}).get('state') if isinstance(checks.get(n), dict) else None for n in ['BEP20', 'TRC20']] if isinstance(checks, dict) else []
+                  if result.get('state') == 'COMPLETED' and result.get('healthy') is False and counts_valid and result['held'] == 0 and len(states) == 2 and all(s in ['PROGRESSED', 'WAITING_FINALITY'] for s in states) and 'PROGRESSED' in states:
+                      print('DEPOSIT_MONITOR_CATCHING_UP: verified progress; reception remains gated.', flush=True)
+                      sys.exit(75)
                   raise ValueError()
           except Exception:
               sys.exit('DEPOSIT_MONITOR_NOT_HEALTHY: no customer reception readiness established.')
           print('DEPOSIT_MONITOR_PASS: scanners healthy; no signing, purchases or broadcasts.')
           PYTHON
+          then exit 0
+          else code=$?
+          fi
+          test "$code" = 75 || exit "$code"
+          done
+          echo 'DEPOSIT_MONITOR_CATCHUP_LIMIT: not healthy yet; inspect real lag before continuing.'
+          exit 1
       - name: Invoke authenticated bounded worker
         if: github.event_name == 'schedule'
         env:
           WORKER_SECRET: ${{ secrets.SIRO_FINANCIAL_WORKER_SECRET }}
         run: |
           set -eu
-          test "${#WORKER_SECRET}" -ge 32 || { echo 'Financial worker credential is not configured.'; exit 1; }
-          curl --fail --silent --show-error --max-time 175 --retry 0 \
-            --request POST --header "Authorization: Bearer ${WORKER_SECRET}" \
-            --header 'Content-Length: 0' \
-            'https://sirocash.vercel.app/api/internal/financial-worker' > worker-result.json
-          python3 - <<'PYTHON'
+          trap 'rm -f worker-result.json' EXIT
+          test "${#WORKER_SECRET}" -ge 32 && test "${#WORKER_SECRET}" -le 512 || { echo 'Financial worker credential is not configured.'; exit 1; }
+          # Retry no transport errors or financial outcomes. Continue only a completed,
+          # zero-held deposit-only scan whose per-network evidence proves progress.
+          for batch in $(seq 1 32); do
+          echo "SCHEDULED_WORKER_BATCH_${batch}"
+          status=$(curl --silent --show-error --max-time 175 --retry 0 \
+            --proto '=https' --request POST --output worker-result.json --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${WORKER_SECRET}" --header 'Content-Length: 0' \
+            'https://sirocash.vercel.app/api/internal/financial-worker') || { echo 'SCHEDULED_WORKER_TRANSPORT_FAILED: inspect state before another run.'; exit 1; }
+          test "$status" = 200 || { echo "SCHEDULED_WORKER_HTTP_${status}: completion not confirmed."; exit 1; }
+          if python3 - <<'PYTHON'
           import json, sys
-          with open('worker-result.json') as f:
-              result = json.load(f)
-          if result.get('healthy') is False or result.get('held', 0):
-              sys.exit('Deposit watcher unhealthy or work held; customer reception is gated by scanner liveness.')
-          print('Authenticated worker completed; no credentials or customer data logged.')
+          def count(value):
+              return type(value) is int and 0 <= value <= 1000000000
+          try:
+              with open('worker-result.json') as f:
+                  result = json.load(f)
+              if not isinstance(result, dict) or result.get('state') != 'COMPLETED' or type(result.get('held')) is not int or result['held'] != 0:
+                  raise ValueError()
+              if 'healthy' not in result:
+                  # Full financial mode is single-shot. Never loop signing/purchase work.
+                  if not count(result.get('processed')) or any(k in result for k in ['checks', 'scans', 'staged', 'valuations']):
+                      raise ValueError()
+                  print('SCHEDULED_FINANCIAL_WORKER_COMPLETED: single batch; no replay requested.')
+                  sys.exit(0)
+              if type(result['healthy']) is not bool or not all(count(result.get(k)) for k in ['scans', 'staged', 'valuations']):
+                  raise ValueError()
+              checks = result.get('checks')
+              if not isinstance(checks, dict):
+                  raise ValueError()
+              states = []
+              for network in ['BEP20', 'TRC20']:
+                  check = checks.get(network)
+                  if not isinstance(check, dict) or check.get('state') not in ['PROGRESSED', 'WAITING_FINALITY']:
+                      raise ValueError()
+                  state = check['state']
+                  if state == 'PROGRESSED' and (not count(check.get('blocks')) or check['blocks'] == 0):
+                      raise ValueError()
+                  states.append(state)
+                  metrics = {k: check[k] for k in ['blocks', 'lagBlocks', 'elapsedMs'] if count(check.get(k))}
+                  print(network + '_PROGRESS: ' + json.dumps(metrics, sort_keys=True), flush=True)
+              if result['healthy']:
+                  print('SCHEDULED_DEPOSIT_MONITOR_PASS: scanners healthy; no external execution.')
+                  sys.exit(0)
+              if result['scans'] > 0 and 'PROGRESSED' in states:
+                  print('SCHEDULED_DEPOSIT_CATCHING_UP: confirmed progress; reception remains gated.', flush=True)
+                  sys.exit(75)
+              raise ValueError()
+          except Exception:
+              sys.exit('SCHEDULED_WORKER_STOPPED: no safe completed progress; inspect health. No raw response logged.')
           PYTHON
+          then exit 0
+          else code=$?
+          fi
+          test "$code" = 75 || exit "$code"
+          done
+          echo 'SCHEDULED_DEPOSIT_CATCHUP_LIMIT: bounded scan ended; reception remains gated.'
+          exit 1

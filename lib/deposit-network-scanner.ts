@@ -9,7 +9,7 @@ import {stageBep20Deposit,stageTronDeposit} from './deposit-inbox';
 import {bep20UsdtContract} from './bep20-deposit-verification';
 import {tronUsdtContract} from './tron-deposit-verification';
 type Network='TRC20'|'BEP20';
-type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;maxEvents?:number};
+type Options={bep20:Bep20Rpc;tron:TronRead;genesisId:string;minimumConfirmations:number;maxAmount:(network:Network)=>bigint;bep20Window?:number;tronWindow?:number;tronConcurrency?:number;tronBlockBatch?:number;maxEvents?:number};
 type Address={id:string;address:string;next:number;offset:number;previous:string|null;partial:string|null};
 const transfer='ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 function obj(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw Error('SCAN_INVALID_OBJECT');return v as Record<string,unknown>}
@@ -21,8 +21,8 @@ const tronHex=(address:string)=>Buffer.from(base58.decode(address)).subarray(1,2
  * Progress + inbox staging commit together; newly allocated addresses retain their own start.
  */
 export function createNetworkDepositScanner(db:WalletDb,o:Options){
- const window=o.bep20Window??1000,maxEvents=o.maxEvents??32;
- if(!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
+ const window=o.bep20Window??1000,tronWindow=o.tronWindow??1,tronConcurrency=o.tronConcurrency??1,tronBlockBatch=o.tronBlockBatch??1,maxEvents=o.maxEvents??32;
+ if(!Number.isSafeInteger(tronBlockBatch)||tronBlockBatch<1||tronBlockBatch>4||!Number.isSafeInteger(tronConcurrency)||tronConcurrency<1||tronConcurrency>4||!Number.isSafeInteger(tronWindow)||tronWindow<1||tronWindow>32||!/^0{16}[a-f0-9]{48}$/.test(o.genesisId)||!Number.isSafeInteger(o.minimumConfirmations)||o.minimumConfirmations<15||!Number.isSafeInteger(window)||window<1||window>1000||!Number.isSafeInteger(maxEvents)||maxEvents<1||maxEvents>128)throw Error('SCAN_CONFIGURATION');
  async function block(network:Network,n:number){
   if(network==='BEP20'){
    const b=obj(await o.bep20('eth_getBlockByNumber',['0x'+n.toString(16),false]));
@@ -67,7 +67,7 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
     check();await db.transaction(tx=>tx.query('UPDATE "DepositNetworkScanner" SET "lastHead"=$3,"lagBlocks"=0,"lastSuccessAt"=clock_timestamp() WHERE network=$1 AND "claimId"=$2 AND "expiresAt">clock_timestamp()',[network,claim,head]));
     return {state:'WAITING_FINALITY',lagBlocks:0};
    }
-   let end=Math.min(head,start+(network==='BEP20'?window:1)-1);
+   let end=Math.min(head,start+(network==='BEP20'?window:tronWindow)-1);
    const first=await block(network,start);
    for(const a of addresses.filter(a=>a.next===start)){
     if(a.partial&&a.partial!==first.hash||a.previous&&a.previous!==first.parent)throw Error('CHAIN_REORG');
@@ -94,27 +94,69 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
      candidates.push({address:a,n,offset:index,txId:'0x'+hash(l.transactionHash),logIndex:index,blockHash:hash(l.blockHash)});
     }
    }else{
-    const txs=first.raw.transactions??[];
-    if(!Array.isArray(txs)||txs.length>10000)throw Error('SCAN_BLOCK_LIMIT');
-    const raw=await o.tron('/wallet/gettransactioninfobyblocknum',{num:start});
-    if(!Array.isArray(raw)||raw.length>10000)throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
-    const receipts=new Map<string,Record<string,unknown>>();
-    for(const value of raw){const r=obj(value),id=hash(r.id);if(num(r.blockNumber)!==start||receipts.has(id))throw Error('SCAN_RECEIPT_CONTEXT');receipts.set(id,r)}
-    // Missing receipts cannot be mistaken for an empty block, including native transfers.
-    const ids=txs.map(t=>hash(obj(t).txID));if(new Set(ids).size!==ids.length||receipts.size!==ids.length||ids.some(id=>!receipts.has(id)))throw Error('SCAN_INCOMPLETE_RECEIPTS');
-    const recipients=new Map(selected.map(a=>[tronHex(a.address),a]));
-    const contract=tronHex(tronUsdtContract);
-    for(let i=0;i<ids.length;i++){
-     const receipt=receipts.get(ids[i])!,logs=receipt.log??[];
-     if(!Array.isArray(logs)||logs.length>10000)throw Error('SCAN_LOG_LIMIT');
-     if(receipt.result==='FAILED'||obj(receipt.receipt??{}).result!=='SUCCESS')continue;
-     for(let j=0;j<logs.length;j++){
-      const l=obj(logs[j]);if(String(l.address).toLowerCase()!==contract||!Array.isArray(l.topics)||l.topics.length!==3||String(l.topics[0]).toLowerCase()!==transfer)continue;
-      const to=String(l.topics[2]).toLowerCase();if(!/^0{24}[a-f0-9]{40}$/.test(to))throw Error('SCAN_LOG_CONTEXT');
-      const a=recipients.get(to.slice(-40));if(!a)continue;
-      const offset=i*10001+j;
-      if(start<a.next||start===a.next&&offset<a.offset||l.topics[1]===l.topics[2]||l.data==='0'.repeat(64))continue;
-      candidates.push({address:a,n:start,offset,txId:ids[i],logIndex:j,blockHash:first.hash});
+    // At most four block/receipt pairs are resident at once. Each complete batch
+    // is reduced to candidates before fetching more; never skip receipt validation.
+    // Same-provider solidified range API: bounded to 2 blocks in production.
+    // All blocks and every receipt are still checked; incomplete ranges fail closed.
+    const groups=new Map<number,Promise<Awaited<ReturnType<typeof block>>[]>>();
+    const rangeBlock=async(n:number)=>{
+     if(tronBlockBatch===1)return n===start?first:block(network,n);
+     const base=start+Math.floor((n-start)/tronBlockBatch)*tronBlockBatch;
+     if(!groups.has(base)){
+      const count=Math.min(tronBlockBatch,end-base+1);
+      groups.set(base,(async()=>{
+       const response=obj(await o.tron('/walletsolidity/getblockbylimitnext',{startNum:base,endNum:base+count}));
+       if(!Array.isArray(response.block)||response.block.length!==count)throw Error('SCAN_BLOCK_MISMATCH');
+       return response.block.map((value,i)=>{
+        const raw=obj(value),header=obj(obj(raw.block_header).raw_data),height=base+i,id=hash(raw.blockID);
+        if(num(header.number??0)!==height||id.slice(0,16)!==height.toString(16).padStart(16,'0'))throw Error('SCAN_BLOCK_MISMATCH');
+        if(height===start&&id!==first.hash)throw Error('CHAIN_REORG');
+        return {hash:id,parent:hash(header.parentHash),raw};
+       });
+      })());
+      // Retain at most four small ranges, never the full catch-up history.
+      if(groups.size>4)groups.delete(groups.keys().next().value!);
+     }
+     return (await groups.get(base)!)[n-base];
+    };
+    let previous=first.parent;
+    for(let base=start;base<=end;base+=tronConcurrency){
+     check();
+     const batch=await Promise.all(Array.from({length:Math.min(tronConcurrency,end-base+1)},async(_,i)=>{
+      const n=base+i,current=await rangeBlock(n);
+      for(const a of selected.filter(a=>a.next===n)){
+       if(a.partial&&a.partial!==current.hash||a.previous&&a.previous!==current.parent)throw Error('CHAIN_REORG');
+      }
+      const found:Candidate[]=[];
+      const txs=current.raw.transactions??[];
+      if(!Array.isArray(txs)||txs.length>10000)throw Error('SCAN_BLOCK_LIMIT');
+      const raw=await o.tron('/wallet/gettransactioninfobyblocknum',{num:n});
+      if(!Array.isArray(raw)||raw.length>10000)throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
+      const receipts=new Map<string,Record<string,unknown>>();
+      for(const value of raw){const r=obj(value),id=hash(r.id);if(num(r.blockNumber)!==n||receipts.has(id))throw Error('SCAN_RECEIPT_CONTEXT');receipts.set(id,r)}
+      // Missing receipts cannot be mistaken for an empty block, including native transfers.
+      const ids=txs.map(t=>hash(obj(t).txID));if(new Set(ids).size!==ids.length||receipts.size!==ids.length||ids.some(id=>!receipts.has(id)))throw Error('SCAN_INCOMPLETE_RECEIPTS');
+      const recipients=new Map(selected.map(a=>[tronHex(a.address),a]));
+      const contract=tronHex(tronUsdtContract);
+      for(let i=0;i<ids.length;i++){
+       const receipt=receipts.get(ids[i])!,logs=receipt.log??[];
+       if(!Array.isArray(logs)||logs.length>10000)throw Error('SCAN_LOG_LIMIT');
+       if(receipt.result==='FAILED'||obj(receipt.receipt??{}).result!=='SUCCESS')continue;
+       for(let j=0;j<logs.length;j++){
+        const l=obj(logs[j]);if(String(l.address).toLowerCase()!==contract||!Array.isArray(l.topics)||l.topics.length!==3||String(l.topics[0]).toLowerCase()!==transfer)continue;
+        const to=String(l.topics[2]).toLowerCase();if(!/^0{24}[a-f0-9]{40}$/.test(to))throw Error('SCAN_LOG_CONTEXT');
+        const a=recipients.get(to.slice(-40));if(!a)continue;
+        const offset=i*10001+j;
+        if(n<a.next||n===a.next&&offset<a.offset||l.topics[1]===l.topics[2]||l.data==='0'.repeat(64))continue;
+        found.push({address:a,n,offset,txId:ids[i],logIndex:j,blockHash:current.hash});
+       }
+      }
+      return {hash:current.hash,parent:current.parent,found};
+     }));
+     for(const current of batch){
+      if(current.parent!==previous)throw Error('CHAIN_REORG');
+      previous=current.hash;candidates.push(...current.found);
+      if(candidates.length>10000)throw Error('SCAN_LOG_LIMIT');
      }
     }
    }
@@ -138,6 +180,7 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
     }
    }
    if((await block(network,end)).hash!==endBlock.hash)throw Error('CHAIN_REORG');check();
+   let lagBlocks=0;
    await db.transaction(async tx=>{
     const {rows:owned}=await tx.query('SELECT network FROM "DepositNetworkScanner" WHERE network=$1 AND "claimId"=$2 AND "expiresAt">clock_timestamp() AND NOT paused FOR UPDATE',[network,claim]);if(owned.length!==1)throw Error('SCAN_LEASE_LOST');
     const ids=selected.map(a=>a.id);
@@ -145,9 +188,10 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
     for(const v of observed){const scoped={transaction:<T>(run:(tx:import('./wallet-engine').WalletTx)=>Promise<T>)=>run(tx)};if(v.network==='BEP20')await stageBep20Deposit(scoped,v.evidence);else await stageTronDeposit(scoped,v.evidence)}
     await tx.query('UPDATE "DepositScanCursor" SET "nextBlock"=$2,"transactionOffset"=$3,"blockHash"=$4,"previousBlockHash"=$5 WHERE "addressId"=ANY($1::uuid[]) AND ("nextBlock","transactionOffset")<($2,$3)',[ids,next,offset,partial?endBlock.hash:null,partial?endBlock.parent:endBlock.hash]);
     const {rows:[lag]}=await tx.query('SELECT COALESCE(MAX(GREATEST(0,$2-"nextBlock"+1)),0) AS lag FROM "DepositScanCursor" s JOIN "UserDepositAddress" a ON a.id=s."addressId" WHERE a.network=$1 AND NOT s.paused',[network,head]);
+    lagBlocks=num(lag.lag);
     await tx.query('UPDATE "DepositNetworkScanner" SET "lastBlock"=CASE WHEN "lastBlock" IS NULL OR "lastBlock"<=$3 THEN $3 ELSE "lastBlock" END,"lastHash"=CASE WHEN "lastBlock" IS NULL OR "lastBlock"<=$3 THEN $4 ELSE "lastHash" END,"lastHead"=$5,"lagBlocks"=$6,"lastSuccessAt"=clock_timestamp() WHERE network=$1 AND "claimId"=$2',[network,claim,end,endBlock.hash,head,lag.lag]);
    });
-   return {state:'PROGRESSED',staged:chosen.length,blocks:partial?end-start:end-start+1};
+   return {state:'PROGRESSED',lagBlocks,staged:chosen.length,blocks:partial?end-start:end-start+1};
   }catch(error){
    const message=error instanceof Error?error.message:'';
    if(['CHAIN_REORG','DEPOSIT_EVIDENCE_CONFLICT','DEPOSIT_OBSERVATION_REORG','TRON_OBSERVATION_REORG'].includes(message))await db.transaction(async tx=>{

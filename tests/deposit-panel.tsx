@@ -23,6 +23,7 @@ globalThis.fetch=(async(_url,options)=>{const body=JSON.parse(String(options!.bo
 let copied='';Object.defineProperty(navigator,'clipboard',{value:{writeText:async(v:string)=>{copied=v}},configurable:true});
 async function main(){
  await act(async()=>root.render(<DepositPanel ar={false} userId="owner"/>));
+ assert(text().includes('USDC · Coming soon'));assert(!Array.from(document.querySelectorAll('button')).some(b=>b.textContent?.includes('USDC')));
  assert(text().includes('Checking deposit availability'));assert.equal(requests.length,0);assert(!document.querySelector('input'));
  await act(async()=>Source.current.snapshot());
  assert(text().includes('TRON'));assert(text().includes('BNB Smart Chain'));assert.equal(requests.length,0,'No automatic allocation');
@@ -45,7 +46,7 @@ async function main(){
  await click('Show deposit address');
  Object.defineProperty(navigator,'clipboard',{value:{writeText:async()=>{throw Error('denied')}},configurable:true});
  await click('Copy address');assert(text().includes('Copy failed'));assert.equal(document.querySelector('input')!.value,trc);
- await act(async()=>root.render(<DepositPanel ar={true} userId="owner"/>));assert(text().includes('اختر شبكة الإيداع'));assert(text().includes('نسخ العنوان'));
+ await act(async()=>root.render(<DepositPanel ar={true} userId="owner"/>));assert(text().includes('USDC · سيتوفر قريباً'));assert(text().includes('اختر شبكة الإيداع'));assert(text().includes('نسخ العنوان'));
  await act(async()=>Source.current.listeners.get('session-ended')!({data:''}));assert(!document.querySelector('input'));
  await act(async()=>root.unmount());
  console.log('Deposit UI PASS: network choice, verified QR/address, exact copy, capability/session gates, no automatic allocation, stale request rejection, wrong chain/demo rejection, clipboard failure, Arabic/English. Mocked transport only; no funds or live addresses.');
