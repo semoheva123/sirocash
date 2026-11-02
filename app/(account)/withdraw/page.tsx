@@ -1,2 +1,2 @@
-import { SiroApp } from '@/components/siro-app';
-export default function Page(){return <SiroApp page="withdraw"/>}
+import {CustomerPayments} from "@/components/customer-payments";
+export default function WithdrawPage(){return <CustomerPayments view="withdraw"/>}

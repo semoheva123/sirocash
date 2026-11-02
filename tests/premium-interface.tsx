@@ -31,9 +31,11 @@ async function main(){
  assert(app.includes("event.key==='Escape'"));
  assert(app.includes('menuButton.current?.focus()'));
  const payments=await readFile('components/customer-payments.tsx','utf8');
- assert(payments.includes('!status.enabled?'));
- assert(payments.includes('sync!==\'current\''));
- assert(payments.includes('href="/trust"'));
+ assert(payments.includes("status?.enabled===true"));
+ assert(payments.includes("status.capabilities?.withdrawals===true"));
+ assert(payments.includes("sync==='current'"));
+ assert(payments.includes('if(!prepared||!canExecute)return'));
+ assert(payments.includes('href="/dashboard"'));
  console.log('Premium interface PASS: bilingual grouped navigation, truthful resource footer, availability escape routes, release transparency and retained financial execution/liveness gates.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1});

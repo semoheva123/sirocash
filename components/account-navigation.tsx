@@ -2,12 +2,14 @@
 import Link from 'next/link';
 import {Fragment} from 'react';
 import {WorkspaceSearch} from './workspace-search';
-import {ArrowDownLeft,ArrowUpRight,ArrowLeftRight,LayoutDashboard,Settings2,Smartphone,ShieldCheck,Wallet,LifeBuoy} from 'lucide-react';
+import {ArrowDownLeft,ArrowUpRight,ArrowLeftRight,LayoutDashboard,Settings2,Smartphone,ShieldCheck,Wallet,LifeBuoy,History} from 'lucide-react';
 
 /** One navigation model for every private page; logical CSS properties mirror it in RTL. */
 export function AccountNavigation({active,ar}:{active:string;ar:boolean}){
  const items=[
-  {href:'/dashboard',icon:LayoutDashboard,en:'Overview',ar:'نظرة عامة'},
+  {href:'/dashboard',icon:LayoutDashboard,en:'Home',ar:'الرئيسية'},
+  {href:'/wallet',icon:Wallet,en:'Wallet',ar:'المحفظة'},
+  {href:'/activity',icon:History,en:'Activity',ar:'النشاط'},
   {href:'/deposit',icon:ArrowDownLeft,en:'Deposit',ar:'الإيداع'},
   {href:'/withdraw',icon:ArrowUpRight,en:'Withdraw',ar:'السحب'},
   {href:'/payments',icon:ArrowLeftRight,en:'Financial commands',ar:'الطلبات المالية'},
@@ -18,7 +20,7 @@ export function AccountNavigation({active,ar}:{active:string;ar:boolean}){
  return <><aside className="account-rail">
   <Link href="/dashboard" className="logo rail-logo"><span className="logo-mark"><ArrowLeftRight size={23}/></span><span>SiroCash<span className="logo-dot">.</span></span></Link>
   <div className="signature-rail-identity"><span>PERSONAL</span><i/><span>SIROCASH</span></div><span className="rail-caption">{ar?'مساحة الحساب':'YOUR WORKSPACE'}</span>
-  <WorkspaceSearch ar={ar}/><nav aria-label={ar?'التنقّل الرئيسي للحساب':'Main account navigation'}>{items.map((item,index)=><Fragment key={item.href}>{[0,3,6].includes(index)&&<span className="premium-nav-group">{index===0?(ar?'المحفظة':'WALLET'):index===3?(ar?'الخدمات':'SERVICES'):(ar?'الحساب':'ACCOUNT')}</span>}<Link href={item.href} aria-current={active===item.href?'page':undefined}><item.icon size={19}/><span>{ar?item.ar:item.en}</span><i/></Link></Fragment>)}</nav>
-  <div className="rail-bottom"><Link className="premium-rail-help" href="/support"><LifeBuoy size={18}/><span>{ar?'المساعدة والإرشادات':'Help & guidance'}</span><ArrowUpRight size={15}/></Link><div className="rail-security"><ShieldCheck size={22}/><strong>{ar?'الأمان في كل خطوة':'Security at every step'}</strong><p>{ar?'كلمة مرور ورمز بريد للتحقق من الدخول والتغييرات الحسّاسة.':'Password and email approval for sign-in and sensitive changes.'}</p><Link href="/settings">{ar?'إعدادات الأمان':'Security settings'}<ArrowUpRight size={14}/></Link></div><span className="rail-environment"><Wallet size={14}/>{ar?'بيئة تجريبية · دون أموال فعلية':'Preview environment · No real funds'}</span></div>
- </aside><nav className="pro-mobile-nav" aria-label={ar?'التنقّل السريع':'Quick navigation'}>{items.filter(item=>['/dashboard','/payments','/deposit','/withdraw','/settings'].includes(item.href)).map(item=><Link key={item.href} href={item.href} aria-current={active===item.href?'page':undefined}><item.icon size={20}/><span>{item.href==='/payments'?(ar?'الطلبات':'Payments'):ar?item.ar:item.en}</span></Link>)}</nav></>;
+  <WorkspaceSearch ar={ar}/><nav aria-label={ar?'التنقّل الرئيسي للحساب':'Main account navigation'}>{items.map((item,index)=><Fragment key={item.href}>{[0,5,8].includes(index)&&<span className="premium-nav-group">{index===0?(ar?'المحفظة':'WALLET'):index===5?(ar?'الخدمات':'SERVICES'):(ar?'الحساب':'ACCOUNT')}</span>}<Link href={item.href} aria-current={active===item.href?'page':undefined}><item.icon size={19}/><span>{ar?item.ar:item.en}</span><i/></Link></Fragment>)}</nav>
+  <div className="rail-bottom"><Link className="premium-rail-help" href="/support"><LifeBuoy size={18}/><span>{ar?'المساعدة والإرشادات':'Help & guidance'}</span><ArrowUpRight size={15}/></Link><div className="rail-security"><ShieldCheck size={22}/><strong>{ar?'الأمان في كل خطوة':'Security at every step'}</strong><p>{ar?'كلمة مرور ورمز بريد للتحقق من الدخول والتغييرات الحسّاسة.':'Password and email approval for sign-in and sensitive changes.'}</p><Link href="/settings">{ar?'إعدادات الأمان':'Security settings'}<ArrowUpRight size={14}/></Link></div><span className="rail-environment"><Wallet size={14}/>{ar?'SIRO CASH · محفظتك':'SIRO CASH · Your wallet'}</span></div>
+ </aside><nav className="pro-mobile-nav" aria-label={ar?'التنقّل السريع':'Quick navigation'}>{[{href:'/dashboard',icon:LayoutDashboard,en:'Home',ar:'الرئيسية'},{href:'/wallet',icon:Wallet,en:'Wallet',ar:'المحفظة'},{href:'/activity',icon:History,en:'Activity',ar:'النشاط'},{href:'/settings',icon:Settings2,en:'Settings',ar:'الإعدادات'}].map(item=><Link key={item.href} href={item.href} aria-current={(active===item.href||(item.href==='/wallet'&&['/send','/payments','/deposit','/withdraw','/exchange','/sham-cash','/mobile-topup'].includes(active)))?'page':undefined}><item.icon size={20}/><span>{ar?item.ar:item.en}</span></Link>)}</nav></>;
 }

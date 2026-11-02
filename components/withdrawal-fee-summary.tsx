@@ -8,6 +8,6 @@ export function WithdrawalFeeSummary({asset,network,amount,ar}:{asset:string;net
   <div><span>{ar?'رسم سحب ثابت':'Fixed withdrawal fee'}</span><strong dir="ltr">{fee} USDT</strong></div>
   <p>{ar?'رسم خدمة للمنصة يُخصم من مبلغ السحب، وليس تسعيرة رسوم الشبكة.':'Platform service fee deducted from the withdrawal amount, not a network gas quote.'}</p>
   {quote?<><div><span>{ar?'إجمالي الخصم من الرصيد':'Total balance debit'}</span><strong dir="ltr">{quote.gross} USDT</strong></div><div><span>{ar?'صافي المبلغ للمستلم':'Recipient receives'}</span><strong dir="ltr">{quote.net} USDT</strong></div></>:<p>{ar?`يجب أن يتجاوز مبلغ السحب ${fee} USDT.`:`Withdrawal amount must exceed ${fee} USDT.`}</p>}
-  <small>{ar?'السياسة المقررة؛ السحب الفعلي غير مفعّل.':'Planned policy; live withdrawals are not activated.'}</small>
+
  </div>;
 }

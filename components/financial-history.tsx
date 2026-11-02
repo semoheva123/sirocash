@@ -1,5 +1,6 @@
 "use client";
 import { ArrowDownLeft, ArrowUpRight, MapPin, Layers } from "lucide-react";
+import {FinancialRecords} from "./financial-records";
 import { FinancialActivity } from "./financial-activity";
 import {
   FinancialEmpty,
@@ -13,15 +14,20 @@ export function FinancialHistory({
   status,
   ar,
   hideBalance = false,
+  showBalance = true,
+  scope = "all",
 }: {
   status: FinancialStatus;
   ar: boolean;
   hideBalance?: boolean;
+  showBalance?: boolean;
+  scope?: "all"|"deposits"|"withdrawals";
 }) {
   const t = (a: string, e: string) => (ar ? a : e);
+  if(scope!=="all")return <FinancialRecords status={status} ar={ar} scope={scope}/>;
   return (
     <div className="financial-history" data-financial-source="shared-sse">
-      <FinancialActivity status={status} ar={ar} hideBalance={hideBalance} />
+      <FinancialActivity status={status} ar={ar} hideBalance={hideBalance} showBalance={showBalance} />
       <div className="pro-history-grid">
         <section className="card">
           <div className="pro-section-heading">
@@ -110,8 +116,8 @@ export function FinancialHistory({
           </div>
           <p className="pro-card-caption">
             {t(
-              "رصد الإيداع لا يعني إضافته إلى رصيدك. تُعرض الإضافة في دفتر الحسابات بعد التحقق والتقييم.",
-              "Observation is not ledger credit. Credit appears after verification and valuation.",
+              "تُضاف الإيداعات إلى رصيدك بعد التحقق من المعاملة.",
+              "Credit appears after transaction verification.",
             )}
           </p>
           {status.deposits?.length ? (
@@ -150,8 +156,8 @@ export function FinancialHistory({
           </div>
           <p className="pro-card-caption">
             {t(
-              "حجز المبلغ أو توقيع المعاملة ليس تأكيدًا على الشبكة.",
-              "Reservation or signing is not network confirmation.",
+              "تظهر حالة إرسال كل عملية وتأكيدها على الشبكة.",
+              "Each withdrawal shows its current network status.",
             )}
           </p>
           {status.payouts?.length ? (

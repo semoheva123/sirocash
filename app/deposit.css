@@ -1,5 +1,5 @@
 /* Scoped wallet deposit experience. No changes to financial activation gates. */
-.deposit-studio{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(260px,.8fr);gap:24px;align-items:start;margin-block:24px;max-width:1120px;margin-inline:auto}
+.deposit-studio{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start;margin-block:24px;max-width:760px;margin-inline:auto}
 .deposit-studio-main,.deposit-guide{border:1px solid #ffffff12;border-radius:26px;background:linear-gradient(145deg,#14141bcc,#09090bf5);padding:32px;min-width:0}
 .deposit-studio-heading{display:flex;align-items:center;gap:14px;padding-bottom:28px;border-bottom:1px solid #ffffff0d}
 .deposit-studio-heading>svg{margin-inline-start:auto;color:#67e8f9}.deposit-symbol{display:grid;place-items:center;width:52px;height:52px;border:1px solid #67e8f930;border-radius:18px;background:#22d3ee0d;color:#67e8f9;font-size:32px}
@@ -16,3 +16,7 @@
 @media(max-width:850px){.deposit-studio{grid-template-columns:1fr;max-width:620px}.deposit-guide{padding:24px}.deposit-studio-main{padding:24px}}
 @media(max-width:420px){.deposit-studio-main{padding:20px 16px;border-radius:20px}.deposit-network-options{gap:8px}.deposit-network{padding:14px 9px;gap:7px}.deposit-network strong{font-size:10px}.deposit-network-mark{width:25px;height:28px}.deposit-address-label input{font-size:10px!important;padding-inline:5px!important}.deposit-studio-heading h2{font-size:22px}}
 @media(prefers-reduced-motion:reduce){.deposit-spin{animation:none}.deposit-network{transition:none}}
+
+.financial-records .pro-records{list-style:none;padding:0;margin:0;display:grid;gap:12px}.financial-records .pro-records li{padding:16px;border:1px solid #ffffff12;border-radius:16px;background:#09090b66}.financial-records .pro-record-heading,.financial-records .pro-record-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.financial-records .pro-record-footer{margin-top:10px;color:#a1a1aa;font-size:12px}.financial-records{margin-block:24px}
+
+.pro-balance-summary{grid-template-columns:minmax(0,1fr)}
