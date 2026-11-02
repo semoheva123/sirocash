@@ -20,7 +20,7 @@
     "test:database-options": "tsx tests/database-options.ts",
     "test:email-template": "tsx tests/verification-email.ts",
     "email:preview": "tsx scripts/preview-verification-email.ts",
-    "test:account": "tsx tests/account-overview.ts && tsx tests/customer-balance.tsx",
+    "test:account": "tsx tests/account-overview.ts && tsx tests/customer-balance.tsx && tsx tests/activity-presentation.tsx",
     "test:routing": "node tests/account-routing.mjs",
     "test:settings": "tsx tests/account-settings.tsx",
     "test:password-change": "tsx tests/change-password.ts",

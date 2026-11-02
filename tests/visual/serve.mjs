@@ -6,7 +6,7 @@ import {resolve,extname} from 'node:path';
 const root=process.cwd(),out=resolve('.cache/visual-wallet');
 await build({entryPoints:['tests/visual/entry.tsx'],bundle:true,outdir:out,format:'esm',jsx:'automatic',loader:{'.woff2':'file','.woff':'file'},assetNames:'fonts/[name]-[hash]',alias:{'next/link':resolve('tests/visual/link.tsx')},define:{'process.env.NODE_ENV':'"development"'}});
 const owner='11111111-2222-4333-8444-555555555555';
-const snapshot={enabled:true,readable:true,userId:owner,capabilities:{transfers:true,withdrawals:true,deposits:true},balance:{posted:'1480.000000',held:'20.000000'},activity:[{id:'fixture-deposit',type:'DEPOSIT',amount:'49.916750',status:'COMPLETED',createdAt:'2026-11-03T09:24:00Z'},{id:'fixture-transfer',type:'P2P',amount:'25.000000',status:'COMPLETED',createdAt:'2026-11-02T18:10:00Z'},{id:'fixture-withdraw',type:'WITHDRAWAL',amount:'20.000000',status:'PENDING',createdAt:'2026-11-02T12:06:00Z'}],operations:[],payouts:[],deposits:[],addresses:[]};
+const snapshot={enabled:true,readable:true,userId:owner,capabilities:{transfers:true,withdrawals:true,deposits:true},balance:{posted:'1480.000000',held:'20.000000'},activity:[{id:'fixture-deposit',type:'DEPOSIT',amount:'49.916750',status:'COMPLETED',createdAt:'2026-11-03T09:24:00Z'},{id:'fixture-transfer',type:'P2P',amount:'-25.000000',status:'COMPLETED',createdAt:'2026-11-02T18:10:00Z'},{id:'fixture-withdraw',type:'WITHDRAWAL',amount:'-20.000000',status:'PENDING',createdAt:'2026-11-02T12:06:00Z'}],operations:[],payouts:[],deposits:[],addresses:[]};
 const json=(res,data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data))};
 createServer(async(req,res)=>{
  const url=new URL(req.url,'http://fixture.local');
