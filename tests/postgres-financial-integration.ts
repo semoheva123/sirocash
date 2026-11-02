@@ -1,3 +1,4 @@
+import {schedulerHttpAcceptance} from './postgres-scheduler-http';
 import {dualResourceBudgetAcceptance} from './dual-resource-budget';
 import assert from 'node:assert/strict';
 import {financialReadTransactions} from '../lib/financial-read-transactions';
@@ -44,6 +45,7 @@ async function main(){
    try{pids.add(Number((await c.query('SELECT pg_backend_pid() AS pid')).rows[0].pid));await c.query('BEGIN');await c.query('SET LOCAL ROLE sirocash_financial_worker');const result=await run(c);await c.query('COMMIT');return result}
    catch(error){await c.query('ROLLBACK');throw error}finally{c.release()}
   }};
+  await schedulerHttpAcceptance(pool);
   // Independent-session scheduler capability race: exactly one committed consumer.
   const monitorHash=createHash('sha256').update(randomUUID()).digest('hex');
   await pool.query('UPDATE "DepositMonitorSchedule" SET enabled=true WHERE id=1');

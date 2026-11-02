@@ -35,9 +35,9 @@ async function main(){
   assert.equal(await consume('bad'),false);
  }finally{await pg.close()}
  const ops=await readFile('ops/supabase-deposit-monitor.sql','utf8');
- assert(ops.includes("'*/2 * * * *'"));assert(ops.includes('175000'));assert(ops.includes('extensions.gen_random_bytes(32)'));
+ assert(ops.includes("'*/2 * * * *'"));assert(ops.includes('175000'));assert(ops.includes('extensions.gen_random_bytes(32)'));assert(ops.includes('COMMIT; SELECT public.dispatch_deposit_monitor()'));assert(!ops.includes('net.http_post('));
  assert(ops.includes('https://sirocash.vercel.app/api/internal/deposit-monitor-scheduled'));assert(!ops.includes('/api/internal/financial-worker'));
- assert(ops.includes('REVOKE ALL ON FUNCTION public.enqueue_deposit_monitor()'));
+ assert(ops.includes('REVOKE ALL ON FUNCTION public.prepare_deposit_monitor(),public.dispatch_deposit_monitor()'));
  console.log('DB scheduler PASS: single-use expiring hashed capabilities, disabled default, hosted grants/RLS isolation, replay/expiry rejection, no DB before deployment/isolation gates, fixed monitor-only composition and no secret/error leakage. Fixture DB only.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
