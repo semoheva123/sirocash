@@ -49,6 +49,20 @@ jobs:
                   result = json.load(f)
               valid = isinstance(result, dict) and result.get('state') == 'COMPLETED' and result.get('healthy') is True
               valid = valid and all(type(result.get(k)) is int and result[k] >= 0 for k in ['scans', 'staged', 'held', 'valuations'])
+              if isinstance(result, dict):
+                  summary = {'state': result.get('state') if result.get('state') == 'COMPLETED' else 'UNKNOWN',
+                             'healthy': result.get('healthy') if type(result.get('healthy')) is bool else None}
+                  for key in ['scans', 'staged', 'held', 'valuations']:
+                      value = result.get(key)
+                      summary[key] = value if type(value) is int and 0 <= value <= 1000000000 else None
+                  print('DEPOSIT_MONITOR_SUMMARY:' + json.dumps(summary, sort_keys=True), flush=True)
+                  checks = result.get('checks', {})
+                  if isinstance(checks, dict):
+                      for network in ['BEP20', 'TRC20']:
+                          check = checks.get(network)
+                          state = check.get('state') if isinstance(check, dict) else None
+                          allowed = ['PROGRESSED', 'WAITING_FINALITY', 'BUSY_OR_PAUSED', 'FAILED']
+                          print(network + '_STATE: ' + (state if state in allowed else 'UNKNOWN'), flush=True)
               if not valid or result['held'] != 0:
                   checks = result.get('checks', {})
                   if isinstance(checks, dict):
