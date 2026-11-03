@@ -160,7 +160,7 @@ No raw bodies, rates, key, request headers, arbitrary messages or cookies are lo
 The old currencies experiment is not re-invoked by builds. A finished batch is evidence
 of those specific responses, not evidence that prices or API-key validity are resolved.
 
-## Requested public-page schedule — BLOCKED, not activated (2026-11-03)
+## Requested public-page schedule — ordinary-client baseline (2026-11-03)
 
 Owner approved three shared daily public-website observations at 10:00, 14:00 and
 18:00 Asia/Damascus, without an API key or per-visitor requests. Between observations,
@@ -204,3 +204,44 @@ that Chrome emulation will succeed. Five offline fixture tests verify bounds/sto
 The PR inspection workflow runs the one source request; Node's previously failed source
 inspection is NOT invoked as an automatic fallback. No production or financial changes,
 no third-party service subscription and no source API key access are involved.
+
+
+### Actual TLS-profile result and saved-page review
+
+One live request completed successfully in Actions run **41712438743**, check/job
+**126183659407**, at **2026-11-03T20:25:56.804278+00:00**:
+HTTP **200**, HTML, `cf-mitigated` challenge absent, **124882 bytes**, Ray ID
+`a54e1c72caa78c26-DTW`, result `PUBLIC_HTML_RECEIVED`.
+This supersedes the homepage-access blocker for this particular client/run only.
+It does not prove the TLS fingerprint alone caused success: the earlier ordinary
+request was from a different runner/edge location (WAW rather than DTW).
+No further source request was made to create a controlled comparison.
+
+The sandbox could not download the saved artifact because its redirected blob host
+was unreachable. Instead, run **41712736424**, check/job **126184722925**, read that
+SAME saved HTML within GitHub and emitted its inert visible text/time attributes in
+check annotations. No new source request and no page JavaScript execution occurred.
+Verified visible evidence from that response (NOT production constants):
+
+| Label | Observed value | Meaning |
+| --- | --- | --- |
+| USD buy / sell | 143.75 / 144.25 | New SYP, explicitly labelled; Syria-general market |
+| USD/TRY | 49.9821 | TRY per USD, global FX section |
+| EUR/USD | 1.1192 | USD per EUR, global FX section |
+
+The page separately showed the old-SYP equivalents; these were NOT substituted for
+new-SYP values or converted by the application. No official Syrian USD rate was
+established. The visible `time` elements described news/archive entries, not a precise
+rate-update timestamp. Retrieval time must NOT be advertised as source-update time.
+
+The live inspection workflow is now **manual-only** to prevent PR edits from
+repeating the authorized single request. The one-off saved-artifact review workflow
+was removed after completion; its run/annotations remain the evidence. The initial
+workflow YAML validation failure (41712307250) executed no job/source request and was
+fixed before the successful live run.
+
+**Still unfinished:** durable price parser/schema validation, separate official-rate
+source, shared ingestion/cache integration and the 10:00/14:00/18:00 Damascus schedule.
+None has been activated. PR19 remains draft; existing API collection remains paused,
+its counters and production financial behavior unchanged. Successful access is not
+an availability guarantee, a working ticker, or a claim of completed integration.
