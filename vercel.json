@@ -1,3 +1,14 @@
 {
-  "crons": [{"path":"/api/internal/identity-lifecycle","schedule":"37 2 * * *"}]
+  "crons": [
+    {
+      "path": "/api/internal/identity-lifecycle",
+      "schedule": "37 2 * * *"
+    }
+  ],
+  "functions": {
+    "api/exchange_collect.py": {
+      "maxDuration": 60,
+      "includeFiles": "exchange_worker/**"
+    }
+  }
 }

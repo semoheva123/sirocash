@@ -280,3 +280,48 @@ probe, including setup failure/unknown outcomes honestly. Even successful API JS
 is diagnostic only, not a saved/validated ticker snapshot or permission to resume
 normal collection. PR19's scope is now bounded source diagnostics, not delivery of
 the still-unimplemented three-times-daily feed.
+
+## Shared API TLS collector activation (2026-11-03)
+
+Owner authorized automatic collection using the newly verified Chrome TLS API client.
+The new server-only Python Vercel function `/api/exchange_collect` calls the documented
+**overview** endpoint (one request per observation) using curl_cffi's Chrome profile,
+verified HTTPS, no proxy environment/redirect/solver/retry, and 256 KiB decoded-body cap.
+The source key and database credentials stay inside Vercel. It publishes only validated
+Damascus-market NEW-SYP USD buy/sell, USD/TRY and EUR/USD into the existing shared
+snapshot. No inferred official price or currency conversion. Financial paths unchanged.
+
+GitHub cron `0 7,11,15 * * *` targets 10/14/18 Asia/Damascus. Delivery is best-effort;
+GitHub can delay/skip scheduled jobs. A two-hour slot window accepts moderate delays;
+outside it no provider call occurs. These are observations, not guaranteed exact-time
+opening/closing prints. A one-time manually dispatched bootstrap is accepted ONLY
+before the first claimed slot and while no snapshot exists. No automatic retries.
+
+Short-lived signed GitHub OIDC authenticates the production function: exact issuer,
+audience, repository, main ref/subject, workflow_ref and schedule/workflow_dispatch
+event. PRs, other workflows/repos/branches, expired/wrong-signature tokens are rejected
+before DB/source work. No copied Vercel/API key or new shared secret in GitHub. Only
+safe state/reason is printed by the no-checkout, id-token-only scheduler.
+
+The migration enables the new collector only from the verified API_TLS_COMPLETE/200 /
+apiOk=true/challenge=false state. It DOES NOT reset attempts/month, clear the original
+infinite pause, overwrite snapshots or re-arm diagnostics. Separate collectorEnabled,
+collectorBlockedUntil and lastCollectionSlot control this explicitly approved engine.
+Atomic PostgreSQL UPDATE commits slot+request ID+the SAME <=93/month budget before
+source I/O. Concurrent dispatch/replay/redeploy cannot repeat an already claimed or
+older slot. Lost/unknown slots stay consumed. Month rollover resets only on first
+eligible claim in a new UTC month; activation never resets the counter.
+
+Auth/challenge/schema/oversize stop this collector indefinitely for investigation.
+429/remaining=0 blocks until validated bounded reset or next UTC month. Network/5xx
+consume that slot without retry. Every failure retains the last valid snapshot;
+older source times and loss of previously available FX cannot overwrite it. Postgres
+uses verify-full hostname/CA validation and bounded connect/statement timeouts.
+
+Customer GET `/api/exchange-rates` is now strictly a snapshot read with no source key,
+claim or external fetch. Build-time probes are removed from npm build. Ticker details
+show retrieval time separately from source-update times and the three target slots.
+Official Syrian USD remains unavailable pending an independently verified source.
+
+Acceptance requires real deployment function routing, applied migration, OIDC dispatch,
+and first actual validated shared snapshot; CI/build success alone is insufficient.
