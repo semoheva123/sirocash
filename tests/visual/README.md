@@ -52,3 +52,14 @@ These are synthetic data only; the fixture never executes a financial command.
 idempotency key, customer follow-up, staff reply, closure, escaped hostile text
 and overflow. Browser API responses are synthetic; no production users/emails or
 financial commands are involved. Screenshots include the compose and thread views.
+
+## Reference exchange ticker
+
+The shared synthetic account fixture includes the top exchange ticker. Run
+`node tests/visual/exchange-review.mjs` against `node tests/visual/serve.mjs`.
+It intercepts the authenticated feed with synthetic new-SYP data and checks 24
+AR/EN states at 320/390/1440px: reference/stale/expired/unavailable, no document
+overflow, source disclosure and a single feed request. No provider or production
+calls. Optional `playwright` / `@sparticuz/chromium` packages are no-save tools.
+On minimal Linux, extracted Chromium al2023 libraries may require
+`LD_LIBRARY_PATH="$PWD/.cache/chromium-libs/lib"`.
