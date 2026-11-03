@@ -9,15 +9,15 @@ import {parseExchangeOverview} from '../lib/exchange-reference';
  for(const ar of [true,false]){
   const html=renderToStaticMarkup(<ExchangeTickerView ar={ar} snapshot={snapshot} now={now.getTime()}/>);
   assert(html.includes(ar?'ل.س الجديدة':'New SYP'));
-  assert(html.includes(ar?'غير متاح':'unavailable'));assert(html.includes('aria-hidden="true"'));assert(html.includes(ar?'إيقاف حركة الشريط':'Pause ticker'));assert(!html.includes('<article'));assert(html.includes('<dialog'));
-  assert(html.includes(ar?'ليس المصرف المركزي':'not the central bank'));
-  assert(html.includes(ar?'ليست أسعارًا لحظية':'not live quotes'));
+  assert(html.includes('aria-hidden="true"'));assert(!html.includes('<article'));
+  for(const removed of ['<button','<dialog','exchange-ticker-dialog','aria-pressed','data-paused','— details','— التفاصيل'])assert(!html.includes(removed),removed);
+  assert(html.includes('exchange-ticker-track'));assert(html.includes('USD / SYP'));
   assert(!html.includes('YOUR_API_KEY'));assert(!html.includes('14500'));
   const stale=renderToStaticMarkup(<ExchangeTickerView ar={ar} snapshot={snapshot} now={now.getTime()+17*3600000}/>);
   assert(stale.includes(ar?'بيانات قديمة':'Stale'));
   const expired=renderToStaticMarkup(<ExchangeTickerView ar={ar} snapshot={snapshot} now={now.getTime()+8*86400000}/>);
-  assert(expired.includes(ar?'انتهت صلاحية البيانات':'data expired'));assert(!expired.includes('34.52'));
+  assert(expired.includes(ar?'تعذّر تحميل الأسعار':'Rates could not be loaded'));assert(!expired.includes('<button'));assert(!expired.includes('<dialog'));assert(!expired.includes('34.52'));
   const empty=renderToStaticMarkup(<ExchangeTickerView ar={ar} snapshot={null} now={now.getTime()}/>);
-  assert(!empty.includes('145'));assert(!empty.includes('<time'));assert(!empty.includes('exchange-ticker-group'));assert(empty.includes(ar?'تعذّر تحميل الأسعار':'Rates could not be loaded'));
+  assert(!empty.includes('<button'));assert(!empty.includes('<dialog'));assert(!empty.includes('145'));assert(!empty.includes('<time'));assert(!empty.includes('exchange-ticker-group'));assert(empty.includes(ar?'تعذّر تحميل الأسعار':'Rates could not be loaded'));
  }
-console.log('Exchange ticker AR/EN reference/stale/expired/unavailable presentation PASS');
+console.log('Exchange ticker AR/EN strip-only, no controls/dialog, moving/stale/expired/unavailable presentation PASS');
