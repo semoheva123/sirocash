@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import {useNotifications} from './account-notifications';
 import {useEffect,useRef,useState,useCallback} from 'react';
 import {ArrowLeft,ArrowRight,Check,ChevronDown,Headphones,LockKeyhole,MessageSquare,Plus,Send,ShieldCheck,X} from 'lucide-react';
 import {useAccountLanguage} from './account-language';
@@ -8,6 +9,8 @@ type Ticket={id:string;subject:string;category:string;status:string;createdAt:st
 type Message={id:string;body:string;fromSupport:boolean;createdAt:string};
 const categories=[['ACCOUNT','الحساب والأمان','Account & security'],['DEPOSIT','الإيداعات','Deposits'],['TRANSFER','التحويلات','Transfers'],['OTHER','استفسار آخر','Something else']] as const;
 export function SupportCenter({staff=false}:{staff?:boolean}){
+ const notifications=useNotifications();
+ const liveInbox=useRef<unknown>(null);
  const [ar]=useAccountLanguage(),t=(a:string,e:string)=>ar?a:e;
  const [tickets,setTickets]=useState<Ticket[]>([]),[next,setNext]=useState<Cursor>(null),[ticket,setTicket]=useState<Ticket|null>(null),[messages,setMessages]=useState<Message[]>([]),[older,setOlder]=useState<Cursor>(null);
  const [compose,setCompose]=useState(false),[subject,setSubject]=useState(''),[category,setCategory]=useState('ACCOUNT'),[body,setBody]=useState(''),[reply,setReply]=useState('');
@@ -32,6 +35,16 @@ export function SupportCenter({staff=false}:{staff?:boolean}){
   try{const data=await api('/'+id+(cursor?'?before='+encodeURIComponent(JSON.stringify(cursor)):''));if(!mounted.current||generation!==epoch.current)return;setTicket(data.ticket);setMessages(previous=>cursor?[...data.messages.filter((m:Message)=>!previous.some(p=>p.id===m.id)),...previous]:data.messages);setOlder(data.next)}catch(e){if(generation===epoch.current)fail(e)}finally{if(generation===epoch.current)setThreadLoading(false)}
  }
  useEffect(()=>{mounted.current=true;void load().catch(()=>setError(ar?'تعذّر تحميل الطلبات.':'Could not load requests.'));return()=>{mounted.current=false;epoch.current++}},[load]);
+ // Database-driven invalidation only; never a periodic fetch. Preserve drafts/pending writes.
+ useEffect(()=>{
+  if(!notifications?.inbox||liveInbox.current===notifications.inbox||lock.current||pending)return;
+  liveInbox.current=notifications.inbox;
+  void (async()=>{if(active.current)await open(active.current);await load()})().catch(()=>{});
+ },[notifications?.inbox,pending,load]);
+ useEffect(()=>{
+  const id=new URLSearchParams(window.location.search).get('ticket');
+  if(id&&/^[0-9a-f-]{36}$/i.test(id))void open(id);
+ },[]);
  async function submit(event:React.FormEvent){
   event.preventDefault();if(lock.current)return;
   const creating=compose;if(!creating&&!ticket)return;
