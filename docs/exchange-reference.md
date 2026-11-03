@@ -356,3 +356,17 @@ failure categories distinguish dependencies/JWKS/token/individual identity check
 without logging claims/tokens/exceptions or weakening signature/ref/workflow checks.
 The temporary PR route diagnostic is removed after evidence collection. Real first
 snapshot acceptance remains required before reporting collection works.
+
+### Verified immutable OIDC subject (actual cause)
+
+Bootstrap41723749044 reached signed token validation and exact repository/ref/workflow
+checks, then correctly rejected `AUTH_SUBJECT`. GitHub's authorized metadata endpoint
+`repos/semoheva123/sirocash/actions/oidc/customization/sub` returned use_default=true,
+use_immutable_subject=true, sub_claim_prefix=`repo:semoheva123@321572336/sirocash@1439918663`.
+Therefore the required main subject is that immutable prefix + `:ref:refs/heads/main`,
+not the older name-only GitHub subject. Require the matching repository_id1439918663
+and repository_owner_id321572336 claims as well. No legacy-subject fallback, wildcard,
+other-repo allowance, signature bypass or key copying. Fixtures reject the legacy
+subject and wrong immutable IDs. Portable verified JWKS SSL remains appropriate, but
+was not established as the original cause. All these failures occurred BEFORE source
+I/O/claim; last verified DB count was still7 and no slot/snapshot had been reserved.
