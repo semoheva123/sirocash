@@ -46,7 +46,8 @@ const layout=await readFile('app/layout.tsx','utf8');
 assert.ok(layout.includes('@fontsource-variable/noto-sans-arabic'));
 assert.ok(layout.includes('@fontsource-variable/manrope'));
 assert.ok(layout.indexOf('./signature.css')>layout.indexOf('./design-system.css'));
-assert.ok(layout.includes('lang="ar" dir="rtl"'));
+assert.ok(layout.includes("get('siro-language')?.value==='en'?'en':'ar'"));
+assert.ok(layout.includes("lang={language} dir={language==='ar'?'rtl':'ltr'}"));
 console.log('Design system: all six navigation destinations/locales, unique active state, account-safe first paint, local fonts, RTL logical layout, reduced motion, keyboard focus and mobile safe-area rules passed.');
 
 }

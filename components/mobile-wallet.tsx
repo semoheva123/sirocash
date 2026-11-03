@@ -1,4 +1,5 @@
 'use client';
+import {useAccountLanguage} from './account-language';
 import {ReceivingIdentityPanel} from './receiving-identity';
 import Link from 'next/link';
 import {useEffect,useState} from 'react';
@@ -12,8 +13,7 @@ import {FinancialSyncStatus} from './financial-sync-status';
 import {useFinancialStatus} from './use-financial-status';
 import {displayAvailableBalance} from '@/lib/account-overview';
 export function useWalletLanguage(){
- const [ar,setAr]=useState(true);
- useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en')},[]);
+ const [ar]=useAccountLanguage();
  useEffect(()=>{document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr'},[ar]);
  return ar;
 }
@@ -27,7 +27,7 @@ export function MobileWallet({ownerId,view='home'}:{ownerId:string;view?:'home'|
  return <div className="site-shell account-workspace mobile-wallet"><AccountNavigation active={active} ar={ar}/>
   <main id="main-content" className="mobile-wallet-main" dir={ar?'rtl':'ltr'}>
    <header className="mobile-wallet-header"><Link className="mobile-avatar" href="/settings#profile" aria-label={t('الملف الشخصي','Profile')}>SC</Link><div><small>SIRO CASH</small><h1>{view==='home'?t('مرحبًا بك في Siro Cash','Welcome to Siro Cash'):view==='wallet'?t('المحفظة','Wallet'):view==='activity'?t('النشاط','Activity'):t('تبديل العملات','Exchange')}</h1></div><Link className="mobile-icon-button" href="/settings#active-sessions" aria-label={t('تنبيهات ونشاط الأمان','Security notifications and activity')}><Bell size={21}/></Link></header>
-   <FinancialSyncStatus compact sync={sync} updatedAt={updatedAt} ar={ar} retry={()=>void refresh().catch(()=>{})}/>
+   <FinancialSyncStatus hasData={!!status} compact sync={sync} updatedAt={updatedAt} ar={ar} retry={()=>void refresh().catch(()=>{})}/>
    {(view==='home'||view==='wallet')&&<>
     <div className="wallet-overview-card"><section className="mobile-balance" aria-label={t('إجمالي الرصيد','Total balance')}><span>{t('إجمالي الرصيد','Total balance')}</span><div className="mobile-balance-value"><strong dir="ltr">{hidden?'••••••':displayAvailableBalance(owned,ownerId)} <small>USD</small></strong><button type="button" className="mobile-icon-button" onClick={()=>setHidden(!hidden)} aria-pressed={!hidden} aria-label={hidden?t('إظهار الرصيد','Show balance'):t('إخفاء الرصيد','Hide balance')}>{hidden?<Eye size={20}/>:<EyeOff size={20}/>}</button></div><div className="mobile-currencies"><span>₮ USDT</span><span>USDC <small>{t('قريبًا','Soon')}</small></span></div></section>
     <div className="wallet-primary-funding"><Link href="/deposit"><ArrowDownLeft size={23}/><span>{t('إيداع','Deposit')}</span></Link><Link href="/withdraw"><ArrowUpRight size={23}/><span>{t('سحب','Withdraw')}</span></Link></div></div>

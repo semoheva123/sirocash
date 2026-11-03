@@ -13,7 +13,7 @@ async function main(){
   const updated=renderToStaticMarkup(<FinancialHistory status={{...status,payouts:status.payouts!.map(p=>({...p,state:'CONFIRMED'}))}} ar={ar}/>);
   assert(updated.includes(ar?'مؤكدة على الشبكة':'Confirmed on chain'));assert(!updated.includes(ar?'نتيجة الإرسال غير مؤكدة':'Broadcast outcome unknown'));
  }
- const layout=await readFile('app/(account)/layout.tsx','utf8');assert(layout.includes('<FinancialStatusProvider userId={user.id}>'));
+ const layout=await readFile('app/(account)/layout.tsx','utf8');assert(layout.includes('<FinancialStatusProvider key={user.id} userId={user.id} initialStatus={initial.financial}>'));
  const app=await readFile('components/siro-app.tsx','utf8');assert(app.includes("useFinancialStatus(page!=='home'&&Boolean(user),user?.id)"));assert(app.includes('<FinancialLivePanel ar={ar} userId={user.id}'));assert(!app.includes('displayAccountBalance(accountBalance)'));assert(app.includes('{!user&&<div className="transactions glass">'));
  const hook=await readFile('components/use-financial-status.ts','utf8');assert(hook.includes('enabled&&!shared'));assert.equal((hook.match(/new EventSource/g)??[]).length,1);
  console.log('Financial UI coverage PASS: shared authenticated-layout stream, all member financial routes, live balance/history, deposit observation, payout transitions, Arabic/English and no authenticated legacy balance/table.');

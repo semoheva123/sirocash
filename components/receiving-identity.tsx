@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import {useFinancialStatus} from "./use-financial-status";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, Share2, UserRound } from "lucide-react";
 import {
@@ -8,17 +9,17 @@ import {
   normalizeUid,
   type ReceivingIdentity,
 } from "@/lib/receiving-uid";
-export function useReceivingIdentity(ownerId: string) {
+function useReceivingIdentitySource(ownerId: string, enabled=true, initialIdentity:ReceivingIdentity|null=null) {
   const [stored, setStored] = useState<{
       ownerId: string;
       identity: ReceivingIdentity;
-    } | null>(null),
+    } | null>(initialIdentity ? {ownerId, identity:initialIdentity} : null),
     [error, setError] = useState(false),
     [version, setVersion] = useState(0);
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     let active = true;
-    setStored(null);
     setError(false);
     fetch("/api/account/receiving-identity", {
       cache: "no-store",
@@ -38,12 +39,25 @@ export function useReceivingIdentity(ownerId: string) {
       active = false;
       controller.abort();
     };
-  }, [ownerId, version]);
+  }, [ownerId, version, enabled]);
   return {
     identity: stored?.ownerId === ownerId ? stored.identity : null,
     error,
     reload: () => setVersion((v) => v + 1),
   };
+}
+const ReceivingContext=createContext<{ownerId:string;value:ReturnType<typeof useReceivingIdentitySource>}|null>(null);
+/** Layout-scoped, in-memory only: one request shared by all account views. */
+export function ReceivingIdentityProvider({children,ownerId,initialIdentity}:{children:React.ReactNode;ownerId:string;initialIdentity:ReceivingIdentity|null}) {
+ const {sync}=useFinancialStatus(true,ownerId);
+ const value=useReceivingIdentitySource(ownerId,sync!=='unauthenticated',initialIdentity);
+ return <ReceivingContext.Provider value={{ownerId,value:sync==='unauthenticated'?{...value,identity:null}:value}}>{children}</ReceivingContext.Provider>;
+}
+export function useReceivingIdentity(ownerId:string) {
+ const shared=useContext(ReceivingContext);
+ const own=useReceivingIdentitySource(ownerId,!shared);
+ if(shared)return shared.ownerId===ownerId?shared.value:{identity:null,error:false,reload:()=>{}};
+ return own;
 }
 export function RecipientIdentityCard({
   identity,

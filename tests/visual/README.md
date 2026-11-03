@@ -44,3 +44,11 @@ QR display, immutable usernames, owner-bound profile updates and wrong-owner
 response rejection at 320/360/390/768/1440 px in AR/EN. The base review also enters
 an Arabic-digit UID and checks the resolved recipient card before device approval.
 These are synthetic data only; the fixture never executes a financial command.
+
+## In-app support center
+
+`node tests/visual/support-review.mjs` checks six complete AR/EN flows at
+320/390/1440 px: customer request, committed-but-lost response/retry with the same
+idempotency key, customer follow-up, staff reply, closure, escaped hostile text
+and overflow. Browser API responses are synthetic; no production users/emails or
+financial commands are involved. Screenshots include the compose and thread views.

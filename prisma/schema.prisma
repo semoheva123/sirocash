@@ -40,6 +40,9 @@ enum CryptoAsset {
   USDC
 }
 model User {
+ supportTickets SupportTicket[]
+ supportMessages SupportMessage[]
+ supportBudget SupportBudget?
  receivingIdentity ReceivingIdentity?
  receivingIdentityBudgets ReceivingIdentityBudget[]
  usdtWithdrawalQuotes UsdtWithdrawalQuote[]
@@ -500,4 +503,39 @@ model ReceivingIdentityBudget {
  windowStart DateTime @db.Timestamptz
  count Int
  @@id([userId,action])
+}
+
+model SupportTicket {
+ id String @id @db.Uuid
+ ownerId String @db.Uuid
+ owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+ subject String
+ category String
+ status String @default("WAITING_SUPPORT")
+ createdAt DateTime @default(now()) @db.Timestamptz
+ updatedAt DateTime @default(now()) @db.Timestamptz
+ messages SupportMessage[]
+ @@index([ownerId,updatedAt(sort:Desc),id(sort:Desc)],map:"support_owner_updated")
+ @@index([updatedAt(sort:Desc),id(sort:Desc)],map:"support_queue_updated")
+}
+model SupportMessage {
+ id String @id @db.Uuid
+ ticketId String @db.Uuid
+ ticket SupportTicket @relation(fields:[ticketId],references:[id],onDelete:Restrict)
+ authorId String @db.Uuid
+ author User @relation(fields:[authorId],references:[id],onDelete:Restrict)
+ fromSupport Boolean
+ body String
+ requestKey String @db.Uuid
+ createdAt DateTime @default(now()) @db.Timestamptz
+ @@unique([authorId,requestKey])
+ @@index([ticketId,createdAt(sort:Desc),id(sort:Desc)],map:"support_message_page")
+}
+model SupportBudget {
+ userId String @id @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ minute DateTime @db.Timestamptz
+ minuteCount Int
+ day DateTime @db.Timestamptz
+ dayCount Int
 }
