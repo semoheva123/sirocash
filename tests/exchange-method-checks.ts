@@ -46,6 +46,12 @@ async function main(){
   await seed();n=0;
   await checkExchangeMethodsOnce({...deps,fetch:(async()=>{n++;throw Error('TEST_SECRET')}) as typeof fetch});
   assert.equal(n,2);row=await state();assert.equal(row.attempts,6);assert(!JSON.stringify(row).includes('TEST_SECRET'));
+  await seed();n=0;
+  await checkExchangeMethodsOnce({...deps,fetch:(async()=>{n++;return Response.json({ok:false,error:{code:'QUOTA_EXCEEDED'}},{status:429})}) as typeof fetch});
+  assert.equal(n,1,'Provider exhaustion must stop even the control request');row=await state();assert.equal(row.attempts,5);
+  await seed();n=0;
+  await checkExchangeMethodsOnce({...deps,fetch:(async()=>{n++;return Response.json({ok:true,data:{}},{headers:{'x-ratelimit-remaining':'0'}})}) as typeof fetch});
+  assert.equal(n,1,'Zero remaining must stop the comparison');row=await state();assert.equal(row.attempts,5);
   console.log('Method comparison PASS: one durable batch, exactly 2 comparisons/at most 3 calls, authenticated vs credential-free headers, stop after challenge/rejection, no retries, fixed month, existing quota/pause/snapshot preserved, sanitized Ray IDs/JSON/errors, no secret leakage or live I/O.');
  }finally{await pg.close()}
 }
