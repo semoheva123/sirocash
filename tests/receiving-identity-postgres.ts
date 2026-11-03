@@ -76,6 +76,23 @@ export async function receivingIdentityAcceptance(
     prepared.digest,
     paymentDigest("/api/wallet/transfer", prepared.payload),
   );
+  // Deterministic clock-boundary regression, only inside this disposable fixture DB.
+  // The deployed function has NO injectable clock. Preserve/restore its definition.
+  const definition=(await pool.query("SELECT pg_get_functiondef('public.receiving_identity_budget(uuid,text)'::regprocedure) AS sql")).rows[0].sql as string;
+  try{
+    await pool.query(definition.replaceAll('statement_timestamp()',"current_setting('siro.fixture_budget_time')::timestamptz"));
+    await pool.query('DELETE FROM "ReceivingIdentityBudget" WHERE "userId"=$1',[alice]);
+    const boundary=await Promise.all(Array.from({length:24},(_,i)=>db.transaction(async tx=>{
+      await tx.query("SELECT set_config('siro.fixture_budget_time',$1,true)",[i<12?'2026-11-04T12:59:59Z':'2026-11-04T13:00:00Z']);
+      return (await tx.query("SELECT receiving_identity_budget($1,'lookup') AS allowed",[alice])).rows[0].allowed;
+    })));
+    assert.equal(boundary.filter(Boolean).length,10,'Calendar-minute boundary must not reset an active 60-second budget');
+    await db.transaction(async tx=>{
+      await tx.query("SELECT set_config('siro.fixture_budget_time','2026-11-04T13:01:01Z',true)");
+      assert.equal((await tx.query("SELECT receiving_identity_budget($1,'lookup') AS allowed",[alice])).rows[0].allowed,true);
+    });
+    assert.equal((await pool.query('SELECT count FROM "ReceivingIdentityBudget" WHERE "userId"=$1 AND action=\'lookup\'',[alice])).rows[0].count,1);
+  }finally{await pool.query(definition)}
   // Lookup limit commits even when resolution is rejected. Concurrent requests share a single budget.
   await pool.query('DELETE FROM "ReceivingIdentityBudget" WHERE "userId"=$1', [
     alice,

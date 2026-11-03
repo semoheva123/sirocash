@@ -94,11 +94,11 @@
     "test:deposit-ui": "tsx tests/deposit-panel.tsx && tsx tests/withdrawal-page.tsx && tsx tests/mobile-wallet.tsx",
     "deposit:prelaunch-audit": "node --conditions=react-server --import tsx scripts/audit-prelaunch-deposit-start.ts",
     "test:prelaunch-audit": "node --conditions=react-server --import tsx tests/prelaunch-tron-audit.ts",
-    "test:receiving-identity": "tsx tests/receiving-uid.ts && node --conditions=react-server --import tsx tests/receiving-identity.ts",
+    "test:receiving-identity": "tsx tests/receiving-uid.ts && node --conditions=react-server --import tsx tests/receiving-identity.ts && tsx tests/receiving-budget-window.ts",
     "receiving:readiness": "node --conditions=react-server --import tsx scripts/check-receiving-identity.ts",
     "test:account-continuity": "tsx tests/account-continuity.tsx",
     "test:canonical-domain": "tsx tests/canonical-domain.ts",
-    "test:support": "node --conditions=react-server --import tsx tests/support-center.ts",
+    "test:support": "node --conditions=react-server --import tsx tests/support-center.ts && node --conditions=react-server --import tsx tests/account-notifications.ts",
     "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts && node --conditions=react-server --import tsx tests/exchange-currencies-probe.ts && node --conditions=react-server --import tsx tests/exchange-method-checks.ts && node --conditions=react-server --import tsx tests/exchange-api-tls-check.ts"
   },
   "dependencies": {
