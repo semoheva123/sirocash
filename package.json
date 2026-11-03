@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "npm run deposit:prelaunch-audit && node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:monitor-reads && npm run deposit:probe && npm run receiving:readiness && next build --webpack",
+    "build": "npm run deposit:prelaunch-audit && node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:monitor-reads && npm run deposit:probe && npm run receiving:readiness && npm run notifications:check && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",
@@ -99,7 +99,8 @@
     "test:account-continuity": "tsx tests/account-continuity.tsx",
     "test:canonical-domain": "tsx tests/canonical-domain.ts",
     "test:support": "node --conditions=react-server --import tsx tests/support-center.ts && node --conditions=react-server --import tsx tests/account-notifications.ts",
-    "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts && node --conditions=react-server --import tsx tests/exchange-currencies-probe.ts && node --conditions=react-server --import tsx tests/exchange-method-checks.ts && node --conditions=react-server --import tsx tests/exchange-api-tls-check.ts"
+    "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts && node --conditions=react-server --import tsx tests/exchange-currencies-probe.ts && node --conditions=react-server --import tsx tests/exchange-method-checks.ts && node --conditions=react-server --import tsx tests/exchange-api-tls-check.ts",
+    "notifications:check": "node --conditions=react-server --import tsx scripts/check-account-notifications.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
