@@ -132,3 +132,30 @@ currency-list count/USD presence are retained. Raw bodies/values/messages/keys a
 not logged or stored. Even HTTP 200 does not resume the overview collector or claim
 that the ticker is integrated with a new response shape. Production result must be
 reported separately from offline tests and deployment readiness.
+
+## User-authorized direct method comparisons (2026-11-03)
+
+Owner asked for further API checks without being concerned about the request quota;
+this is NOT permission to share the key with intermediaries or to run unlimited
+requests. One fixed November batch is authorized from the verified attempts=4,
+CURRENCIES_HTTP/403/challenge + infinite-pause state. No recurring re-arming.
+
+1. GET documented `/currency/usd?lang=en`, key in X-API-Key, minimal JSON Accept;
+   no Origin/Referer, invented auth schemes, query-string key or fake browser.
+2. Same URL from the same production environment WITHOUT any key: a deliberate
+   control to distinguish credential-specific rejection from hosting/edge rejection.
+   No follow-up after explicit 429/remaining=0 on the first check.
+3. Only if the authenticated USD request succeeds with ok=true and neither comparison
+   is challenged/exhausted, GET `/currencies?lang=en` with the documented minimal headers.
+
+Each actual request is reserved in the existing counter BEFORE I/O, <=93/month.
+There are at most three calls, no per-case retry and no proxy/challenge solver.
+A detected challenge stops further authenticated probes; the single credential-free
+control is diagnostic, not an attempt to obtain protected data. Existing snapshot,
+normal collection pause, financial execution and fees remain unchanged.
+
+Only fixed case/path, UTC time, HTTP/content/challenge/quota flags, allowlisted provider
+code and format-validated Cloudflare Ray ID are stored (support reference, not a secret).
+No raw bodies, rates, key, request headers, arbitrary messages or cookies are logged.
+The old currencies experiment is not re-invoked by builds. A finished batch is evidence
+of those specific responses, not evidence that prices or API-key validity are resolved.
