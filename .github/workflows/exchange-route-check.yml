@@ -2,7 +2,8 @@ name: Check collector routing without credentials
 on:
   pull_request:
     paths: ['.github/workflows/exchange-route-check.yml']
-permissions: {}
+permissions:
+  id-token: write
 jobs:
   inspect:
     runs-on: ubuntu-latest
@@ -10,9 +11,16 @@ jobs:
     steps:
       - shell: python
         run: |
-          import urllib.request, urllib.error
+          import urllib.request, urllib.error, json, os, base64
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,*args,**kwargs): return None
+          uri=os.environ['ACTIONS_ID_TOKEN_REQUEST_URL']+'&audience=sirocash-exchange-collector'
+          req=urllib.request.Request(uri,headers={'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          with urllib.request.urlopen(req,timeout=15) as r: token=json.load(r)['value']
+          encoded=token.split('.')[1]
+          claims=json.loads(base64.urlsafe_b64decode(encoded+'='*(-len(encoded)%4)))
+          fields=('iss','aud','sub','repository','ref','workflow_ref','job_workflow_ref','workflow','nbf','exp','iat')
+          print('::notice title=OIDC claim availability::'+json.dumps({k:k in claims for k in fields}))
           opener=urllib.request.build_opener(NoRedirect)
           for path in ('/api/exchange_collect','/api/exchange_collect.py','/api/exchange-rates'):
               status=0
