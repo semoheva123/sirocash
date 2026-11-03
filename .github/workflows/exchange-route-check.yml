@@ -22,10 +22,12 @@ jobs:
           fields=('iss','aud','sub','repository','ref','workflow_ref','job_workflow_ref','workflow','nbf','exp','iat')
           print('::notice title=OIDC claim availability::'+json.dumps({k:k in claims for k in fields}))
           opener=urllib.request.build_opener(NoRedirect)
-          for path in ('/api/exchange_collect','/api/exchange_collect.py','/api/exchange-rates'):
-              status=0
+          for path in ('/','/api/exchange_collect','/api/exchange_collect.py','/api/exchange-rates'):
+              status=0; fmt="none"; empty=False
               try:
-                  with opener.open('https://sirocash.vercel.app'+path,timeout=15) as r: status=r.status
-              except urllib.error.HTTPError as e: status=e.code
+                  with opener.open('https://sirocash.vercel.app'+path,timeout=15) as r:
+                      status=r.status; fmt='json' if 'json' in r.headers.get('content-type','') else 'html'; empty=not bool(r.read(1))
+              except urllib.error.HTTPError as e:
+                  status=e.code; fmt='json' if 'json' in e.headers.get('content-type','') else 'html'; empty=not bool(e.read(1))
               except Exception: pass
-              print('::notice title=Collector routing::'+path+' HTTP_'+str(status))
+              print('::notice title=Collector routing::'+path+' HTTP_'+str(status)+' '+fmt+' empty='+str(empty))
