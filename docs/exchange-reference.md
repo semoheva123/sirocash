@@ -245,3 +245,38 @@ source, shared ingestion/cache integration and the 10:00/14:00/18:00 Damascus sc
 None has been activated. PR19 remains draft; existing API collection remains paused,
 its counters and production financial behavior unchanged. Successful access is not
 an availability guarantee, a working ticker, or a claim of completed integration.
+
+## User-authorized direct API Chrome TLS-profile test (2026-11-03)
+
+After the public HTML success, the owner explicitly requested checking the API now.
+The existing sensitive key is scoped to Vercel **production only**, so it must not be
+read/decrypted/copied into GitHub, the sandbox or any intermediary. The production
+build probe now invokes `checkExchangeApiTlsOnce`, replacing invocation of the old,
+already completed method comparisons (the old testable module remains historical).
+
+From precisely attempts=6 / METHOD_CHECKS_COMPLETE / November 2026 / HTTP403 /
+methods-20261103 complete / no snapshot / infinite pause, one atomic reservation
+increments the SAME <=93 budget to 7 before any setup/I/O. Parallel builds, crashes,
+setup failure, timeout and redeploys cannot re-arm it. No pause, snapshot, financial
+operation, fee, ticker or recurring schedule is changed. A reserved internal attempt
+is NOT evidence of provider billing or quota consumption.
+
+Within Vercel only, Python installs the same binary-only hash-locked diagnostic
+client using a minimal environment WITHOUT the source key or other application
+secrets. The single source subprocess receives only the required source key (environment,
+never argv), isolated package path and basic interpreter variables: no database,
+signing keys or proxy configuration. Its fixed HTTPS URL is the documented
+`https://api-v2.sp-today.com/api/v1/currency/usd?lang=en`, X-API-Key + JSON Accept,
+Chrome profile, verify=True, no redirects, no solver/proxy/control/fallback/retry.
+The key is never sent to a package registry. Challenge responses stop unread; JSON
+is bounded to 1 MiB. No body, price fixture, arbitrary exception/message/header,
+cookie or key is logged or persisted. An independent Node allowlist sanitizes the
+child's bounded stdout before writing diagnostic state.
+
+Tests: six Python fixtures plus PGlite concurrent reservation/guard/pause/cache/error
+fixtures; these make NO actual source requests. A successful deployment alone is
+not a successful API test: report actual persisted status/result after the production
+probe, including setup failure/unknown outcomes honestly. Even successful API JSON
+is diagnostic only, not a saved/validated ticker snapshot or permission to resume
+normal collection. PR19's scope is now bounded source diagnostics, not delivery of
+the still-unimplemented three-times-daily feed.
