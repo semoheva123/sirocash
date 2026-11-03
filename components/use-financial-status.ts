@@ -2,11 +2,11 @@
 import {createContext,createElement,useContext,useCallback,useEffect,useRef,useState} from 'react';
 import {createFinancialStream,type SyncState} from '@/lib/financial-stream-client';
 export type FinancialStatus={enabled:boolean;readable?:boolean;userId:string;capabilities?:{transfers?:boolean;withdrawals:boolean;deposits:boolean};balance?:{posted:string;held:string};operations?:{id:string;kind:string;amount:string;feeAmount:string;state:string;createdAt:string}[];activity?:{id:string;amount:string;type:string;status:string;createdAt:string}[];deposits?:{id:string;network:string;txId:string;amountBaseUnits:string;state:string;createdAt:string}[];addresses?:{network:string;address:string}[];payouts?:{id:string;operationId:string;network:string;txId:string;state:string;createdAt:string}[]};
-function useFinancialStatusSource(enabled=true,expectedUserId?:string){
- const [status,setStatus]=useState<FinancialStatus|null>(null),[sync,setSync]=useState<SyncState>('syncing'),[updatedAt,setUpdatedAt]=useState<number|null>(null);
+function useFinancialStatusSource(enabled=true,expectedUserId?:string,initialStatus?:FinancialStatus|null){
+ const [status,setStatus]=useState<FinancialStatus|null>(()=>initialStatus && initialStatus.userId===expectedUserId?initialStatus:null),[sync,setSync]=useState<SyncState>('syncing'),[updatedAt,setUpdatedAt]=useState<number|null>(null);
  const controller=useRef<ReturnType<typeof createFinancialStream<FinancialStatus>>|null>(null);
  useEffect(()=>{
-  setStatus(null);setUpdatedAt(null);setSync(enabled?'syncing':'paused');
+  setStatus(initialStatus && initialStatus.userId===expectedUserId?initialStatus:null);setUpdatedAt(null);setSync(enabled?'syncing':'paused');
   if(!enabled)return;
   const c=createFinancialStream<FinancialStatus>({active:()=>document.visibilityState!=='hidden'&&navigator.onLine,expectedUserId,
    open:()=>new EventSource('/api/financial/events'),
@@ -22,8 +22,8 @@ function useFinancialStatusSource(enabled=true,expectedUserId?:string){
 
 const FinancialContext=createContext<ReturnType<typeof useFinancialStatusSource>|null>(null);
 /** One SSE subscription for the entire authenticated layout, preserved across client navigation. */
-export function FinancialStatusProvider({children,userId}:{children:React.ReactNode;userId:string}){
- const value=useFinancialStatusSource(true,userId);
+export function FinancialStatusProvider({children,userId,initialStatus}:{children:React.ReactNode;userId:string;initialStatus?:FinancialStatus|null}){
+ const value=useFinancialStatusSource(true,userId,initialStatus);
  return createElement(FinancialContext.Provider,{value},children);
 }
 export function useFinancialStatus(enabled=true,expectedUserId?:string){

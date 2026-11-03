@@ -1,4 +1,5 @@
 'use client';
+import {useAccountLanguage} from './account-language';
 import {ReceivingIdentityPanel,RecipientIdentityCard} from './receiving-identity';
 import {normalizeUid,type ReceivingIdentity} from '@/lib/receiving-uid';
 import {SendRoutePicker} from './send-route-picker';
@@ -22,10 +23,11 @@ export function CustomerPayments({view='payments'}:{view?:'payments'|'withdraw'|
  const [sendRoute,setSendRoute]=useState<'choose'|'internal'|'external'>('choose'),[transferStep,setTransferStep]=useState(0);
  const guided=view==='send';
  const [deliveryMethod,setDeliveryMethod]=useState<DeliveryMethod>('internal');
- const [ar,setAr]=useState(true),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[kind,setKind]=useState<'TRANSFER'|'WITHDRAWAL'>(withdrawalOnly?'WITHDRAWAL':'TRANSFER'),[recipient,setRecipient]=useState(''),[amount,setAmount]=useState(''),[chain,setChain]=useState('TRC20'),[prepared,setPrepared]=useState<Prepared|null>(null),[attempted,setAttempted]=useState(false),[submitted,setSubmitted]=useState<unknown>(null),[requestKey,setRequestKey]=useState('');
+ const [ar]=useAccountLanguage();
+ const [notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[kind,setKind]=useState<'TRANSFER'|'WITHDRAWAL'>(withdrawalOnly?'WITHDRAWAL':'TRANSFER'),[recipient,setRecipient]=useState(''),[amount,setAmount]=useState(''),[chain,setChain]=useState('TRC20'),[prepared,setPrepared]=useState<Prepared|null>(null),[attempted,setAttempted]=useState(false),[submitted,setSubmitted]=useState<unknown>(null),[requestKey,setRequestKey]=useState('');
  const t=(a:string,e:string)=>ar?a:e;
  const {status,sync,updatedAt,refresh}=useFinancialStatus();
- useEffect(()=>{setAr(localStorage.getItem('siro-language')!=='en');setRequestKey('customer:'+crypto.randomUUID());const params=new URL(window.location.href).searchParams;if(view==='send'&&['internal','external'].includes(params.get('route')??'')){const route=params.get('route') as 'internal'|'external';setSendRoute(route);setDeliveryMethod(route==='internal'?'internal':'cash')}if(withdrawalOnly||(view!=='send'&&params.get('kind')==='WITHDRAWAL')){setKind('WITHDRAWAL');const prefill=withdrawalPrefill(params);if(prefill){setChain(prefill.chain);setRecipient(prefill.recipient);setAmount(prefill.amount)}}else{const prefill=internalTransferPrefill(params);if(prefill){setRecipient(prefill.recipient);setAmount(prefill.amount)}}},[withdrawalOnly,view]);
+ useEffect(()=>{setRequestKey('customer:'+crypto.randomUUID());const params=new URL(window.location.href).searchParams;if(view==='send'&&['internal','external'].includes(params.get('route')??'')){const route=params.get('route') as 'internal'|'external';setSendRoute(route);setDeliveryMethod(route==='internal'?'internal':'cash')}if(withdrawalOnly||(view!=='send'&&params.get('kind')==='WITHDRAWAL')){setKind('WITHDRAWAL');const prefill=withdrawalPrefill(params);if(prefill){setChain(prefill.chain);setRecipient(prefill.recipient);setAmount(prefill.amount)}}else{const prefill=internalTransferPrefill(params);if(prefill){setRecipient(prefill.recipient);setAmount(prefill.amount)}}},[withdrawalOnly,view]);
  useEffect(()=>{document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr'},[ar]);
  function edit(){if(attempted&&!submitted)return;setAttempted(false);setPrepared(null);setTransferStep(0);setSubmitted(null);setRequestKey('customer:'+crypto.randomUUID())}
  const canExecute=(view!=='send'||(sendRoute==='internal'&&deliveryMethod==='internal'))&&sync==='current'&&status?.enabled===true&&(kind==='WITHDRAWAL'?status.capabilities?.withdrawals===true:status.capabilities?.transfers===true);
@@ -39,7 +41,7 @@ export function CustomerPayments({view='payments'}:{view?:'payments'|'withdraw'|
  }catch(e){setNotice(e instanceof Error?e.message:'تعذّر تأكيد النتيجة.');/* Preserve exact request/quote for retry. Never generate a second command after an unknown result. */}finally{setBusy(false)}}
  return <div className={`site-shell account-workspace pro-payments-workspace${guided?' guided-send':''}`}><AccountNavigation active={withdrawalOnly?"/withdraw":view==='send'?"/send":"/payments"} ar={ar}/><main id="main-content" className="section-width app-main pro-payments" dir={ar?'rtl':'ltr'} lang={ar?'ar':'en'}>
   <WalletPageHeader ar={ar} title={withdrawalOnly?t('سحب USDT','Withdraw USDT'):t('إرسال الأموال','Send money')} href="/dashboard" onBack={guided&&sendRoute!=='choose'?()=>{if(busy||(attempted&&!submitted))return;if(prepared){edit();return}if(transferStep>0){setTransferStep(0);return}setSendRoute('choose')}:undefined}/>
-  <FinancialSyncStatus compact sync={sync} updatedAt={updatedAt} ar={ar} retry={()=>void refresh().catch(()=>{})}/>
+  <FinancialSyncStatus hasData={!!status} compact sync={sync} updatedAt={updatedAt} ar={ar} retry={()=>void refresh().catch(()=>{})}/>
   {guided&&sendRoute==='choose'&&<SendRoutePicker ar={ar} onChoose={route=>{setSendRoute(route);setDeliveryMethod(route==='internal'?'internal':'cash')}}/>}
   {guided&&sendRoute==='external'&&<DeliveryMethods externalOnly ar={ar} value={deliveryMethod} onChange={setDeliveryMethod}/>}
   {guided&&sendRoute==='internal'&&<ol className="transfer-progress" aria-label={t('خطوات التحويل','Transfer steps')}>{[t('المبلغ','Amount'),t('المستفيد','Recipient'),t('المراجعة','Review')].map((label,index)=><li key={label} aria-current={(prepared?2:transferStep)===index?'step':undefined}><span>{index+1}</span>{label}</li>)}</ol>}

@@ -1,8 +1,8 @@
 'use client';
 import {Radio,RefreshCw,ShieldAlert} from 'lucide-react';
 import type {SyncState} from '@/lib/financial-stream-client';
-export function FinancialSyncStatus({sync,updatedAt,ar,retry,compact=false}:{compact?:boolean;sync:SyncState;updatedAt:number|null;ar:boolean;retry:()=>void}){
+export function FinancialSyncStatus({sync,updatedAt,ar,retry,compact=false,hasData=false}:{compact?:boolean;hasData?:boolean;sync:SyncState;updatedAt:number|null;ar:boolean;retry:()=>void}){
  const labels:Record<SyncState,[string,string]>={syncing:['جارٍ تحديث البيانات…','Refreshing data…'],current:['محدّث الآن','Up to date'],disabled:['الخدمات المالية غير مفعّلة؛ البث غير متاح حاليًا.','Financial services are disabled; streaming is unavailable.'],retrying:['تعذّر التحديث؛ البيانات المعروضة قديمة، وتُعاد المحاولة تلقائيًا.','Refresh failed; displayed data is stale. Retrying automatically.'],paused:['المزامنة متوقفة مؤقتًا لعدم الاتصال أو إخفاء الصفحة.','Sync paused while offline or hidden.'],unauthenticated:['انتهت الجلسة؛ سجّل الدخول مجددًا.','Session ended. Please sign in again.']};
- if(compact&&sync==='current')return null;
+ if(compact&&(sync==='current'||sync==='syncing'&&hasData))return null;
  return <div className={"financial-sync-status pro-sync pro-sync-"+sync}><span className="pro-sync-icon" aria-hidden="true">{sync==='current'?<Radio size={18}/>:sync==='unauthenticated'?<ShieldAlert size={18}/>:<RefreshCw size={18}/>}</span><p role="status" aria-live={sync==='retrying'||sync==='unauthenticated'?'polite':'off'}>{labels[sync][ar?0:1]} {updatedAt&&<span>{ar?'آخر تحديث ناجح: ':'Last successful refresh: '}<time dateTime={new Date(updatedAt).toISOString()}>{new Date(updatedAt).toLocaleTimeString(ar?'ar':'en')}</time></span>}</p>{sync==='unauthenticated'?<a href="/auth">{ar?'تسجيل الدخول':'Sign in'}</a>:<button type="button" className="button small secondary" onClick={retry} disabled={sync==='syncing'||sync==='paused'}>{ar?'تحديث الآن':'Refresh now'}</button>}</div>;
 }

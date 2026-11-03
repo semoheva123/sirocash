@@ -6,7 +6,7 @@ const layout=await readFile('app/(account)/layout.tsx','utf8');
 for(const source of [root,auth])assert.ok(source.includes("if(await serverUser())redirect('/dashboard')"));
 assert.ok(layout.includes("if(!user)redirect('/auth')"));
 assert.ok(layout.includes('const user=await serverUser()'));
-assert.ok(layout.includes('<FinancialStatusProvider userId={user.id}>'));
+assert.ok(layout.includes('<FinancialStatusProvider key={user.id} userId={user.id} initialStatus={initial.financial}>'));
 const session=await readFile('lib/server-user.ts','utf8');
 assert.ok(session.includes('currentUser('));assert.ok(session.includes("cookies()).get('siro-auth')"));
 const client=await readFile('components/email-auth.tsx','utf8');
