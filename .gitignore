@@ -20,3 +20,6 @@ cloudflare/identity/wrangler.generated.json
 
 # Local Python caches produced by agent skills
 .agents/**/__pycache__/
+
+# Python diagnostics bytecode
+__pycache__/

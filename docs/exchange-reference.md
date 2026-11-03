@@ -187,3 +187,20 @@ Keep this PR unmerged until a permitted automated source is reachable and actual
 can be validated, then implement/test the three-slot idempotent shared scheduler.
 Do not repeatedly redeploy/probe the same challenged page or enable knowingly failing
 recurring fetches in place of a working schedule.
+
+## User-requested TLS-client comparison (2026-11-03)
+
+The owner proposed a Chrome/Firefox-style TLS fingerprint rather than the ordinary
+HTTP client. A single diagnostic is prepared using hash-locked curl_cffi 0.17.0
+with its Chrome profile. It is confined to `https://sp-today.com/` (public HTML),
+not an authenticated API route. No key, proxy, clearance cookie, solver, rotating
+identity or retry is supplied; TLS certificate verification stays enabled, redirects
+are rejected and the decoded body is capped at 1 MiB. Environment proxies are ignored.
+If the same challenge is returned, record its status/category/Ray ID and STOP without
+reading/solving the challenge or trying other fingerprints.
+
+This diagnostic does not by itself activate the three-times-daily schedule or establish
+that Chrome emulation will succeed. Five offline fixture tests verify bounds/stop paths.
+The PR inspection workflow runs the one source request; Node's previously failed source
+inspection is NOT invoked as an automatic fallback. No production or financial changes,
+no third-party service subscription and no source API key access are involved.
