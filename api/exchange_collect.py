@@ -30,10 +30,11 @@ def authorization_result(value):
         key = _jwks.get_signing_key_from_jwt(token).key
         phase = 'AUTH_TOKEN'
         claims = jwt.decode(token, key, algorithms=['RS256'], audience=AUDIENCE, issuer=ISSUER,
-                            options={'require': ['exp', 'iat', 'nbf', 'sub', 'repository', 'ref', 'workflow_ref', 'event_name']}, leeway=10)
+                            options={'require': ['exp', 'iat', 'nbf', 'sub', 'repository', 'ref', 'workflow_ref', 'event_name', 'repository_id', 'repository_owner_id']}, leeway=10)
         expected = {'repository': 'semoheva123/sirocash', 'ref': 'refs/heads/main',
-                    'workflow_ref': WORKFLOW, 'sub': 'repo:semoheva123/sirocash:ref:refs/heads/main'}
-        labels = {'repository':'AUTH_REPOSITORY','ref':'AUTH_REF','workflow_ref':'AUTH_WORKFLOW','sub':'AUTH_SUBJECT'}
+                    'workflow_ref': WORKFLOW, 'sub': 'repo:semoheva123@321572336/sirocash@1439918663:ref:refs/heads/main',
+                    'repository_id': '1439918663', 'repository_owner_id': '321572336'}
+        labels = {'repository':'AUTH_REPOSITORY','ref':'AUTH_REF','workflow_ref':'AUTH_WORKFLOW','sub':'AUTH_SUBJECT','repository_id':'AUTH_REPOSITORY','repository_owner_id':'AUTH_REPOSITORY'}
         for k, v in expected.items():
             if not isinstance(claims.get(k), str) or not hmac.compare_digest(claims[k], v):
                 return False, labels[k]

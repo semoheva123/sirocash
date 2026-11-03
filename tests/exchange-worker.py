@@ -66,10 +66,10 @@ class Tests(unittest.TestCase):
         private=rsa.generate_private_key(public_exponent=65537,key_size=2048)
         http._jwks=SimpleNamespace(get_signing_key_from_jwt=lambda t:SimpleNamespace(key=private.public_key()))
         at=datetime.now(timezone.utc)
-        claims=dict(iss=http.ISSUER,aud=http.AUDIENCE,sub='repo:semoheva123/sirocash:ref:refs/heads/main',repository='semoheva123/sirocash',ref='refs/heads/main',workflow_ref=http.WORKFLOW,event_name='schedule',iat=at,nbf=at,exp=at+timedelta(minutes=5))
+        claims=dict(iss=http.ISSUER,aud=http.AUDIENCE,sub='repo:semoheva123@321572336/sirocash@1439918663:ref:refs/heads/main',repository_id='1439918663',repository_owner_id='321572336',repository='semoheva123/sirocash',ref='refs/heads/main',workflow_ref=http.WORKFLOW,event_name='schedule',iat=at,nbf=at,exp=at+timedelta(minutes=5))
         def allowed(c):return http.authorized('Bearer '+jwt.encode(c,private,algorithm='RS256',headers={'kid':'fixture'}))
         self.assertTrue(allowed(claims));self.assertTrue(allowed(dict(claims,event_name='push')));self.assertFalse(http.authorized(None));self.assertFalse(http.authorized('Bearer junk'))
-        for key,val in [('repository','attacker/repo'),('ref','refs/pull/20/merge'),('workflow_ref','other.yml'),('aud','other'),('iss','other'),('event_name','pull_request'),('sub','other'),('exp',at-timedelta(minutes=1))]:
+        for key,val in [('repository','attacker/repo'),('ref','refs/pull/20/merge'),('workflow_ref','other.yml'),('aud','other'),('iss','other'),('event_name','pull_request'),('sub','other'),('sub','repo:semoheva123/sirocash:ref:refs/heads/main'),('repository_id','1'),('repository_owner_id','1'),('exp',at-timedelta(minutes=1))]:
             self.assertFalse(allowed(dict(claims,**{key:val})),key)
         other=rsa.generate_private_key(public_exponent=65537,key_size=2048)
         self.assertFalse(http.authorized('Bearer '+jwt.encode(claims,other,algorithm='RS256')))
