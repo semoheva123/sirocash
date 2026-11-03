@@ -16,6 +16,9 @@ async function main(){
   const input={action:'create' as const,subject:'Account inquiry',category:'ACCOUNT' as const,body:'Please help with my account.',requestKey:randomUUID()};
   assert(!supportInput.safeParse({...input,ownerId:other}).success);
   assert(!supportInput.safeParse({...input,body:' '}).success);
+  assert(!supportInput.safeParse({...input,body:'😀'}).success);
+  assert(!supportInput.safeParse({...input,body:'bad\u0000text'}).success);
+  assert(!supportInput.safeParse({...input,subject:'😀😀'}).success);
   assert(!supportInput.safeParse({...input,body:'a'.repeat(4001)}).success);
   assert(!supportInput.safeParse({...input,category:'FAKE'}).success);
   assert(!supportAdmin(owner));

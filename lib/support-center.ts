@@ -4,9 +4,9 @@ import {z} from 'zod';
 import {operationsAllowed} from './operations-policy';
 import type {PoolClient} from 'pg';
 export const supportAdmin=(id:string)=>operationsAllowed(id,process.env.SUPPORT_ADMIN_IDS??process.env.OPERATIONS_ADMIN_IDS);
-const body=z.string().trim().min(2).max(4000);
+const body=z.string().trim().min(2).max(4000).refine(value=>Array.from(value).length>=2&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value));
 export const supportInput=z.discriminatedUnion('action',[
- z.object({action:z.literal('create'),subject:z.string().trim().min(4).max(120),category:z.enum(['ACCOUNT','DEPOSIT','TRANSFER','OTHER']),body,requestKey:z.string().uuid()}).strict(),
+ z.object({action:z.literal('create'),subject:z.string().trim().min(4).max(120).refine(value=>Array.from(value).length>=4&&!/[\u0000-\u001f\u007f]/.test(value)),category:z.enum(['ACCOUNT','DEPOSIT','TRANSFER','OTHER']),body,requestKey:z.string().uuid()}).strict(),
  z.object({action:z.literal('reply'),body,requestKey:z.string().uuid()}).strict(),
  z.object({action:z.literal('close')}).strict(),
 ]);
