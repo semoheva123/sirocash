@@ -53,6 +53,7 @@ class handler(BaseHTTPRequestHandler):
             self.reply(401, {'state': 'UNAUTHORIZED'})
             return
         ca_path = None
+        phase = 'INITIALIZATION'
         try:
             if os.environ.get('VERCEL_ENV') != 'production':
                 self.reply(503, {'state': 'DISABLED'})
@@ -70,6 +71,7 @@ class handler(BaseHTTPRequestHandler):
             if not key or not url:
                 self.reply(503, {'state': 'UNCONFIGURED'})
                 return
+            phase = 'DEPENDENCIES'
             import certifi
             import psycopg
             from curl_cffi import requests
@@ -86,13 +88,15 @@ class handler(BaseHTTPRequestHandler):
                 with tempfile.NamedTemporaryFile(mode='w', prefix='exchange-ca-', delete=False) as f:
                     f.write(ca.replace('\\n', '\n'))
                     ca_path = root = f.name
+            phase = 'DATABASE_CONNECT'
             with psycopg.connect(url, autocommit=True, sslmode='verify-full', sslrootcert=root,
                                  connect_timeout=8, prepare_threshold=None, options='-c statement_timeout=10000') as db:
                 with requests.Session(trust_env=False) as session:
+                    phase = 'COLLECTION'
                     result = collect(db, session, key, payload.get('bootstrap', False))
             self.reply(200, result)
         except Exception:
-            self.reply(503, {'state': 'UNAVAILABLE'})
+            self.reply(503, {'state': 'UNAVAILABLE', 'phase': phase})
         finally:
             if ca_path:
                 try:
