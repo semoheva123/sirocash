@@ -341,3 +341,18 @@ POST. No provider retries: DB still denies bootstrap after any first slot reserv
 or existing snapshot. Health checks neither connect to DB nor call the provider.
 Scheduled observations continue independently at the three approved times. This is
 normal authorized deployment automation, not a change to the integration's permissions.
+
+### Runtime authentication acceptance repair
+
+The first bootstrap run41721701128 exhausted auth-only readiness without any provider
+POST. Key-free route checks41722919880 confirmed both default and canonical hosts
+serve the function (401 JSON, empty body); the homepages return200. Claim availability
+check41722633425 confirmed required OIDC fields exist, without printing token/values.
+This is not a provider failure and no counter/reset/retry was authorized or performed.
+
+Use the canonical `https://www.sirocash.online/api/exchange_collect` endpoint, and
+explicit certifi-backed verified SSL for portable Python's JWKS client. Safe auth
+failure categories distinguish dependencies/JWKS/token/individual identity checks
+without logging claims/tokens/exceptions or weakening signature/ref/workflow checks.
+The temporary PR route diagnostic is removed after evidence collection. Real first
+snapshot acceptance remains required before reporting collection works.

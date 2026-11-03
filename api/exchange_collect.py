@@ -12,23 +12,41 @@ WORKFLOW = 'semoheva123/sirocash/.github/workflows/exchange-collector.yml@refs/h
 _jwks = None
 
 
-def authorized(value):
+def authorization_result(value):
     global _jwks
     if not value or not value.startswith('Bearer ') or len(value) > 8192:
-        return False
+        return False, 'AUTH_HEADER'
+    phase = 'AUTH_DEPENDENCIES'
     try:
         import jwt
+        import certifi
+        import ssl
         if _jwks is None:
-            _jwks = jwt.PyJWKClient(ISSUER + '/.well-known/jwks', cache_jwk_set=True, lifespan=300, timeout=8)
+            # Portable serverless Python must use an explicit verified public CA bundle.
+            _jwks = jwt.PyJWKClient(ISSUER + '/.well-known/jwks', cache_jwk_set=True,
+                lifespan=300, timeout=8, ssl_context=ssl.create_default_context(cafile=certifi.where()))
         token = value[7:]
+        phase = 'AUTH_JWKS'
         key = _jwks.get_signing_key_from_jwt(token).key
+        phase = 'AUTH_TOKEN'
         claims = jwt.decode(token, key, algorithms=['RS256'], audience=AUDIENCE, issuer=ISSUER,
                             options={'require': ['exp', 'iat', 'nbf', 'sub', 'repository', 'ref', 'workflow_ref', 'event_name']}, leeway=10)
         expected = {'repository': 'semoheva123/sirocash', 'ref': 'refs/heads/main',
                     'workflow_ref': WORKFLOW, 'sub': 'repo:semoheva123/sirocash:ref:refs/heads/main'}
-        return all(isinstance(claims.get(k), str) and hmac.compare_digest(claims[k], v) for k, v in expected.items()) and claims['event_name'] in ('schedule', 'workflow_dispatch', 'push')
+        labels = {'repository':'AUTH_REPOSITORY','ref':'AUTH_REF','workflow_ref':'AUTH_WORKFLOW','sub':'AUTH_SUBJECT'}
+        for k, v in expected.items():
+            if not isinstance(claims.get(k), str) or not hmac.compare_digest(claims[k], v):
+                return False, labels[k]
+        if claims['event_name'] not in ('schedule', 'workflow_dispatch', 'push'):
+            return False, 'AUTH_EVENT'
+        return True, 'OK'
     except Exception:
-        return False
+        # Static categories only: never exceptions, decoded claims, key IDs or tokens.
+        return False, phase
+
+
+def authorized(value):
+    return authorization_result(value)[0]
 
 
 class handler(BaseHTTPRequestHandler):
@@ -46,7 +64,8 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        self.reply(204 if authorized(self.headers.get('Authorization')) else 401)
+        ok, reason = authorization_result(self.headers.get('Authorization'))
+        self.reply(204 if ok else 401, None if ok else {'auth': reason})
 
     def do_POST(self):
         if not authorized(self.headers.get('Authorization')):
