@@ -78,7 +78,7 @@ class handler(BaseHTTPRequestHandler):
             if parsed.scheme not in ('postgres', 'postgresql'):
                 raise ValueError('DB_CONFIG')
             # URL SSL flags cannot override hostname verification or our trusted CA.
-            query = [(k, v) for k, v in parse_qsl(parsed.query) if k not in ('sslmode', 'sslrootcert', 'sslcert', 'sslkey', 'uselibpqcompat')]
+            query = [(k, v) for k, v in parse_qsl(parsed.query) if k not in ('sslmode', 'sslrootcert', 'sslcert', 'sslkey', 'uselibpqcompat', 'pgbouncer', 'connection_limit', 'pool_timeout', 'schema', 'socket_timeout', 'sslaccept')]
             url = urlunsplit(parsed._replace(query=urlencode(query)))
             ca = os.environ.get('DATABASE_SSL_CA')
             root = certifi.where()
@@ -87,7 +87,7 @@ class handler(BaseHTTPRequestHandler):
                     f.write(ca.replace('\\n', '\n'))
                     ca_path = root = f.name
             with psycopg.connect(url, autocommit=True, sslmode='verify-full', sslrootcert=root,
-                                 connect_timeout=8, options='-c statement_timeout=10000') as db:
+                                 connect_timeout=8, prepare_threshold=None, options='-c statement_timeout=10000') as db:
                 with requests.Session(trust_env=False) as session:
                     result = collect(db, session, key, payload.get('bootstrap', False))
             self.reply(200, result)

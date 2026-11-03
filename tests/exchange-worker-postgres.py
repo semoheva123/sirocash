@@ -45,7 +45,7 @@ class Tests(unittest.TestCase):
     def tearDown(self):self.c.close()
     def state(self):
         with self.c.cursor(row_factory=psycopg.rows.dict_row) as cur:
-            cur.execute('SELECT *,"blockedUntil"::text AS legacy_pause,"collectorBlockedUntil"::text AS collector_pause FROM "ExchangeReference"');return cur.fetchone()
+            cur.execute('SELECT attempts,snapshot,"lastIssues","lastOutcome","blockedUntil"::text AS legacy_pause,"collectorBlockedUntil"::text AS collector_pause FROM "ExchangeReference"');return cur.fetchone()
     def test_independent_concurrent_claim_and_duplicate(self):
         barrier=threading.Barrier(2);lock=threading.Lock();calls=[]
         class S(f.Session):

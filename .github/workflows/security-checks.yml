@@ -137,7 +137,18 @@ jobs:
       - name: Real isolated exchange collector concurrency and retention
         run: |
           python3 -m pip install --require-hashes -r requirements.txt
-          python3 tests/exchange-worker-postgres.py
+          mkdir -p .cache
+          set -o pipefail
+          python3 tests/exchange-worker-postgres.py 2>&1 | tee .cache/exchange-pg.log
         env:
           SIRO_ALLOW_ISOLATED_POSTGRES_TESTS: 'true'
           SIRO_TEST_POSTGRES_URL: postgresql://postgres:isolated-fixture-only@127.0.0.1:5432/postgres
+      - name: Surface isolated collector fixture failures
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('.cache/exchange-pg.log')
+          if p.exists():
+              text = p.read_text()[-6000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::error title=Exchange PostgreSQL fixture::' + text)
