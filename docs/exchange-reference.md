@@ -112,3 +112,23 @@ repeat once attempts advances. Normal collection still follows its eight-hour co
 A real successful response and saved snapshot, not a successful build, establishes
 that provider access is working. If refusal persists, report the exact safe provider
 code rather than claiming that prices were fixed.
+
+## User-authorized currencies-path experiment (2026-11-03)
+
+The owner supplied `/currencies?lang=en` documentation with `data.currencies` and
+explicitly asked to try it after the overview-path Cloudflare challenge. This is one
+ordinary authenticated request to a documented endpoint, NOT a challenge solver,
+proxy/host fallback, browser impersonation or recurring retry.
+
+`probeExchangeCurrenciesOnce` atomically reserves attempt 4 only from the observed
+November 2026 state: attempts=3, snapshot absent, last HTTP 403 + challenge=true,
+and blockedUntil=infinity (the deliberate challenge pause). The same 93-attempt
+budget is incremented before I/O. It does NOT clear the pause, change cooldowns,
+reset counters, overwrite a snapshot or re-arm in a later month. Redeploys cannot
+repeat once attempts becomes 4. The previous access-repair probe is not called.
+
+Only status, content category, challenge flag, allowlisted error code, and validated
+currency-list count/USD presence are retained. Raw bodies/values/messages/keys are
+not logged or stored. Even HTTP 200 does not resume the overview collector or claim
+that the ticker is integrated with a new response shape. Production result must be
+reported separately from offline tests and deployment readiness.

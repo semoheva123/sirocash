@@ -99,7 +99,7 @@
     "test:account-continuity": "tsx tests/account-continuity.tsx",
     "test:canonical-domain": "tsx tests/canonical-domain.ts",
     "test:support": "node --conditions=react-server --import tsx tests/support-center.ts",
-    "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts"
+    "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts && node --conditions=react-server --import tsx tests/exchange-currencies-probe.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

@@ -35,7 +35,7 @@ export async function blockExhaustedExchange(db:DB,id:string,response:Response,n
  const until=Number.isFinite(reset)&&reset>now.getTime()&&reset<=now.getTime()+32*86400000?reset:next;
  await db.query(`UPDATE "ExchangeReference" SET "blockedUntil"=$2 WHERE id='sp-today' AND "requestId"=$1`,[id,new Date(until)]);
 }
-async function boundedJson(response:Response){
+export async function readExchangeJson(response:Response){
  if(!response.body)throw Error('EXCHANGE_UNAVAILABLE');
  const reader=response.body.getReader(),parts:Uint8Array[]=[];let length=0;
  try{while(true){const {done,value}=await reader.read();if(done)break;length+=value.byteLength;if(length>256*1024)throw Error('EXCHANGE_UNAVAILABLE');parts.push(value)}}finally{await reader.cancel().catch(()=>{})}
@@ -61,11 +61,11 @@ export async function loadExchangeReference(deps:{db:DB;key?:string;fetch:typeof
    await blockExhaustedExchange(deps.db,requestId,response,deps.now());
    if(!response.ok){
     let details={providerCode:'UNRECOGNIZED_RESPONSE'};
-    try{details=exchangeProviderFailure(await boundedJson(response))}catch{/* No raw body or message is retained. */}
+    try{details=exchangeProviderFailure(await readExchangeJson(response))}catch{/* No raw body or message is retained. */}
     await outcome(response.status===401||response.status===403?'AUTH_OR_ACCESS':response.status===429?'QUOTA':'HTTP',{...details,responseFormat:response.headers.get('content-type')?.includes('application/json')?'json':response.headers.get('content-type')?.includes('text/html')?'html':'other',challenge:response.headers.get('cf-mitigated')==='challenge'});
     return previous;
    }
-   const raw=await boundedJson(response);
+   const raw=await readExchangeJson(response);
    const object=(v:unknown):Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
    const type=(v:unknown)=>v===null?'null':Array.isArray(v)?'array':typeof v;
    const data=object(object(raw).data),rates=Array.isArray(data.rates)?data.rates:[];
