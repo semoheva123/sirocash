@@ -4,9 +4,16 @@ import {PGlite} from '@electric-sql/pglite';
 import type {PoolClient} from 'pg';
 import {exchangeAge,parseExchangeOverview} from '../lib/exchange-reference';
 import {claimExchangeAttempt,loadExchangeReference,blockExhaustedExchange} from '../lib/exchange-reference-store';
+import {exchangeProviderHeaders,exchangeProviderFailure} from '../lib/exchange-provider-http';
 import {GET} from '../app/api/exchange-rates/route';
 async function main(){
  const now=new Date(),at=now.toISOString();
+ assert.deepEqual(exchangeProviderHeaders('  test-only  '),{'X-API-Key':'test-only',Accept:'application/json',Origin:'https://www.sirocash.online',Referer:'https://www.sirocash.online/'});
+ for(const origin of ['http://www.sirocash.online','https://evil.test','https://sirocash.online.evil.test','https://user@sirocash.online','https://sirocash.online:444'])assert.throws(()=>exchangeProviderHeaders('test',origin));
+ assert.equal(exchangeProviderFailure({error:{code:'INVALID_API_KEY',message:'SECRET'}}).providerCode,'INVALID_API_KEY');
+ assert.equal(exchangeProviderFailure({error:{code:'SECRET_VALUE',message:'SECRET'}}).providerCode,'UNRECOGNIZED_RESPONSE');
+ assert.equal(exchangeProviderFailure('<html>SECRET</html>').providerCode,'UNRECOGNIZED_RESPONSE');
+
  const raw={ok:true,data:{cities:[],rates:[{code:'USD',cities:{damascus:{buy:145,sell:146,change:0.35}},updated_at:at}],global_fx:[{pair:'EUR/USD',rate:1.0856},{pair:'USD/TRY',rate:34.52}],updated_at:at}};
  const snapshot=parseExchangeOverview(raw,now);
  assert.equal(snapshot.market.buy,145,'New SYP must not be converted');
@@ -38,6 +45,8 @@ async function main(){
    calls++;assert.equal(url,'https://api-v2.sp-today.com/api/v1/overview?lang=en');
    assert.equal(options?.redirect,'error');assert.equal(options?.cache,'no-store');
    assert.equal(new Headers(options?.headers).get('x-api-key'),'private-test-key');
+   assert.equal(new Headers(options?.headers).get('origin'),'https://www.sirocash.online');
+   assert.equal(new Headers(options?.headers).get('referer'),'https://www.sirocash.online/');
    return Response.json(raw);
   }) as typeof fetch};
   assert.equal(await loadExchangeReference({...deps,key:undefined}),null);assert.equal(calls,0);
@@ -83,6 +92,12 @@ async function main(){
   assert.equal(await claimExchangeAttempt(db,undefined,true),null,'Recovery must not bypass provider exhaustion');
   await pg.exec(`UPDATE "ExchangeReference" SET attempts=93,"blockedUntil"=now()-interval '1 second'`);
   assert.equal(await claimExchangeAttempt(db,undefined,true),null,'Recovery cannot exceed monthly cap');
+  await pg.exec(`UPDATE "ExchangeReference" SET attempts=2,"lastHttpStatus"=403,"blockedUntil"=now()-interval '1 second'`);
+  assert(await claimExchangeAttempt(db,undefined,'repair-access'));
+  assert.equal(await claimExchangeAttempt(db,undefined,'repair-access'),null,'Access repair probe cannot repeat on redeploy');
+  assert.equal((await pg.query<{attempts:number}>('SELECT attempts FROM "ExchangeReference"')).rows[0].attempts,3);
+  await pg.exec(`UPDATE "ExchangeReference" SET attempts=2,"lastHttpStatus"=403,"blockedUntil"=now()+interval '1 day'`);
+  assert.equal(await claimExchangeAttempt(db,undefined,'repair-access'),null,'Access repair cannot bypass provider exhaustion');
   const {rows:[priv]}=await pg.query(`SELECT has_table_privilege('anon','"ExchangeReference"','SELECT') anon,has_table_privilege('authenticated','"ExchangeReference"','INSERT') browser,has_table_privilege('sirocash_app','"ExchangeReference"','UPDATE') backend,has_table_privilege('sirocash_app','"ExchangeReference"','DELETE') erase`);
   assert.deepEqual(priv,{anon:false,browser:false,backend:true,erase:false});
   await pg.exec('SET ROLE anon');await assert.rejects(()=>pg.query('SELECT * FROM "ExchangeReference"'));await pg.exec('RESET ROLE');
