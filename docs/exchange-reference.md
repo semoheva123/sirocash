@@ -89,3 +89,26 @@ This explicit bootstrap diagnostic is the only exception to the normal eight-hou
 spacing; it does not reset counters, bypass exhaustion or allow redeploy loops.
 Its sanitized result can establish the actual cause without decrypting the API key.
 Apply migration 20261103210000_exchange_diagnostics before deploying this correction.
+
+## Access repair investigation (2026-11-03)
+
+The live first-bootstrap diagnostic returned HTTP 403 without a snapshot. That is
+an upstream refusal, not proof of a bad key. Normal requests now identify the actual
+application using its verified canonical Origin/Referer (server configuration only,
+strictly restricted to HTTPS sirocash.online / www.sirocash.online), and trim accidental
+outer whitespace from the server key. No alternate host/proxy/redirect or browser
+impersonation is introduced. Domain binding being the root cause is a hypothesis to
+be verified, not a claimed success.
+
+HTTP failures now retain only an allowlisted constant provider error code, categorical
+content type, and challenge boolean; never provider messages, arbitrary codes, raw
+bodies, keys or secret values. Diagnostics stay backend-only.
+
+The explicit access-repair build probe can atomically reserve attempt 3 only when
+attempts=2, no snapshot exists, lastHttpStatus=403 and the provider is not blocked.
+This is one additional spacing exception for the user-requested repair, not a reset
+or a repeated deployment retry. It consumes the SAME <=93/month allowance and cannot
+repeat once attempts advances. Normal collection still follows its eight-hour cooldown.
+A real successful response and saved snapshot, not a successful build, establishes
+that provider access is working. If refusal persists, report the exact safe provider
+code rather than claiming that prices were fixed.
