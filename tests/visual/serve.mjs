@@ -12,7 +12,8 @@ createServer(async(req,res)=>{
  const url=new URL(req.url,'http://fixture.local');
  if(url.pathname==='/api/financial/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});res.write(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`);const timer=setInterval(()=>res.write('event: heartbeat\ndata: {}\n\n'),15000);req.on('close',()=>clearInterval(timer));return}
  if(url.pathname==='/api/deposit/generate-address'){let body='';for await(const chunk of req)body+=chunk;const {chain}=JSON.parse(body);return json(res,{chain,asset:'USDT',demo:false,address:chain==='BEP20'?'0x'+'a'.repeat(40):'T'+'A'.repeat(33)})}
- if(url.pathname==='/api/financial/prepare'){let body='';for await(const chunk of req)body+=chunk;const data=JSON.parse(body);return json(res,{kind:'TRANSFER',path:'/api/financial/transfer',payload:{recipient:data.recipient,amount:data.amount,fee:'1.000000',totalDebit:'101.000000'}})}
+ if(url.pathname==='/api/account/receiving-identity'){if(req.method==='POST')return json(res,{ok:true});return json(res,{userId:owner,identity:{uid:'1234567897',displayName:'حساب اختبار محلي',username:'fixture_owner',identityVerified:false}})}
+ if(url.pathname==='/api/financial/prepare'){let body='';for await(const chunk of req)body+=chunk;const data=JSON.parse(body);return json(res,{kind:'TRANSFER',path:'/api/wallet/transfer',recipientIdentity:{uid:'1234567897',displayName:'أحمد · بيانات اختبار',username:'fixture_recipient',identityVerified:false},payload:{recipient:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',requestKey:data.requestKey,amount:data.amount,fee:'1.000000',totalDebit:'101.000000'}})}
  if(req.method!=='GET')return json(res,{error:'VISUAL_FIXTURE_EXECUTION_DISABLED'},503);
  if(url.pathname==='/api/auth/sessions')return json(res,{sessions:[]});
  if(url.pathname==='/api/auth/security-events')return json(res,{events:[]});

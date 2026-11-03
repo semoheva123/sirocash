@@ -36,3 +36,11 @@ Checks cover card/document overflow before and after expanding the full referenc
 exact full-value clipboard copy and copy-failure/manual fallback. No real addresses
 or transactions are read. Use the same local fixture server and browser library
 setup above.
+
+## Receiving UID and recipient review
+
+`node tests/visual/uid-review.mjs` checks wallet/profile UID rendering, exact copy,
+QR display, immutable usernames, owner-bound profile updates and wrong-owner
+response rejection at 320/360/390/768/1440 px in AR/EN. The base review also enters
+an Arabic-digit UID and checks the resolved recipient card before device approval.
+These are synthetic data only; the fixture never executes a financial command.

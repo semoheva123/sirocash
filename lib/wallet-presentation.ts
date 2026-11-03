@@ -1,3 +1,4 @@
+import {normalizeUid} from './receiving-uid';
 /** Presentation only. This module never authorizes or executes a payment. */
 export type ReceiveSnapshot={userId:string;enabled:boolean;readable?:boolean;capabilities?:{deposits?:boolean};addresses?:{network:string;address:string}[]};
 export type SendNetwork='TRC20'|'BEP20';
@@ -25,9 +26,9 @@ export function withdrawalPrefill(params:URLSearchParams){
 
 export function internalTransferReviewHref(recipient:string,amount:string){
  const account=recipient.replace(/^sirocash:pay:/,'').toLowerCase();
- if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(account))throw Error('INVALID_ACCOUNT');
+ if(!normalizeUid(account)&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(account))throw Error('INVALID_ACCOUNT');
  if(!/^\d{1,14}(\.\d{1,6})?$/.test(amount)||!/[1-9]/.test(amount))throw Error('INVALID_AMOUNT');
- return '/payments?'+new URLSearchParams({kind:'TRANSFER',recipient:account,amount}).toString();
+ return '/payments?'+new URLSearchParams({kind:'TRANSFER',recipient:normalizeUid(account)??account,amount}).toString();
 }
 export function internalTransferPrefill(params:URLSearchParams){
  if(params.get('kind')!=='TRANSFER')return null;

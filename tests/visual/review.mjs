@@ -41,11 +41,14 @@ for(const width of [360,390,768,1440])for(const lang of ['ar','en'])for(const sc
   await page.locator('.transfer-amount-field input').fill('100');
   await page.locator('button[type="submit"]').click();
   assert.equal(await page.locator('.transfer-amount-field').count(),0);
-  await page.locator('form input').fill('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+  await page.locator('form input').fill('١٢٣٤ ٥٦٧٨ ٩٧');
   if(width===390)await page.screenshot({path:`${dir}/send-recipient-${lang}.png`,fullPage:true,animations:'disabled'});
   await page.locator('button[type="submit"]').click();
   await page.waitForSelector('.pro-payments>section.card');
   assert.equal(await page.locator('form').count(),0);
+  assert(await page.locator('.recipient-identity-card').isVisible());
+  assert((await page.locator('.recipient-identity-card').innerText()).includes('1234 5678 97'));
+  assert.equal(await page.locator('.identity-verified').count(),0);
   if(width===390)await page.screenshot({path:`${dir}/send-review-${lang}.png`,fullPage:true,animations:'disabled'});
  }
  await page.close();

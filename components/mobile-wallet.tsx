@@ -1,4 +1,5 @@
 'use client';
+import {ReceivingIdentityPanel} from './receiving-identity';
 import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import {ArrowDownLeft,ArrowUpRight,ArrowLeftRight,Bell,Eye,EyeOff,ShieldCheck,Wallet,Smartphone} from 'lucide-react';
@@ -33,6 +34,7 @@ export function MobileWallet({ownerId,view='home'}:{ownerId:string;view?:'home'|
     <WalletActions ar={ar} ownerId={ownerId} status={owned} current={sync==='current'} mobileWallet onSend={()=>setSendOpen(true)}/>
    </>}
    {view==='home'&&<section className="mobile-recent"><div className="mobile-section-title"><h2>{t('آخر العمليات','Recent transactions')}</h2><Link href="/activity">{t('عرض الكل','View all')}</Link></div>{owned?<WalletTransactionFeed status={owned} ar={ar} compact/>:<FinancialEmpty title={t('جارٍ تحميل العمليات…','Loading transactions…')}/>}</section>}
+   {view==='wallet'&&<ReceivingIdentityPanel ownerId={ownerId} ar={ar}/>}
    {(view==='wallet'||view==='home')&&<section className="wallet-service-grid"><h2>{t('خدمات المحفظة','Wallet services')}</h2><Link href="/deposit"><ArrowDownLeft size={20}/>{t('إيداع العملات الرقمية','Crypto deposit')}</Link><Link href="/withdraw"><ArrowUpRight size={20}/>{t('سحب USDT','Withdraw USDT')}</Link><Link href="/sham-cash"><Wallet size={20}/>{t('شام كاش','Sham Cash')}</Link><Link href="/mobile-topup"><Smartphone size={20}/>{t('شحن الهاتف','Mobile top-up')}</Link></section>}
    {view==='activity'&&(owned?<WalletTransactionFeed status={owned} ar={ar}/>:<FinancialEmpty title={t('جارٍ تحميل النشاط…','Loading activity…')}/>)}
    {view==='exchange'&&<section className="mobile-unavailable"><ArrowLeftRight size={32}/><h2>{t('التبديل سيتوفر قريبًا','Exchange is coming soon')}</h2><p>{t('خدمة تبديل العملات غير مفعّلة حاليًا. لم تُنشأ أسعار أو طلبات تبديل.','Currency exchange is not activated. No exchange quotes or orders have been created.')}</p><Link className="button secondary" href="/wallet">{t('العودة إلى المحفظة','Back to wallet')}</Link></section>}
