@@ -27,6 +27,10 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm audit --audit-level=low
+      - name: Offline Python TLS diagnostic fixtures (no source requests)
+        run: |
+          python3 tests/exchange-tls-inspection.py
+          python3 tests/exchange-api-tls-inspection.py
       - name: Run offline regression suite
         run: |
           mkdir -p .cache

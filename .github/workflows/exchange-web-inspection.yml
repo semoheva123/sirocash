@@ -1,0 +1,32 @@
+name: Inspect public exchange webpage
+# One live comparison completed; never repeat automatically on PR edits.
+on: workflow_dispatch
+permissions:
+  contents: read
+concurrency:
+  group: exchange-public-inspection-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Verify inspection bounds without network
+        run: python tests/exchange-tls-inspection.py
+      - name: Install hash-locked diagnostic client
+        run: |
+          python -m pip install --only-binary=:all: --require-hashes -r scripts/exchange-inspection-requirements.txt
+      - name: One public-page TLS-profile request (no API key)
+        run: python scripts/inspect-exchange-tls.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-exchange-tls-inspection
+          path: .cache/exchange-tls-inspection/
+          retention-days: 1

@@ -159,3 +159,124 @@ code and format-validated Cloudflare Ray ID are stored (support reference, not a
 No raw bodies, rates, key, request headers, arbitrary messages or cookies are logged.
 The old currencies experiment is not re-invoked by builds. A finished batch is evidence
 of those specific responses, not evidence that prices or API-key validity are resolved.
+
+## Requested public-page schedule — ordinary-client baseline (2026-11-03)
+
+Owner approved three shared daily public-website observations at 10:00, 14:00 and
+18:00 Asia/Damascus, without an API key or per-visitor requests. Between observations,
+retain the last valid snapshot and label retrieval time separately from any source
+update timestamp. Official Syrian rates and execution/fees remain separate.
+
+Before implementing/activating a recurring job, a credential-free source inspection
+was run from the intended GitHub scheduler environment. The public homepage
+`https://sp-today.com/` returned 403, `text/html; charset=UTF-8`, and
+`cf-mitigated: challenge` at 2026-11-03T20:14:15.808Z.
+Evidence: Actions run 41710669306, check/job 126177574242, annotation
+"Public source inspection". This was the PUBLIC homepage, not an API endpoint.
+The earlier successful interactive fetch-tool read is NOT proof of automated access
+from GitHub or Vercel. No production public-site Vercel test has been performed here.
+
+`robots.txt` currently allows `/` and disallows `/api/`; that does not remove the
+observed edge challenge or by itself establish republication rights. No challenge
+solver, proxy, browser impersonation, cookies or secrets were used/forwarded.
+
+Only the inspection workflow/scripts are staged in draft PR 19. NO scheduled refresh
+or parser/ingestion has been activated, no API pause/counters were changed, no static
+example prices were installed and no claim is made that the user request is complete.
+Keep this PR unmerged until a permitted automated source is reachable and actual HTML
+can be validated, then implement/test the three-slot idempotent shared scheduler.
+Do not repeatedly redeploy/probe the same challenged page or enable knowingly failing
+recurring fetches in place of a working schedule.
+
+## User-requested TLS-client comparison (2026-11-03)
+
+The owner proposed a Chrome/Firefox-style TLS fingerprint rather than the ordinary
+HTTP client. A single diagnostic is prepared using hash-locked curl_cffi 0.17.0
+with its Chrome profile. It is confined to `https://sp-today.com/` (public HTML),
+not an authenticated API route. No key, proxy, clearance cookie, solver, rotating
+identity or retry is supplied; TLS certificate verification stays enabled, redirects
+are rejected and the decoded body is capped at 1 MiB. Environment proxies are ignored.
+If the same challenge is returned, record its status/category/Ray ID and STOP without
+reading/solving the challenge or trying other fingerprints.
+
+This diagnostic does not by itself activate the three-times-daily schedule or establish
+that Chrome emulation will succeed. Five offline fixture tests verify bounds/stop paths.
+The PR inspection workflow runs the one source request; Node's previously failed source
+inspection is NOT invoked as an automatic fallback. No production or financial changes,
+no third-party service subscription and no source API key access are involved.
+
+
+### Actual TLS-profile result and saved-page review
+
+One live request completed successfully in Actions run **41712438743**, check/job
+**126183659407**, at **2026-11-03T20:25:56.804278+00:00**:
+HTTP **200**, HTML, `cf-mitigated` challenge absent, **124882 bytes**, Ray ID
+`a54e1c72caa78c26-DTW`, result `PUBLIC_HTML_RECEIVED`.
+This supersedes the homepage-access blocker for this particular client/run only.
+It does not prove the TLS fingerprint alone caused success: the earlier ordinary
+request was from a different runner/edge location (WAW rather than DTW).
+No further source request was made to create a controlled comparison.
+
+The sandbox could not download the saved artifact because its redirected blob host
+was unreachable. Instead, run **41712736424**, check/job **126184722925**, read that
+SAME saved HTML within GitHub and emitted its inert visible text/time attributes in
+check annotations. No new source request and no page JavaScript execution occurred.
+Verified visible evidence from that response (NOT production constants):
+
+| Label | Observed value | Meaning |
+| --- | --- | --- |
+| USD buy / sell | 143.75 / 144.25 | New SYP, explicitly labelled; Syria-general market |
+| USD/TRY | 49.9821 | TRY per USD, global FX section |
+| EUR/USD | 1.1192 | USD per EUR, global FX section |
+
+The page separately showed the old-SYP equivalents; these were NOT substituted for
+new-SYP values or converted by the application. No official Syrian USD rate was
+established. The visible `time` elements described news/archive entries, not a precise
+rate-update timestamp. Retrieval time must NOT be advertised as source-update time.
+
+The live inspection workflow is now **manual-only** to prevent PR edits from
+repeating the authorized single request. The one-off saved-artifact review workflow
+was removed after completion; its run/annotations remain the evidence. The initial
+workflow YAML validation failure (41712307250) executed no job/source request and was
+fixed before the successful live run.
+
+**Still unfinished:** durable price parser/schema validation, separate official-rate
+source, shared ingestion/cache integration and the 10:00/14:00/18:00 Damascus schedule.
+None has been activated. PR19 remains draft; existing API collection remains paused,
+its counters and production financial behavior unchanged. Successful access is not
+an availability guarantee, a working ticker, or a claim of completed integration.
+
+## User-authorized direct API Chrome TLS-profile test (2026-11-03)
+
+After the public HTML success, the owner explicitly requested checking the API now.
+The existing sensitive key is scoped to Vercel **production only**, so it must not be
+read/decrypted/copied into GitHub, the sandbox or any intermediary. The production
+build probe now invokes `checkExchangeApiTlsOnce`, replacing invocation of the old,
+already completed method comparisons (the old testable module remains historical).
+
+From precisely attempts=6 / METHOD_CHECKS_COMPLETE / November 2026 / HTTP403 /
+methods-20261103 complete / no snapshot / infinite pause, one atomic reservation
+increments the SAME <=93 budget to 7 before any setup/I/O. Parallel builds, crashes,
+setup failure, timeout and redeploys cannot re-arm it. No pause, snapshot, financial
+operation, fee, ticker or recurring schedule is changed. A reserved internal attempt
+is NOT evidence of provider billing or quota consumption.
+
+Within Vercel only, Python installs the same binary-only hash-locked diagnostic
+client using a minimal environment WITHOUT the source key or other application
+secrets. The single source subprocess receives only the required source key (environment,
+never argv), isolated package path and basic interpreter variables: no database,
+signing keys or proxy configuration. Its fixed HTTPS URL is the documented
+`https://api-v2.sp-today.com/api/v1/currency/usd?lang=en`, X-API-Key + JSON Accept,
+Chrome profile, verify=True, no redirects, no solver/proxy/control/fallback/retry.
+The key is never sent to a package registry. Challenge responses stop unread; JSON
+is bounded to 1 MiB. No body, price fixture, arbitrary exception/message/header,
+cookie or key is logged or persisted. An independent Node allowlist sanitizes the
+child's bounded stdout before writing diagnostic state.
+
+Tests: six Python fixtures plus PGlite concurrent reservation/guard/pause/cache/error
+fixtures; these make NO actual source requests. A successful deployment alone is
+not a successful API test: report actual persisted status/result after the production
+probe, including setup failure/unknown outcomes honestly. Even successful API JSON
+is diagnostic only, not a saved/validated ticker snapshot or permission to resume
+normal collection. PR19's scope is now bounded source diagnostics, not delivery of
+the still-unimplemented three-times-daily feed.
