@@ -1,4 +1,5 @@
 import 'server-only';
+import {resolveReceivingIdentity} from './receiving-identity';
 import {internalTransfersEnabled} from './internal-transfer-mode';
 import {depositOnlyMode,depositOnlyConfiguration} from './deposit-only-mode';
 import {NextResponse} from 'next/server';
@@ -23,14 +24,20 @@ export async function customerFinancialHttp(request:Request,action:'PREPARE'|'TR
   const user=await requireUser(request),sessionHash=sessionTokenHash(request),origin=process.env.WEBAUTHN_ORIGIN;
   if(!sessionHash||!origin)throw Error('FINANCIAL_SESSION_REQUIRED');
   const context={userId:user.id,sessionHash,origin,rpID:new URL(origin).hostname};
-  const input=await readJson(request,8192);
+  let input=await readJson(request,8192);
   if((action==='WITHDRAWAL'||action==='PREPARE'&&input&&typeof input==='object'&&'kind' in input&&input.kind==='WITHDRAWAL')&&!customerWithdrawalsEnabled())return securityFailure('السحب غير متاح قبل اكتمال السيولة واختبار القبول. لم يُحجز أي مبلغ.',503);
   if(action==='PREPARE'&&input&&typeof input==='object'&&'kind' in input&&input.kind==='WITHDRAWAL'&&process.env.SIRO_PRICING_PROVIDER!=='coinbase-spot-v1')throw Error('PRICING_SOURCE_NOT_APPROVED');
   const withdrawal=action==='WITHDRAWAL'||action==='PREPARE'&&input&&typeof input==='object'&&'kind' in input&&input.kind==='WITHDRAWAL';
   if(!withdrawal&&!customerTransfersEnabled())return securityFailure('التحويلات الداخلية غير مفعّلة.',503);
-  const commands=customerFinancialCommands(financialDatabase(withdrawal||!internalTransfersEnabled()?'outbox':'internal-transfer'),{settlementAccountId:process.env.SIRO_SETTLEMENT_ACCOUNT_ID??'',feeAccountId:process.env.SIRO_FEE_ACCOUNT_ID??''});
+  const db=financialDatabase(withdrawal||!internalTransfersEnabled()?'outbox':'internal-transfer');
+  let recipientIdentity;
+  if(action==='PREPARE'&&!withdrawal&&input&&typeof input==='object'&&'recipient' in input&&typeof input.recipient==='string'&&input.recipient.length<=100){
+   const resolved=await resolveReceivingIdentity(db,context,input.recipient);
+   recipientIdentity=resolved.identity;input={...input,recipient:resolved.recipientId};
+  }
+  const commands=customerFinancialCommands(db,{settlementAccountId:process.env.SIRO_SETTLEMENT_ACCOUNT_ID??'',feeAccountId:process.env.SIRO_FEE_ACCOUNT_ID??''});
   const token=request.headers.get('x-siro-approval')??'';
   const result=action==='PREPARE'?await commands.prepare(context,input):action==='TRANSFER'?await commands.transfer(context,input,token):await commands.withdraw(context,input,token);
-  return NextResponse.json(result,{headers:securityHeaders});
+  return NextResponse.json(action==='PREPARE'&&recipientIdentity?{...result,recipientIdentity}:result,{headers:securityHeaders});
  }catch{return securityFailure('تعذّر اعتماد الطلب المالي. راجع البيانات والتفويض وصلاحية العرض؛ لم يُؤكَّد تنفيذ الطلب.',400)}
 }

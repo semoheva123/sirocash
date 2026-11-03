@@ -23,7 +23,7 @@ class Source{
  snapshot(posted='100',held='6',userId='owner'){this.listeners.get('snapshot')!({data:JSON.stringify({enabled:true,readable:true,userId,balance:{posted,held},capabilities:{transfers:false,withdrawals:false,deposits:true},activity:[{id:'incoming',type:'DEPOSIT',amount:'4.981691',status:'COMPLETED',createdAt:'2026-11-02T20:00:00Z'}]})})}
 }
 Object.assign(globalThis,{EventSource:Source});
-let calls=0;globalThis.fetch=(async()=>{calls++;throw Error('Unexpected network request')}) as typeof fetch;
+let calls=0;globalThis.fetch=(async(url)=>{if(url==='/api/account/receiving-identity')return Response.json({userId:'owner',identity:{uid:'1234567897',displayName:'Owner',username:null,identityVerified:false}});calls++;throw Error('Unexpected financial request')}) as typeof fetch;
 const root=createRoot(document.getElementById('root')!);
 const balance=()=>document.querySelector('.mobile-balance-value strong')!.textContent!;
 function Methods(){const [method,setMethod]=useState<DeliveryMethod>('internal');return <DeliveryMethods ar={false} value={method} onChange={setMethod}/>}

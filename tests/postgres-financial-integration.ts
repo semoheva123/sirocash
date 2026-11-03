@@ -1,3 +1,4 @@
+import {receivingIdentityAcceptance} from './receiving-identity-postgres';
 import {schedulerHttpAcceptance} from './postgres-scheduler-http';
 import {dualResourceBudgetAcceptance} from './dual-resource-budget';
 import assert from 'node:assert/strict';
@@ -31,6 +32,7 @@ async function main(){
   pool=new Pool({connectionString:testUrl.toString(),max:24,options:'-c statement_timeout=15000 -c lock_timeout=10000 -c timezone=UTC'});
   // Fixture cluster may be reused. Existing named roles must retain their non-login safety attributes.
   for(const role of ['anon','authenticated'])await admin.query(`DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='${role}') THEN CREATE ROLE ${role} NOLOGIN; END IF; END $$`);
+  const legacyBeforeUid=randomUUID();
   for(const dir of (await readdir('prisma/migrations')).sort()){
    if(dir.endsWith('.toml'))continue;
    let sql=await readFile(`prisma/migrations/${dir}/migration.sql`,'utf8');
@@ -38,8 +40,10 @@ async function main(){
     const exists=await admin.query("SELECT 1 FROM pg_roles WHERE rolname='sirocash_financial_worker'");
     if(exists.rowCount)sql=sql.replace('CREATE ROLE sirocash_financial_worker NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;','');
    }
+   if(dir==='20261103010000_receiving_uid')await pool.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES ($1,$2,now())',[legacyBeforeUid,'uid-backfill@example.test']);
    await pool.query(sql);
   }
+  assert.equal((await pool.query('SELECT count(*) FROM "ReceivingIdentity" WHERE "userId"=$1',[legacyBeforeUid])).rows[0].count,'1','Existing accounts are backfilled before new registrations');
   const db:WalletDb={transaction:async run=>{
    const c=await pool!.connect();
    try{pids.add(Number((await c.query('SELECT pg_backend_pid() AS pid')).rows[0].pid));await c.query('BEGIN');await c.query('SET LOCAL ROLE sirocash_financial_worker');const result=await run(c);await c.query('COMMIT');return result}
@@ -57,6 +61,7 @@ async function main(){
   const alice=randomUUID(),bob=randomUUID(),settlement=randomUUID(),revenue=randomUUID();
   await pool.query('INSERT INTO "User" (id,email,"emailVerifiedAt","kycStatus") VALUES ($1,\'race-alice@example.test\',now(),\'VERIFIED\'),($2,\'race-bob@example.test\',now(),\'VERIFIED\')',[alice,bob]);
   await pool.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[settlement,revenue]);
+  await receivingIdentityAcceptance(pool,db,alice,bob);
   await financialNotificationFixture(pool,testUrl.toString(),alice);
   // Read-only display is independent of command activation, using actual restricted-role SQL.
   const readPool={connect:async()=>{const c=await pool!.connect();await c.query('SET ROLE sirocash_financial_worker');return {query:c.query.bind(c),release:()=>c.release(true)}}} as unknown as Pick<Pool,'connect'>;

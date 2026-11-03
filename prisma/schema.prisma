@@ -40,6 +40,8 @@ enum CryptoAsset {
   USDC
 }
 model User {
+ receivingIdentity ReceivingIdentity?
+ receivingIdentityBudgets ReceivingIdentityBudget[]
  usdtWithdrawalQuotes UsdtWithdrawalQuote[]
  durablePasskeys DurablePasskeyCredential[]
  depositAddresses UserDepositAddress[]
@@ -480,4 +482,22 @@ model PayoutExpenseReservation {
  createdAt DateTime @default(now()) @db.Timestamptz(6)
  settledAt DateTime? @db.Timestamptz(6)
  @@index([network,state],map: "payout_expense_network_state")
+}
+
+model ReceivingIdentity {
+ userId String @id @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ uid String @unique
+ displayName String?
+ username String? @unique
+ createdAt DateTime @default(now()) @db.Timestamptz
+ updatedAt DateTime @default(now()) @db.Timestamptz
+}
+model ReceivingIdentityBudget {
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ action String
+ windowStart DateTime @db.Timestamptz
+ count Int
+ @@id([userId,action])
 }
