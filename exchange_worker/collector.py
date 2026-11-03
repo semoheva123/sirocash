@@ -136,7 +136,7 @@ def source_not_older(snapshot, previous):
 
 def collect(db, session, key, bootstrap=False):
     # DB time, not caller clock/input, chooses the daily slot and monthly budget.
-    now = db.execute('SELECT now()').fetchone()[0]
+    now = db.execute('SELECT now()').fetchone()[0].astimezone(timezone.utc)
     slot = collection_slot(now, bootstrap)
     if slot is None:
         return dict(state='SKIPPED', reason='OUTSIDE_SLOT')

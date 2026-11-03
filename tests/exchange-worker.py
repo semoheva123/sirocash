@@ -68,7 +68,7 @@ class Tests(unittest.TestCase):
         at=datetime.now(timezone.utc)
         claims=dict(iss=http.ISSUER,aud=http.AUDIENCE,sub='repo:semoheva123/sirocash:ref:refs/heads/main',repository='semoheva123/sirocash',ref='refs/heads/main',workflow_ref=http.WORKFLOW,event_name='schedule',iat=at,nbf=at,exp=at+timedelta(minutes=5))
         def allowed(c):return http.authorized('Bearer '+jwt.encode(c,private,algorithm='RS256',headers={'kid':'fixture'}))
-        self.assertTrue(allowed(claims));self.assertFalse(http.authorized(None));self.assertFalse(http.authorized('Bearer junk'))
+        self.assertTrue(allowed(claims));self.assertTrue(allowed(dict(claims,event_name='push')));self.assertFalse(http.authorized(None));self.assertFalse(http.authorized('Bearer junk'))
         for key,val in [('repository','attacker/repo'),('ref','refs/pull/20/merge'),('workflow_ref','other.yml'),('aud','other'),('iss','other'),('event_name','pull_request'),('sub','other'),('exp',at-timedelta(minutes=1))]:
             self.assertFalse(allowed(dict(claims,**{key:val})),key)
         other=rsa.generate_private_key(public_exponent=65537,key_size=2048)
