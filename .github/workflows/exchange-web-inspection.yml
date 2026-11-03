@@ -1,11 +1,6 @@
 name: Inspect public exchange webpage
-on:
-  pull_request:
-    paths:
-      - 'scripts/inspect-exchange-tls.py'
-      - 'scripts/exchange-inspection-requirements.txt'
-      - 'tests/exchange-tls-inspection.py'
-      - '.github/workflows/exchange-web-inspection.yml'
+# One live comparison completed; never repeat automatically on PR edits.
+on: workflow_dispatch
 permissions:
   contents: read
 concurrency:

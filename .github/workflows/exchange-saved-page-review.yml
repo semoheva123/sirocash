@@ -1,0 +1,51 @@
+name: Review already-saved public page (no source request)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/exchange-saved-page-review.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-exchange-tls-inspection
+          run-id: 41712438743
+          github-token: ${{ github.token }}
+          path: saved-page
+      - name: Read inert saved HTML without any source request or script execution
+        shell: python
+        run: |
+          import json, re
+          from pathlib import Path
+          from html.parser import HTMLParser
+          class VisibleText(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.excluded = 0
+                  self.text = []
+                  self.times = []
+              def handle_starttag(self, tag, attrs):
+                  if tag in ('script', 'style', 'noscript'):
+                      self.excluded += 1
+                  if tag == 'time':
+                      self.times.append(dict(attrs))
+              def handle_endtag(self, tag):
+                  if tag in ('script', 'style', 'noscript'):
+                      self.excluded = max(0, self.excluded - 1)
+              def handle_data(self, data):
+                  if not self.excluded and data.strip():
+                      self.text.append(re.sub(r'\s+', ' ', data.strip()))
+          p = VisibleText()
+          p.feed(Path('saved-page/home.html').read_text(encoding='utf-8'))
+          text = '\n'.join(p.text)[:24000]
+          def notice(title, data):
+              msg = json.dumps(data, ensure_ascii=False).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::notice title={title}::{msg}')
+          notice('Saved page time elements', p.times)
+          for start in range(0, len(text), 3000):
+              notice(f'Saved public page text {start // 3000 + 1}', text[start:start+3000])
