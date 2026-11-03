@@ -539,3 +539,14 @@ model SupportBudget {
  day DateTime @db.Timestamptz
  dayCount Int
 }
+
+// Informational only. Not a source of financial execution or USDT valuation.
+model ExchangeReference {
+ id String @id
+ snapshot Json?
+ nextAttemptAt DateTime @default(dbgenerated("'-infinity'::timestamp with time zone")) @db.Timestamptz
+ month DateTime @default(dbgenerated("(date_trunc('month'::text, (now() AT TIME ZONE 'UTC'::text)))::date")) @db.Date
+ attempts Int @default(0)
+ requestId String? @db.Uuid
+ blockedUntil DateTime @default(dbgenerated("'-infinity'::timestamp with time zone")) @db.Timestamptz
+}
