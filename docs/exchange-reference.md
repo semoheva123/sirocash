@@ -159,3 +159,31 @@ code and format-validated Cloudflare Ray ID are stored (support reference, not a
 No raw bodies, rates, key, request headers, arbitrary messages or cookies are logged.
 The old currencies experiment is not re-invoked by builds. A finished batch is evidence
 of those specific responses, not evidence that prices or API-key validity are resolved.
+
+## Requested public-page schedule — BLOCKED, not activated (2026-11-03)
+
+Owner approved three shared daily public-website observations at 10:00, 14:00 and
+18:00 Asia/Damascus, without an API key or per-visitor requests. Between observations,
+retain the last valid snapshot and label retrieval time separately from any source
+update timestamp. Official Syrian rates and execution/fees remain separate.
+
+Before implementing/activating a recurring job, a credential-free source inspection
+was run from the intended GitHub scheduler environment. The public homepage
+`https://sp-today.com/` returned 403, `text/html; charset=UTF-8`, and
+`cf-mitigated: challenge` at 2026-11-03T20:14:15.808Z.
+Evidence: Actions run 41710669306, check/job 126177574242, annotation
+"Public source inspection". This was the PUBLIC homepage, not an API endpoint.
+The earlier successful interactive fetch-tool read is NOT proof of automated access
+from GitHub or Vercel. No production public-site Vercel test has been performed here.
+
+`robots.txt` currently allows `/` and disallows `/api/`; that does not remove the
+observed edge challenge or by itself establish republication rights. No challenge
+solver, proxy, browser impersonation, cookies or secrets were used/forwarded.
+
+Only the inspection workflow/scripts are staged in draft PR 19. NO scheduled refresh
+or parser/ingestion has been activated, no API pause/counters were changed, no static
+example prices were installed and no claim is made that the user request is complete.
+Keep this PR unmerged until a permitted automated source is reachable and actual HTML
+can be validated, then implement/test the three-slot idempotent shared scheduler.
+Do not repeatedly redeploy/probe the same challenged page or enable knowingly failing
+recurring fetches in place of a working schedule.
