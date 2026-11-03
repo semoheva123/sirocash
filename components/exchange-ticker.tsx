@@ -1,10 +1,10 @@
 'use client';
-import {useEffect,useState} from 'react';
-import {ChevronDown,ChevronLeft,ChevronRight,ChartNoAxesCombined} from 'lucide-react';
+import {useEffect,useState,useRef} from 'react';
+import {Info,Pause,Play,X} from 'lucide-react';
 import {useAccountLanguage} from './account-language';
 import {exchangeAge,exchangeSnapshotSchema,type ExchangeSnapshot} from '@/lib/exchange-reference';
 
-/** One authenticated read per layout mount; no polling, marquee, trade action, or
+/** One authenticated read per layout mount; no polling or trade action, or
  * connection to balance/valuation. A local clock ages data without network traffic. */
 export function ExchangeTicker(){
  const [ar]=useAccountLanguage(),[snapshot,setSnapshot]=useState<ExchangeSnapshot|null>(null),[loading,setLoading]=useState(true);
@@ -20,24 +20,26 @@ export function ExchangeTicker(){
  return <ExchangeTickerView ar={ar} snapshot={snapshot} loading={loading} now={clock}/>;
 }
 export function ExchangeTickerView({ar,snapshot,loading=false,now}:{ar:boolean;snapshot:ExchangeSnapshot|null;loading?:boolean;now:number}){
+ const [paused,setPaused]=useState(false),dialog=useRef<HTMLDialogElement>(null);
  const t=(a:string,e:string)=>ar?a:e;
  const number=(value:number)=>new Intl.NumberFormat(ar?'ar-SY':'en-US',{maximumFractionDigits:4}).format(value);
  const time=(at:string)=><time dateTime={at}>{new Intl.DateTimeFormat(ar?'ar-SY':'en-GB',{timeZone:'Asia/Damascus',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(at))} {t('دمشق','Damascus')}</time>;
- const unavailable=loading?t('جارٍ التحميل','Loading'):t('غير متاح','Unavailable');
- const values=(at:string,content:React.ReactNode)=>{
-  const state=exchangeAge(at,now);
-  return <>{state==='expired'?<strong>{t('غير متاح — انتهت صلاحية البيانات','Unavailable — data expired')}</strong>:<strong>{content}</strong>}<small className={state==='reference'?'':'exchange-ticker-stale'}>{state==='stale'?t('بيانات قديمة · ','Stale · '):state==='expired'?'':t('مرجعي · ','Reference · ')}{time(at)}</small></>;
- };
+ const quotes:React.ReactNode[]=[];
+ if(snapshot&&exchangeAge(snapshot.market.updatedAt,now)!=='expired')quotes.push(<span key="market"><bdi>USD / SYP</bdi> {t('السوق · شراء','Market · Buy')} <strong>{number(snapshot.market.buy)}</strong> {t('مبيع','Sell')} <strong>{number(snapshot.market.sell)}</strong> <small>{t('ل.س الجديدة','New SYP')}</small>{exchangeAge(snapshot.market.updatedAt,now)==='stale'&&<em>{t('بيانات قديمة','Stale')}</em>}</span>);
+ for(const quote of snapshot?.fx??[])if(exchangeAge(quote.updatedAt,now)!=='expired')quotes.push(<span key={quote.pair}><bdi>{quote.pair.replace('/',' / ')}</bdi> <strong>{number(quote.rate)}</strong>{exchangeAge(quote.updatedAt,now)==='stale'&&<em>{t('بيانات قديمة','Stale')}</em>}</span>);
+ const empty=loading?t('جارٍ تحميل أسعار العملات…','Loading exchange rates…'):t('تعذّر تحميل الأسعار — التفاصيل','Rates could not be loaded — details');
  return <section className="exchange-ticker" dir={ar?'rtl':'ltr'} aria-label={t('أسعار الصرف المرجعية','Reference exchange rates')}>
-  <div className="exchange-ticker-heading"><span><ChartNoAxesCombined size={15}/>{t('مؤشر العملات','FX reference')}</span><small>{t('مرّر للاطلاع','Scroll to explore')} {ar?<ChevronLeft size={12}/>:<ChevronRight size={12}/>}</small></div>
-  <div className="exchange-ticker-strip" tabIndex={0} role="region" aria-label={t('أسعار العملات — تمرير أفقي','Exchange rates — horizontally scrollable')}>
-   <article><span><bdi>USD / SYP</bdi> · {t('السوق — دمشق','Market — Damascus')}</span>{snapshot?values(snapshot.market.updatedAt,<><em>{t('شراء','Buy')}</em> {number(snapshot.market.buy)} <i>/</i> <em>{t('مبيع','Sell')}</em> {number(snapshot.market.sell)}</>):<strong>{unavailable}</strong>}<small>{t('ل.س الجديدة لكل 1 دولار','New SYP per 1 USD')}</small></article>
-   <article><span><bdi>USD / SYP</bdi> · {t('الرسمي','Official')}</span><strong>{t('غير متاح','Unavailable')}</strong><small>{t('بانتظار مصدر رسمي موثّق','Verified official source required')}</small></article>
-   {(['USD/TRY','EUR/USD'] as const).map(pair=>{
-    const quote=snapshot?.fx.find(f=>f.pair===pair);
-    return <article key={pair}><span><bdi>{pair.replace('/',' / ')}</bdi> · {t('عالمي','Global')}</span>{quote?values(quote.updatedAt,<bdi>{number(quote.rate)}</bdi>):<strong>{unavailable}</strong>}<small>{pair==='USD/TRY'?t('ليرة تركية لكل 1 دولار','TRY per 1 USD'):t('دولار لكل 1 يورو','USD per 1 EUR')}</small></article>;
-   })}
+  <div className="exchange-ticker-window" tabIndex={0} aria-label={t('شريط أسعار متحرك؛ أوقف الحركة للقراءة','Moving rate ticker; pause to read')} data-paused={paused}>
+   {quotes.length?<div className="exchange-ticker-track"><div className="exchange-ticker-group">{quotes}</div><div className="exchange-ticker-group" aria-hidden="true">{quotes}</div></div>:<span className="exchange-ticker-empty">{empty}</span>}
   </div>
-  <details className="exchange-ticker-details"><summary>{t('المصدر: الليرة اليوم · تفاصيل التحديث','Source: SP Today · Update details')}<ChevronDown size={12}/></summary><p>{t('المصدر: الليرة اليوم — مزوّد مستقل لأسعار السوق، وليس المصرف المركزي. القيم السورية بالليرة الجديدة دون تحويل. تُجلب لقطة مشتركة عند زيارة الحساب، بحد أقصى مرة كل 8 ساعات ضمن الحصة المجانية؛ ليست أسعارًا لحظية. يُعرض وقت السعر كما يرسله المصدر بتوقيت دمشق. الأسعار للاستدلال فقط ولا تغيّر تنفيذ العمليات أو الرسوم.','Source: SP Today — an independent market-data provider, not the central bank. Syrian prices are in new SYP without conversion. A shared snapshot is fetched on account visits, at most once every 8 hours within the free quota; these are not live quotes. Source timestamps are displayed in Damascus time. Reference only; execution prices and fees are unaffected.')} <a href="https://sp-today.com/" target="_blank" rel="noopener noreferrer">{t('زيارة المصدر','Visit source')} ↗</a></p></details>
+  {quotes.length>0&&<button type="button" onClick={()=>setPaused(!paused)} aria-pressed={paused} aria-label={paused?t('تشغيل حركة الشريط','Play ticker'):t('إيقاف حركة الشريط','Pause ticker')}>{paused?<Play size={14}/>:<Pause size={14}/>}</button>}
+  <button type="button" onClick={()=>dialog.current?.showModal()} aria-label={t('مصدر الأسعار وحالة التحديث','Rate source and update status')}><Info size={16}/></button>
+  <dialog ref={dialog} className="exchange-ticker-dialog" aria-label={t('تفاصيل أسعار العملات','Exchange rate details')}>
+   <header><strong>{t('أسعار مرجعية · الليرة اليوم','Reference rates · SP Today')}</strong><button type="button" onClick={()=>dialog.current?.close()} aria-label={t('إغلاق','Close')}><X size={18}/></button></header>
+   <p>{t('المصدر: الليرة اليوم — مزوّد مستقل، وليس المصرف المركزي. القيم السورية بالليرة الجديدة دون تحويل. تُجلب لقطة مشتركة بحد أقصى مرة كل 8 ساعات ضمن الحصة المجانية؛ ليست أسعارًا لحظية، ولا تؤثر في تنفيذ العمليات أو الرسوم.','Source: SP Today — an independent provider, not the central bank. Syrian values are in new SYP without conversion. A shared snapshot is collected at most once every 8 hours within the free quota; these are not live quotes and do not affect execution or fees.')}</p>
+   {snapshot?<ul><li>{t('السوق — دمشق:','Market — Damascus:')} {time(snapshot.market.updatedAt)} {exchangeAge(snapshot.market.updatedAt,now)==='expired'&&t('انتهت صلاحية البيانات','data expired')}</li>{snapshot.fx.map(q=><li key={q.pair}><bdi>{q.pair}</bdi> · {time(q.updatedAt)} {exchangeAge(q.updatedAt,now)==='expired'&&t('انتهت صلاحية البيانات','data expired')}</li>)}</ul>:<p>{t('لم تصل لقطة أسعار صالحة من المزود. لن نعرض أرقامًا تجريبية أو أسعارًا مفترضة.','No valid provider snapshot has been received. Sample or assumed prices are never displayed.')}</p>}
+   <p>{t('السعر السوري الرسمي: غير متاح — بانتظار مصدر رسمي موثّق. لا تُعرض خانات غير متاحة ضمن الشريط المتحرك.','Official Syrian rate: unavailable — a verified official source is required. Unavailable quotes are omitted from the moving strip.')}</p>
+   <a href="https://sp-today.com/" target="_blank" rel="noopener noreferrer">{t('زيارة المصدر','Visit source')} ↗</a>
+  </dialog>
  </section>;
 }

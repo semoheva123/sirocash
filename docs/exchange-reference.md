@@ -63,3 +63,29 @@ No authenticated financial operations are performed by these tests.
 
 A live key/data-shape test and authenticated production rendering must be reported
 separately from offline tests; presence of the environment variable isn't proof.
+
+## Compact news-strip correction (2026-11-03)
+
+Replaced the oversized card row with a single 40px animated news-style strip.
+Source, per-pair timestamps and official-source caveat live in a native modal,
+not expanding page copy. Only valid/non-expired quotes appear in the moving row;
+missing official quotes are disclosed in the dialog instead of empty moving slots.
+An entirely missing snapshot shows one compact failure message, never made-up rates.
+Movement pauses on hover/focus, has a persistent play/pause control and stops under
+prefers-reduced-motion (manual scrolling remains available). Duplicated visual loop
+is aria-hidden. A local clock changes stale presentation, not network traffic.
+
+Production investigation confirmed a reserved first attempt with no saved snapshot;
+the original implementation swallowed errors and imposed an eight-hour cooldown.
+That proves the collection did not complete, NOT its underlying failure reason.
+Added backend-only sanitized lastOutcome/lastHttpStatus/lastIssues, never secrets,
+raw provider bodies, error messages or URLs. No diagnostic data goes to the browser.
+
+A production-only build recovery probe can reserve ONE additional attempt after the
+first failed bootstrap (requires snapshot NULL, attempts exactly 1 in the current UTC
+month, provider not blocked). It increments the SAME <=93 monthly budget, resets the
+normal eight-hour next-attempt time and cannot run again after attempts becomes 2.
+This explicit bootstrap diagnostic is the only exception to the normal eight-hour
+spacing; it does not reset counters, bypass exhaustion or allow redeploy loops.
+Its sanitized result can establish the actual cause without decrypting the API key.
+Apply migration 20261103210000_exchange_diagnostics before deploying this correction.

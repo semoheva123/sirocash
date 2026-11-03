@@ -542,6 +542,9 @@ model SupportBudget {
 
 // Informational only. Not a source of financial execution or USDT valuation.
 model ExchangeReference {
+ lastOutcome String?
+ lastHttpStatus Int?
+ lastIssues Json?
  id String @id
  snapshot Json?
  nextAttemptAt DateTime @default(dbgenerated("'-infinity'::timestamp with time zone")) @db.Timestamptz

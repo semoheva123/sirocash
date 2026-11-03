@@ -14,8 +14,8 @@ try{
   await context.route('**/*sp-today.com/**',()=>{throw Error('Provider calls forbidden in visual fixture')});
   const page=await context.newPage();page.on('pageerror',e=>errors.push(String(e)));
   await page.goto(`http://127.0.0.1:4173/?screen=home&lang=${lang}`);
-  await page.locator('.exchange-ticker time').first().waitFor({state:state==='unavailable'?'hidden':'visible'});
-  if(state==='unavailable')await page.getByText(lang==='ar'?'غير متاح':'Unavailable',{exact:true}).first().waitFor();
+  await page.waitForFunction(()=>!document.querySelector('.exchange-ticker')?.textContent.includes('Loading exchange rates')&&!document.querySelector('.exchange-ticker')?.textContent.includes('جارٍ تحميل'));
+  await page.waitForFunction(()=>document.querySelector('.exchange-ticker-track')||document.querySelector('.exchange-ticker-empty'));
   await page.evaluate(()=>document.fonts.ready);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${width}/${lang}/${state}: overflow`);
   assert.equal(calls,1,'Layout must fetch only once');
@@ -23,9 +23,19 @@ try{
   assert.equal(await ticker.getAttribute('dir'),lang==='ar'?'rtl':'ltr');
   if(state==='stale')assert((await ticker.textContent()).includes(lang==='ar'?'بيانات قديمة':'Stale'));
   if(state==='expired')assert(!(await ticker.textContent()).includes('34.52'));
-  await ticker.locator('summary').click();
-  assert(await ticker.locator('details').getAttribute('open')!==null);
-  await ticker.locator('.exchange-ticker-strip').focus();
+  assert((await ticker.boundingBox()).height<=42,'Must stay a single compact line');
+  if(state==='reference'||state==='stale'){
+   const track=ticker.locator('.exchange-ticker-track');
+   const before=await track.evaluate(el=>getComputedStyle(el).transform);
+   await page.waitForTimeout(180);
+   assert.notEqual(await track.evaluate(el=>getComputedStyle(el).transform),before,'Ticker must actually move');
+   await ticker.getByRole('button',{name:lang==='ar'?'إيقاف حركة الشريط':'Pause ticker'}).click();
+   assert.equal(await track.evaluate(el=>getComputedStyle(el).animationPlayState),'paused');
+  }
+  await ticker.getByRole('button',{name:lang==='ar'?'مصدر الأسعار وحالة التحديث':'Rate source and update status'}).click();
+  assert(await ticker.locator('dialog').isVisible());
+  await page.keyboard.press('Escape');assert(!(await ticker.locator('dialog').isVisible()));
+  await ticker.locator('.exchange-ticker-window').focus();
   if(state==='reference')await page.screenshot({path:`.cache/visual-wallet/screenshots/exchange-${lang}-${width}.png`,fullPage:true});
   // Navigation remains available and does not remount the shared account layout.
   assert(await page.locator('#main-content').isVisible());

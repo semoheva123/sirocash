@@ -31,6 +31,7 @@ async function main(){
  try{
   await pg.exec('CREATE ROLE sirocash_app;CREATE ROLE anon;CREATE ROLE authenticated;');
   await pg.exec(await readFile('prisma/migrations/20261103200000_exchange_reference/migration.sql','utf8'));
+  await pg.exec(await readFile('prisma/migrations/20261103210000_exchange_diagnostics/migration.sql','utf8'));
   const db={query:async(sql:string,values?:unknown[])=>pg.query(sql,values)} as unknown as Pick<PoolClient,'query'>;
   let calls=0;
   const deps={db,key:'private-test-key',now:()=>now,fetch:(async(url,options)=>{
@@ -72,6 +73,16 @@ async function main(){
   await blockExhaustedExchange(db,id,new Response(null,{headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':String(Math.floor(now.getTime()/1000)+86400)}}),now);
   await pg.exec(`UPDATE "ExchangeReference" SET "nextAttemptAt"=now()-interval '1 second'`);
   assert.equal(await claimExchangeAttempt(db),null,'Exhausted headers block even on HTTP 200');
+  // One narrowly scoped bootstrap diagnostic, never repeated by redeployment.
+  await pg.exec(`UPDATE "ExchangeReference" SET snapshot=NULL,attempts=1,"blockedUntil"=now()-interval '1 second',"nextAttemptAt"=now()+interval '8 hours',month=date_trunc('month',now() AT TIME ZONE 'UTC')::date`);
+  assert.equal(await claimExchangeAttempt(db),null);
+  assert(await claimExchangeAttempt(db,undefined,true));
+  assert.equal(await claimExchangeAttempt(db,undefined,true),null);
+  assert.equal((await pg.query<{attempts:number}>('SELECT attempts FROM "ExchangeReference"')).rows[0].attempts,2);
+  await pg.exec(`UPDATE "ExchangeReference" SET attempts=1,"blockedUntil"=now()+interval '1 day'`);
+  assert.equal(await claimExchangeAttempt(db,undefined,true),null,'Recovery must not bypass provider exhaustion');
+  await pg.exec(`UPDATE "ExchangeReference" SET attempts=93,"blockedUntil"=now()-interval '1 second'`);
+  assert.equal(await claimExchangeAttempt(db,undefined,true),null,'Recovery cannot exceed monthly cap');
   const {rows:[priv]}=await pg.query(`SELECT has_table_privilege('anon','"ExchangeReference"','SELECT') anon,has_table_privilege('authenticated','"ExchangeReference"','INSERT') browser,has_table_privilege('sirocash_app','"ExchangeReference"','UPDATE') backend,has_table_privilege('sirocash_app','"ExchangeReference"','DELETE') erase`);
   assert.deepEqual(priv,{anon:false,browser:false,backend:true,erase:false});
   await pg.exec('SET ROLE anon');await assert.rejects(()=>pg.query('SELECT * FROM "ExchangeReference"'));await pg.exec('RESET ROLE');
