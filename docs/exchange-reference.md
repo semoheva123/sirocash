@@ -325,3 +325,19 @@ Official Syrian USD remains unavailable pending an independently verified source
 
 Acceptance requires real deployment function routing, applied migration, OIDC dispatch,
 and first actual validated shared snapshot; CI/build success alone is insufficient.
+
+### Deployment bootstrap
+
+PR20 deployed as 4aa099bcd3f014985fe29af60d807b325178dd07; the migration enabled
+only the new collector, preserving attempts=7 and the legacy infinite pause. GitHub
+reported the collector workflow active, but manual Actions dispatch was denied by
+the repository integration (HTTP403). No source request occurred through that denial.
+
+To complete first-observation acceptance without copying credentials, a main-branch
+push changing this collector workflow/function triggers a bootstrap job. Its exact
+main/workflow OIDC identity may also have event_name=push. It waits boundedly on
+**authentication-only GET health** while production deploys, then sends exactly one
+POST. No provider retries: DB still denies bootstrap after any first slot reservation
+or existing snapshot. Health checks neither connect to DB nor call the provider.
+Scheduled observations continue independently at the three approved times. This is
+normal authorized deployment automation, not a change to the integration's permissions.

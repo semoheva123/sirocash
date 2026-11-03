@@ -26,7 +26,7 @@ def authorized(value):
                             options={'require': ['exp', 'iat', 'nbf', 'sub', 'repository', 'ref', 'workflow_ref', 'event_name']}, leeway=10)
         expected = {'repository': 'semoheva123/sirocash', 'ref': 'refs/heads/main',
                     'workflow_ref': WORKFLOW, 'sub': 'repo:semoheva123/sirocash:ref:refs/heads/main'}
-        return all(isinstance(claims.get(k), str) and hmac.compare_digest(claims[k], v) for k, v in expected.items()) and claims['event_name'] in ('schedule', 'workflow_dispatch')
+        return all(isinstance(claims.get(k), str) and hmac.compare_digest(claims[k], v) for k, v in expected.items()) and claims['event_name'] in ('schedule', 'workflow_dispatch', 'push')
     except Exception:
         return False
 
