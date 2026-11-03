@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "npm run deposit:prelaunch-audit && node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:monitor-reads && npm run deposit:probe && npm run receiving:readiness && node --conditions=react-server --import tsx scripts/probe-exchange-reference.ts && next build --webpack",
+    "build": "npm run deposit:prelaunch-audit && node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:monitor-reads && npm run deposit:probe && npm run receiving:readiness && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",

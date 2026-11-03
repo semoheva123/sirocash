@@ -1,0 +1,53 @@
+name: Shared exchange-rate observations
+on:
+  schedule:
+    # Asia/Damascus is UTC+3: opening / midpoint / closing. Best effort, not exact-time SLA.
+    - cron: '0 7,11,15 * * *'
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: 'One initial snapshot only (server denies after first claimed slot)'
+        type: boolean
+        default: false
+permissions:
+  id-token: write
+concurrency:
+  group: exchange-rate-collector
+  cancel-in-progress: false
+jobs:
+  collect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      # No checkout, source key, DB credentials or third-party forwarding service.
+      - name: Authenticate with short-lived GitHub OIDC and trigger one shared observation
+        env:
+          BOOTSTRAP: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
+        shell: python
+        run: |
+          import json, os, urllib.request, urllib.parse, sys
+          try:
+              audience = 'sirocash-exchange-collector'
+              uri = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=' + urllib.parse.quote(audience)
+              req = urllib.request.Request(uri, headers={'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+              with urllib.request.urlopen(req, timeout=15) as r:
+                  token = json.load(r)['value']
+              body = json.dumps({'bootstrap': os.environ.get('BOOTSTRAP','false').lower() == 'true'}).encode()
+              req = urllib.request.Request('https://sirocash.vercel.app/api/exchange_collect', data=body,
+                  headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'}, method='POST')
+              # Reject redirects: never forward the short-lived token to another URL.
+              class NoRedirect(urllib.request.HTTPRedirectHandler):
+                  def redirect_request(self, *args, **kwargs): return None
+              with urllib.request.build_opener(NoRedirect).open(req, timeout=80) as r:
+                  result = json.loads(r.read(2048))
+              state = result.get('state')
+              reason = result.get('reason')
+              allowed = {'OK','OUTSIDE_SLOT','CLAIM_DENIED','SCHEMA','SOURCE_TIME_REGRESSION','NETWORK_OR_TIMEOUT','HTTP','QUOTA','AUTH_OR_CHALLENGE','INVALID_RESPONSE','BODY_LIMIT'}
+              summary = {'state': state if state in ('COLLECTED','SKIPPED','FAILED') else 'UNKNOWN',
+                         'reason': reason if reason in allowed else 'UNKNOWN'}
+              print('EXCHANGE_COLLECTION:' + json.dumps(summary))
+              if summary['state'] not in ('COLLECTED','SKIPPED'): sys.exit(1)
+          except Exception:
+              print('EXCHANGE_COLLECTION_UNCONFIRMED: no retry; inspect sanitized collector state.')
+              sys.exit(1)

@@ -27,10 +27,17 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm audit --audit-level=low
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install hash-locked Python collector dependencies
+        run: |
+          python3 -m pip install --require-hashes -r requirements.txt
       - name: Offline Python TLS diagnostic fixtures (no source requests)
         run: |
           python3 tests/exchange-tls-inspection.py
           python3 tests/exchange-api-tls-inspection.py
+          python3 tests/exchange-worker.py
       - name: Run offline regression suite
         run: |
           mkdir -p .cache
@@ -124,3 +131,24 @@ jobs:
           SIRO_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
           SIRO_TEST_PG_DUMP: ./tests/bin/pg-dump-fixture.sh
           SIRO_TEST_PG_RESTORE: ./tests/bin/pg-restore-fixture.sh
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Real isolated exchange collector concurrency and retention
+        run: |
+          python3 -m pip install --require-hashes -r requirements.txt
+          mkdir -p .cache
+          set -o pipefail
+          python3 tests/exchange-worker-postgres.py 2>&1 | tee .cache/exchange-pg.log
+        env:
+          SIRO_ALLOW_ISOLATED_POSTGRES_TESTS: 'true'
+          SIRO_TEST_POSTGRES_URL: postgresql://postgres:isolated-fixture-only@127.0.0.1:5432/postgres
+      - name: Surface isolated collector fixture failures
+        if: failure()
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('.cache/exchange-pg.log')
+          if p.exists():
+              text = p.read_text()[-6000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::error title=Exchange PostgreSQL fixture::' + text)

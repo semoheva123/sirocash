@@ -20,7 +20,7 @@ export async function claimExchangeAttempt(db:DB,requestId=randomUUID(),diagnost
   RETURNING id`,[requestId,diagnostic==='repair-access'?'repair-access':diagnostic?'bootstrap':'scheduled']);
  return rows.length?requestId:null;
 }
-async function readSnapshot(db:DB):Promise<ExchangeSnapshot|null>{
+export async function readExchangeSnapshot(db:DB):Promise<ExchangeSnapshot|null>{
  const {rows}=await db.query(`SELECT snapshot FROM "ExchangeReference" WHERE id='sp-today'`);
  const parsed=exchangeSnapshotSchema.safeParse(rows[0]?.snapshot);
  return parsed.success?parsed.data:null;
@@ -45,7 +45,7 @@ export async function loadExchangeReference(deps:{db:DB;key?:string;fetch:typeof
  // Never expose provider diagnostics, key, headers, or raw response to consumers.
  let previous:ExchangeSnapshot|null=null;
  try{
-  previous=await readSnapshot(deps.db);
+  previous=await readExchangeSnapshot(deps.db);
   if(!deps.key)return previous;
   const requestId=await claimExchangeAttempt(deps.db,randomUUID(),deps.diagnostic);
   if(!requestId)return previous;
