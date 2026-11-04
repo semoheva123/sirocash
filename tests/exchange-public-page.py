@@ -32,6 +32,20 @@ class Tests(unittest.TestCase):
   self.assertEqual(public_request(s,NOW)[1],'OK')
   s=Session(Response(body=b'<title>Just a moment...</title>'))
   self.assertEqual(public_request(s,NOW)[1],'SCHEMA')
+ def test_post_version_contract_without_database_or_source_requests(self):
+  from unittest.mock import patch,MagicMock
+  spec=importlib.util.spec_from_file_location('collector_contract',Path(__file__).resolve().parents[1]/'api/exchange_collect.py')
+  api=importlib.util.module_from_spec(spec);spec.loader.exec_module(api)
+  h=object.__new__(api.handler);h.headers={'Authorization':'fixture'};responses=[]
+  h.reply=lambda status,value=None:responses.append((status,value))
+  psycopg=MagicMock();certifi=MagicMock();certifi.where.return_value='fixture-ca'
+  curl=MagicMock()
+  with patch.dict(sys.modules,{'psycopg':psycopg,'certifi':certifi,'curl_cffi':curl}), \
+       patch.dict(os.environ,{'VERCEL_ENV':'production','DATABASE_URL':'postgresql://fixture@fixture.invalid/fixture'},clear=True), \
+       patch.object(api,'authorized',return_value=False),patch.object(api,'public_authorized',return_value=True), \
+       patch('exchange_worker.public_page.collect_public',return_value={'state':'SKIPPED','reason':'CLAIM_DENIED'}):
+   h.do_POST()
+  self.assertEqual(responses,[(200,{'state':'SKIPPED','reason':'CLAIM_DENIED','mode':'public-page-v2'})])
  def test_short_lived_purpose_bound_mac(self):
   secret='fixture-only-'*4;at=str(int(time.time()))
   def sign(at,purpose='public-exchange:POST:/api/exchange_collect:'):
