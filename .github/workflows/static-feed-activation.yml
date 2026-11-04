@@ -1,0 +1,44 @@
+name: Static feed activation proof
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/static-feed-activation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-file:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      # Activation-only check, NOT a dependency of ordinary wallet builds/releases.
+      # Public static file only: no source requests, cookies, secrets or wallet APIs.
+      - name: Verify independent public JSON and browser CORS policy
+        shell: python
+        run: |
+          import urllib.request, json, math
+          from datetime import datetime, timezone
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs): return None
+          opener=urllib.request.build_opener(NoRedirect)
+          url='https://semoheva123.github.io/sirocash/rates.json'
+          for origin in ('https://www.sirocash.online','https://sirocash.online'):
+              request=urllib.request.Request(url,headers={'Origin':origin,'Accept':'application/json'})
+              with opener.open(request,timeout=10) as response:
+                  assert response.status==200
+                  assert response.headers.get('Access-Control-Allow-Origin') in ('*',origin), 'CORS_DENIED'
+                  assert 'application/json' in response.headers.get('Content-Type','')
+                  body=response.read(16385)
+                  assert len(body)<=16384, 'OVERSIZE'
+              data=json.loads(body)
+              assert data['source']=='sp-today' and data['unit']=='SYP_NEW'
+              assert data['observation']=='public-page' and data['city']=='syria-general'
+              for value in (data['market']['buy'],data['market']['sell']):
+                  assert type(value) in (int,float) and math.isfinite(value) and 0<value<=1e12
+              assert data['market']['buy']<=data['market']['sell']
+              assert set(q['pair'] for q in data['fx'])=={'USD/TRY','EUR/USD'}
+              for quote in data['fx']:
+                  assert type(quote['rate']) in (int,float) and math.isfinite(quote['rate']) and 0<quote['rate']<=1e12
+              age=(datetime.now(timezone.utc)-datetime.fromisoformat(data['fetchedAt'].replace('Z','+00:00'))).total_seconds()
+              assert -300<=age<=86400, 'EXPIRED_OR_FUTURE'
+              print(json.dumps({'origin':origin,'cors':'VERIFIED','source':data['source'],'unit':data['unit'],'fetchedAt':data['fetchedAt'],'ageSeconds':int(age)}))
