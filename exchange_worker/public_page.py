@@ -62,7 +62,9 @@ def public_request(session,now):
             if size>LIMIT:return None,'BODY_LIMIT',status
             chunks.append(chunk)
         html=b''.join(chunks).decode('utf-8',errors='strict')
-        if any(t in html.lower() for t in ('/cdn-cgi/challenge-platform/','cf-chl-','just a moment...')):return None,'AUTH_OR_CHALLENGE',status
+        # CF's optional JS-detection script can also appear on valid public HTML.
+        # HTTP/challenge headers are rejected above; a 200 challenge without real
+        # explicit price cards fails strict parsing below and pauses as SCHEMA.
         return parse_public(html,now),'OK',status
     except (ValueError,UnicodeError):return None,'SCHEMA',status
     except Exception:return None,'NETWORK_OR_TIMEOUT',status
