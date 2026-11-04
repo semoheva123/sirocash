@@ -1,4 +1,5 @@
 "use client";
+import {TransferParties} from "./transfer-parties";
 import { useMemo, useState } from "react";
 import {
   ArrowDownLeft,
@@ -34,7 +35,7 @@ export function FinancialActivity({
       status.activity?.filter(
         (a) =>
           (filter === "ALL" || a.type === filter) &&
-          (a.id.toLowerCase().includes(search.toLowerCase().trim()) ||
+          ([a.id,a.senderName,a.senderUsername,a.senderUid,a.recipientName,a.recipientUsername,a.recipientUid].some(v=>v?.toLowerCase().includes(search.toLowerCase().trim())) ||
             financialKind(a.type, ar)
               .toLowerCase()
               .includes(search.toLowerCase().trim())),
@@ -140,6 +141,7 @@ export function FinancialActivity({
                         <div>
                           <strong>{financialKind(a.type, ar)}</strong>
                           <FinancialReference value={a.id} ar={ar} />
+                          {a.type==='P2P'&&<TransferParties entry={a} ar={ar}/>}
                         </div>
                       </div>
                     </td>
