@@ -25,3 +25,12 @@ info={'usd':a,'fx':text[i:i+230]}
 print('::notice title=Public exchange fields::'+json.dumps(info,ensure_ascii=False))
 for n in ['ل.س جديدة','USD/TRY','EUR/USD']:
  i=s.find(n);print('::notice title=Public exchange markup::'+json.dumps({'field':n,'html':s[max(0,i-180):i+350]},ensure_ascii=False))
+
+import sys
+from datetime import datetime
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from exchange_worker.public_page import parse_public
+at=json.loads(Path('.cache/exchange-tls-inspection/result.json').read_text())['observedAt']
+parsed=parse_public(s,datetime.fromisoformat(at))
+assert parsed['market']['buy']==144.0 and parsed['market']['sell']==144.5
+print('::notice title=Validated real public snapshot::'+json.dumps(parsed,ensure_ascii=False))

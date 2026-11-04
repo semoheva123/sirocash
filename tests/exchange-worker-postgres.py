@@ -16,6 +16,10 @@ f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
 import psycopg
 from psycopg.conninfo import make_conninfo
 from exchange_worker.collector import collect
+from exchange_worker.public_page import collect_public
+import importlib.util
+public_spec=importlib.util.spec_from_file_location("public_fixtures",Path(__file__).with_name("exchange-public-page.py"))
+pub=importlib.util.module_from_spec(public_spec);public_spec.loader.exec_module(pub)
 BASE=os.environ.get('SIRO_TEST_POSTGRES_URL','')
 parsed=urlsplit(BASE)
 if os.environ.get('SIRO_ALLOW_ISOLATED_POSTGRES_TESTS')!='true' or parsed.hostname not in ('127.0.0.1','localhost') or parsed.password!='isolated-fixture-only':
@@ -33,7 +37,7 @@ class Tests(unittest.TestCase):
             db.execute('CREATE DATABASE sirocash_exchange_fixture')
         with psycopg.connect(DSN,autocommit=True) as db:
             db.execute("DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='sirocash_app') THEN CREATE ROLE sirocash_app; END IF; END $$")
-            for name in ('20261103200000_exchange_reference','20261103210000_exchange_diagnostics','20261104000000_exchange_tls_collector'):
+            for name in ('20261103200000_exchange_reference','20261103210000_exchange_diagnostics','20261104000000_exchange_tls_collector','20261104160000_public_exchange_feed'):
                 db.execute((Path(__file__).resolve().parents[1]/'prisma/migrations'/name/'migration.sql').read_text())
     @classmethod
     def tearDownClass(cls):
@@ -46,6 +50,23 @@ class Tests(unittest.TestCase):
     def state(self):
         with self.c.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute('SELECT attempts,snapshot,"lastIssues","lastOutcome","blockedUntil"::text AS legacy_pause,"collectorBlockedUntil"::text AS collector_pause FROM "ExchangeReference"');return cur.fetchone()
+    def test_public_claim_and_preservation(self):
+        barrier=threading.Barrier(8);lock=threading.Lock();calls=[]
+        class S(pub.Session):
+            def get(self,*args,**kwargs):
+                with lock:calls.append(1)
+                return super().get(*args,**kwargs)
+        def run(_):
+            with psycopg.connect(DSN,autocommit=True) as c:
+                barrier.wait();return collect_public(DB(c),S(pub.Response()))
+        with concurrent.futures.ThreadPoolExecutor(8) as pool:results=list(pool.map(run,range(8)))
+        self.assertEqual(len(calls),1);self.assertEqual(sum(r['state']=='COLLECTED' for r in results),1)
+        self.assertEqual(self.state()['attempts'],7,'Public reads must not consume/reset API budget')
+        old=self.state()['snapshot'];self.assertEqual(old['market']['buy'],144.0)
+        s=S(pub.Response());self.assertEqual(collect_public(DB(self.c,f.NOW+timedelta(minutes=4)),s)['state'],'SKIPPED');self.assertEqual(s.calls,0)
+        s=S(pub.Response(status=403));self.assertEqual(collect_public(DB(self.c,f.NOW+timedelta(minutes=5)),s)['reason'],'AUTH_OR_CHALLENGE')
+        self.assertEqual(self.state()['snapshot'],old)
+        self.assertEqual(collect_public(DB(self.c,f.NOW+timedelta(days=1)),S(pub.Response()))['state'],'SKIPPED')
     def test_independent_concurrent_claim_and_duplicate(self):
         barrier=threading.Barrier(2);lock=threading.Lock();calls=[]
         class S(f.Session):
