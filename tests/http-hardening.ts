@@ -1,3 +1,4 @@
+import {STATIC_EXCHANGE_URL} from '../lib/static-exchange-location';
 import assert from 'node:assert/strict';
 import {NextRequest} from 'next/server';
 import {readJson} from '../lib/request-body';
@@ -16,6 +17,8 @@ async function main(){
   process.env.VERCEL_ENV='production';
   const response=proxy(new NextRequest('https://wallet.example/auth'));
   const csp=response.headers.get('content-security-policy')!;
+  assert.equal(csp.split('; ').find(part=>part.startsWith('connect-src ')),`connect-src 'self' ${STATIC_EXCHANGE_URL}`);
+  assert(!csp.includes('*.github.io'));assert(!csp.includes('connect-src *'));
   assert.match(csp,/frame-ancestors 'none'/);assert.match(csp,/object-src 'none'/);assert.match(csp,/script-src .*'nonce-/);
   assert.equal(response.headers.get('x-frame-options'),'DENY');assert.equal(response.headers.get('strict-transport-security'),'max-age=31536000');
   assert.equal(response.headers.get('x-middleware-request-content-security-policy'),csp);

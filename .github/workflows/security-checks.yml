@@ -154,3 +154,17 @@ jobs:
           if p.exists():
               text = p.read_text()[-6000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
               print('::error title=Exchange PostgreSQL fixture::' + text)
+  browser-csp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:csp-browser

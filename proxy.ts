@@ -1,9 +1,10 @@
+import {STATIC_EXCHANGE_URL} from './lib/static-exchange-location';
 import {NextResponse,type NextRequest} from 'next/server';
 /** Request-scoped nonce: Next reads the forwarded CSP to nonce its own scripts. */
 export function proxy(request:NextRequest){
  const nonce=btoa(crypto.randomUUID());
  const production=process.env.VERCEL_ENV==='production';
- const policy=["default-src 'self'",`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.NODE_ENV==='development'?" 'unsafe-eval'":''}`,"style-src 'self' 'unsafe-inline'","img-src 'self' data: blob:","font-src 'self'","connect-src 'self'", "worker-src 'self' blob:","object-src 'none'","base-uri 'none'","form-action 'self'",...(production?["frame-ancestors 'none'","upgrade-insecure-requests"]:[])].join('; ');
+ const policy=["default-src 'self'",`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.NODE_ENV==='development'?" 'unsafe-eval'":''}`,"style-src 'self' 'unsafe-inline'","img-src 'self' data: blob:","font-src 'self'",`connect-src 'self' ${STATIC_EXCHANGE_URL}`, "worker-src 'self' blob:","object-src 'none'","base-uri 'none'","form-action 'self'",...(production?["frame-ancestors 'none'","upgrade-insecure-requests"]:[])].join('; ');
  const headers=new Headers(request.headers);headers.set('Content-Security-Policy',policy);
  const response=NextResponse.next({request:{headers}});
  response.headers.set('Content-Security-Policy',policy);
