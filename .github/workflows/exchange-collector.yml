@@ -75,7 +75,13 @@ jobs:
               allowed = {'OK','OUTSIDE_SLOT','CLAIM_DENIED','SCHEMA','SOURCE_TIME_REGRESSION','NETWORK_OR_TIMEOUT','HTTP','QUOTA','AUTH_OR_CHALLENGE','INVALID_RESPONSE','BODY_LIMIT'}
               summary = {'state': state if state in ('COLLECTED','SKIPPED','FAILED') else 'UNKNOWN',
                          'reason': reason if reason in allowed else 'UNKNOWN'}
+              summary['mode'] = 'public-page-v1' if result.get('mode') == 'public-page-v1' else 'UNCONFIRMED'
+              eligibility = result.get('eligibility')
+              if isinstance(eligibility,dict):
+                  summary['eligibility'] = {k:v for k,v in eligibility.items() if k in ('rows','enabled','unblocked','due','snapshotAvailable','appRole') and type(v) in (int,bool)}
               print('::notice title=Exchange collection::' + json.dumps(summary))
+              if summary['mode'] != 'public-page-v1': sys.exit(1)
+              if os.environ.get('BOOTSTRAP','false').lower() == 'true' and summary['state'] == 'SKIPPED' and not (eligibility or {}).get('snapshotAvailable'): sys.exit(1)
               if summary['state'] not in ('COLLECTED','SKIPPED'): sys.exit(1)
           except urllib.error.HTTPError as e:
               phase = 'UNKNOWN'

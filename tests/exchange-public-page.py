@@ -27,6 +27,11 @@ class Tests(unittest.TestCase):
  def test_ambiguity_and_unit_rejection(self):
   for bad in [HTML.replace('ل.س جديدة','ل.س'),HTML.replace('144.00','14400'),HTML.replace('14,400 قديمة','14,300 قديمة'),HTML.replace('144.50','143.50'),HTML.replace('USD/TRY','OTHER'),HTML+HTML]:
    with self.assertRaises(ValueError):parse_public(bad,NOW)
+ def test_normal_optional_js_detection_is_not_a_price_challenge(self):
+  s=Session(Response(body=(HTML+'<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>').encode()))
+  self.assertEqual(public_request(s,NOW)[1],'OK')
+  s=Session(Response(body=b'<title>Just a moment...</title>'))
+  self.assertEqual(public_request(s,NOW)[1],'SCHEMA')
  def test_short_lived_purpose_bound_mac(self):
   secret='fixture-only-'*4;at=str(int(time.time()))
   def sign(at,purpose='public-exchange:POST:/api/exchange_collect:'):

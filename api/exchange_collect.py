@@ -127,6 +127,7 @@ class handler(BaseHTTPRequestHandler):
                 with requests.Session(trust_env=False) as session:
                     phase = 'COLLECTION'
                     result = collect_public(db, session)
+                    result['mode']='public-page-v1'
             self.reply(200, result)
         except Exception:
             self.reply(503, {'state': 'UNAVAILABLE', 'phase': phase})
