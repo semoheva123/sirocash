@@ -73,18 +73,27 @@ def collect_public(db,session):
     # One durable claim globally, before I/O. No slot/window tied to scheduler arrival.
     # A crash consumes its five-minute slot. No retry, API, proxy or challenge solver.
     with db.transaction():
-        row=db.execute('''UPDATE "ExchangeReference" SET "publicRequestId"=%s,
+        row=db.execute('''UPDATE public."ExchangeReference" SET "publicRequestId"=%s,
           "publicNextAttemptAt"=now()+interval '5 minutes',"publicOutcome"='COLLECTING'
           WHERE id='sp-today' AND "publicEnabled" AND "publicBlockedUntil"<=now()
           AND "publicNextAttemptAt"<=now() RETURNING now()''',(request_id,)).fetchone()
-    if row is None:return dict(state='SKIPPED',reason='CLAIM_DENIED')
+    if row is None:
+        # Read-only, credential-free diagnostics for this isolated feed, not user
+        # or financial data. Distinguish an actual cooldown from a missing row.
+        flags=db.execute("""SELECT count(*)::int,
+          coalesce(bool_or("publicEnabled"),false),
+          coalesce(bool_or("publicBlockedUntil"<=now()),false),
+          coalesce(bool_or("publicNextAttemptAt"<=now()),false),
+          coalesce(bool_or(snapshot->>'observation'='public-page'),false)
+          FROM public."ExchangeReference" WHERE id='sp-today'""").fetchone()
+        return dict(state='SKIPPED',reason='CLAIM_DENIED',eligibility=dict(zip(('rows','enabled','unblocked','due','snapshotAvailable'),flags)))
     now=row[0].astimezone(timezone.utc)
     snapshot,outcome,status=public_request(session,now)
     # Pause challenge/schema failures for operator inspection. Transient failures
     # back off 30 minutes, keeping the last validated public-page snapshot intact.
     blocked='infinity' if outcome in ('AUTH_OR_CHALLENGE','SCHEMA','INVALID_RESPONSE','BODY_LIMIT') else None
     with db.transaction():
-        db.execute('''UPDATE "ExchangeReference" SET
+        db.execute('''UPDATE public."ExchangeReference" SET
           snapshot=CASE WHEN %s::jsonb IS NULL THEN snapshot ELSE %s::jsonb END,
           "publicOutcome"=%s,"publicHttpStatus"=%s,
           "publicBlockedUntil"=coalesce(%s::timestamptz,"publicBlockedUntil"),
