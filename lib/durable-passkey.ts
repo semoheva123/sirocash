@@ -16,8 +16,9 @@ export async function assertDurableSession(tx:WalletTx,c:Context){
  const {rows:[role]}=await tx.query("SELECT current_user='sirocash_financial_worker' AS financial");
  if(role?.financial===true){await tx.query('SELECT public.financial_assert_session($1::uuid,$2)',[c.userId,c.sessionHash]);return}
 
- const {rows:[session]}=await tx.query('SELECT "userId" FROM "AuthSession" WHERE "tokenHash"=$1 AND "userId"=$2 AND "expiresAt">statement_timestamp() FOR UPDATE',[c.sessionHash,c.userId]);
- if(!session)throw new Error('PASSKEY_SESSION_EXPIRED');
+ // Auth web role intentionally has no UPDATE on sessions. The narrow bridge
+ // takes the same row lock without permitting session mutation or disclosure.
+ await tx.query('SELECT public.passkey_assert_session($1::uuid,$2)',[c.userId,c.sessionHash]);
 }
 /** Private backend only. Authenticated session and fixed origin supplied by the server, not JSON.
  * Holds the session lock through challenge verification/counter update/approval creation.
