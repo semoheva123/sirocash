@@ -7,9 +7,9 @@ const owner='11111111-2222-4333-8444-555555555555';
 const initial={enabled:true,readable:true,userId:owner,balance:{posted:'1480.000000',held:'20.000000'}};
 function Probe({screen}:{screen:string}){
  const {status,sync}=useFinancialStatus(true,owner);
- const {identity}=useReceivingIdentity(owner);
+ const {identity,reload}=useReceivingIdentity(owner);
  const [ar,setAr]=useAccountLanguage();
- return <section style={{padding:40,color:'#fff'}}><h1>{screen}</h1><output data-testid="balance">{status?.balance?.posted??'EMPTY'}</output><p data-testid="uid">{identity?.uid??'EMPTY'}</p><p data-testid="sync">{sync}</p><p data-testid="language">{ar?'ar':'en'}</p><button onClick={()=>setAr(!ar)}>Language</button><p>TEST DATA ONLY · No financial execution</p></section>;
+ return <section style={{padding:40,color:'#fff'}}><h1>{screen}</h1><output data-testid="balance">{status?.balance?.posted??'EMPTY'}</output><p data-testid="uid">{identity?.uid??'EMPTY'}</p><p data-testid="sync">{sync}</p><p data-testid="language">{ar?'ar':'en'}</p><button onClick={()=>setAr(!ar)}>Language</button><button onClick={reload}>Reload identity</button><p>TEST DATA ONLY · No financial execution</p></section>;
 }
 export function NavigationFixture(){
  const [screen,setScreen]=useState('home');

@@ -21,7 +21,7 @@ import {parseExchangeOverview,exchangeSnapshotSchema} from '../lib/exchange-refe
   const empty=renderToStaticMarkup(<ExchangeTickerView ar={ar} snapshot={null} now={now.getTime()}/>);
   assert(!empty.includes('<button'));assert(!empty.includes('<dialog'));assert(!empty.includes('145'));assert(!empty.includes('<time'));assert(!empty.includes('exchange-ticker-group'));assert(empty.includes(ar?'تعذّر تحميل الأسعار':'Rates could not be loaded'));
  }
-console.log('Exchange ticker AR/EN strip-only, no controls/dialog, moving/stale/expired/unavailable presentation PASS');
+console.log('Exchange ticker AR/EN strip-only, no controls/dialog, static/stale/expired/unavailable presentation PASS');
 
 // Public SSR has no per-quote source timestamp: retrieval age is explicit and no
 // API-derived 100x value is substituted. Source values remain literal new SYP.
@@ -31,4 +31,4 @@ for(const ar of [true,false]){
  assert(html.includes(ar?'ل.س الجديدة':'New SYP'));assert(html.includes('USD / TRY'));assert(!html.includes('NaN'));assert(!html.includes(ar?'بيانات قديمة':'Stale'));
 }
 const client=readFileSync('components/exchange-ticker.tsx','utf8');
-assert(client.includes("new EventSource('/api/exchange-rates/events')"));assert(!client.includes('fetch('));
+assert(client.includes("createStaticExchangeReader"));assert(!client.includes("EventSource"));assert(!client.includes("/api/"));

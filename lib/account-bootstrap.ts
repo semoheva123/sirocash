@@ -1,4 +1,5 @@
 import 'server-only';
+import {measureAccountRead} from './account-read-diagnostics';
 import {z} from 'zod';
 import {readOwnerFinancialStatus} from './financial-read-status';
 import {financialReadDatabase,sharedFinancialSnapshot} from './financial-database';
@@ -23,13 +24,13 @@ const snapshotSchema=z.object({
 });
 export async function accountBootstrap(user:{id:string}) {
  const [financial,identity]=await Promise.all([
-  readOwnerFinancialStatus({authenticate:async()=>user,database:financialReadDatabase,snapshot:sharedFinancialSnapshot,
+  measureAccountRead('financial-bootstrap',()=>readOwnerFinancialStatus({authenticate:async()=>user,database:financialReadDatabase,snapshot:sharedFinancialSnapshot,
    enabled:()=>customerFinanceEnabled()||customerTransfersEnabled()||customerDepositsEnabled(),
    transfers:customerTransfersEnabled,withdrawals:customerWithdrawalsEnabled,
    deposits:async()=>customerDepositsEnabled()&&(!depositOnlyMode()||await depositScannerHealthy(financialReadDatabase())),
-  }).then(data=>snapshotSchema.parse(JSON.parse(JSON.stringify(data)))).catch(()=>null),
-  Promise.resolve().then(()=>database().query('SELECT i.uid,i."displayName",i.username,u."kycStatus" FROM "ReceivingIdentity" i JOIN "User" u ON u.id=i."userId" WHERE i."userId"=$1',[user.id]))
-   .then(({rows})=>rows[0]?publicReceivingIdentity(rows[0]):null).catch(()=>null),
+  }).then(data=>snapshotSchema.parse(JSON.parse(JSON.stringify(data))))).catch(()=>null),
+  measureAccountRead('identity-bootstrap',()=>Promise.resolve().then(()=>database().query('SELECT i.uid,i."displayName",i.username,u."kycStatus" FROM "ReceivingIdentity" i JOIN "User" u ON u.id=i."userId" WHERE i."userId"=$1',[user.id]))
+   .then(({rows})=>rows[0]?publicReceivingIdentity(rows[0]):null)).catch(()=>null),
  ]);
  return {financial,identity};
 }
