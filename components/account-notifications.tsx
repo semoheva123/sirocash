@@ -32,14 +32,11 @@ export function NotificationsPage(){
  const t=(a:string,e:string)=>ar?a:e;
  async function read(id:string){setBusy(id);setError(false);try{const r=await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});if(!r.ok)throw Error();await data?.refresh()}catch{setError(true)}finally{setBusy(null)}}
  return <main id="main-content" className="notifications-page" dir={ar?'rtl':'ltr'}><header><h1>{t('الإشعارات','Notifications')}</h1><Link href="/settings">{t('الإعدادات','Settings')}</Link></header>
-  <p>{t('تنبيهات حسابك والدعم. لا يمنح الإشعار تفويضًا لأي عملية.','Account and support updates. A notification never authorizes an operation.')}</p>
-  {data?.sync!=='current'&&<p role="status">{t('الاتصال المباشر غير جاهز؛ قد لا تكون القائمة محدّثة.','Live connection is not ready; this list may be out of date.')} <button onClick={()=>void data?.refresh().catch(()=>setError(true))}>{t('إعادة الاتصال','Reconnect')}</button></p>}
+  {data?.sync!=='current'&&<p role="status">{t(data?.sync==='syncing'?'جارٍ تحميل الإشعارات…':'تعذّر تحديث الإشعارات.',data?.sync==='syncing'?'Loading notifications…':'Could not update notifications.')}{data?.sync!=='syncing'&&<button onClick={()=>void data?.refresh().catch(()=>setError(true))}>{t('إعادة المحاولة','Retry')}</button>}</p>}
   {data?.inbox&&(data.inbox.notifications.length?<ul>{data.inbox.notifications.map(n=>{
    const href=n.kind.startsWith('SUPPORT_')?(n.staff?'/operations/support':'/settings/support')+'?ticket='+encodeURIComponent(n.reference):n.kind.startsWith('SECURITY_')?'/settings#active-sessions':n.kind.includes('DEPOSIT')?'/wallet#deposit':'/activity';
    return <li key={n.id} data-unread={!n.readAt}><div><strong>{labels[n.kind]?.[ar?0:1]??t('تحديث في حسابك','Account update')}</strong><time dateTime={n.createdAt}>{new Intl.DateTimeFormat(ar?'ar-SY':'en-GB',{dateStyle:'medium',timeStyle:'short'}).format(new Date(n.createdAt))}</time><Link href={href}>{t('عرض التفاصيل','View details')}</Link></div>{!n.readAt&&<button disabled={busy!==null} onClick={()=>void read(n.id)}><Check size={16}/>{t('تحديد كمقروء','Mark read')}</button>}</li>;
-  })}</ul>:<p>{t('لا توجد إشعارات بعد. لا ننشئ تنبيهات افتراضية للنشاط السابق.','No notifications yet. Earlier activity was not backfilled.') }</p>)}
-  <p>{t('حتى 50 إشعارًا، غير المقروء أولًا.','Up to 50 notifications, unread first.')}</p>
+  })}</ul>:<p>{t('لا توجد إشعارات','No notifications') }</p>)}
   {error&&<p role="alert">{t('تعذّر تأكيد الطلب. حاول مجددًا.','Could not confirm the request. Please retry.')}</p>}
-  <Link href="/settings/support">{t('مركز الدعم','Support center')}</Link>
  </main>;
 }
