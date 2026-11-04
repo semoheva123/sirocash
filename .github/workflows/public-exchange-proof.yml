@@ -26,9 +26,10 @@ jobs:
       - name: Classify the saved real response without any source request
         shell: python
         run: |
-          import json
+          import json,sys
           from pathlib import Path
           from datetime import datetime
+          sys.path.insert(0,str(Path.cwd()))
           from exchange_worker.public_page import parse_public
           raw=Path('saved/home.html').read_text()
           metadata=json.loads(Path('saved/result.json').read_text())
