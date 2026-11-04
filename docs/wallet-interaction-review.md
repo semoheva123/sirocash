@@ -74,3 +74,15 @@ Limits: no real-device freeze acceptance has been demonstrated. No real financia
 - Direct links to real session/security, installation/device-notification and support tools; dormant wallet service cards explicitly say Soon. No fictional chart/market movement, balance, verified badge or count.
 - Shared focus visibility, safe-area navigation, readable form typography, 320/360px layouts and reduced motion; no new polling, provider, migration, authorization or financial endpoint calls. No hardware/GPU animation or backdrop-filter effects.
 - Local complete `npm test` and production `npm run build` passed. Added owner/current/capability presentation tests and actual mobile/keyboard quick-access interaction tests. Physical device acceptance and broad claims of global-wallet equivalence remain unproved.
+
+## Precision fintech direction — 2026-11-05
+
+User explicitly selected the advanced global-wallet direction rather than private-banking minimalism. Implemented:
+
+- Responsive activity ledger with aligned date/state/reference/amount columns on wide screens and readable mobile cards; UTC day groups, exact persisted references/network metadata and unchanged amount precision. No aggregate totals inferred from a partial page.
+- Explicit global search with removable applied-filter chips; removing a chip synchronizes the open search form and preserves other applied filters. Still user-driven reads only, never polling or payment execution.
+- Exact transaction-page and reference-scoped support links from the detail sheet, including transfers. Existing deposit/withdrawal exact reads retained.
+- Consistent branded task header and denser transfer form/review surfaces, readable saved quote rows and existing step indicators; stage attributes are presentation-only. Approval flow, request keys, fees, stale-data gates and unknown-outcome locks are untouched.
+- Real-browser fixture added to the existing CSP browser suite to check actual navigation/feed/account CSS at 320/390/1440px in RTL/LTR. Fixture is explicitly synthetic and has no session or financial I/O. Browser CI acceptance is recorded in the release, separate from physical-device proof.
+
+Local complete `npm test` and production `npm run build` passed. New interaction fixtures prove UTC grouping across offset dates, exact amounts, explicit read-only filtering, chip/form synchronization and exact detail/support navigation. No migration, live provider request or financial operation. No claim of absolute luxury, universal device performance or feature parity with regulated global wallets.
