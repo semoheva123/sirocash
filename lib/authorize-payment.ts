@@ -1,6 +1,7 @@
 'use client';
+import {clientRequest} from '@/lib/client-request';
 import {startRegistration,startAuthentication,browserSupportsWebAuthn} from '@simplewebauthn/browser';
-async function call(body:unknown){const r=await fetch('/api/security/passkey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error);return d}
+async function call(body:unknown){const r=await clientRequest('/api/security/passkey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error);return d}
 export async function authorizePayment(path:string,payload:unknown):Promise<string>{
  if(!window.isSecureContext||!browserSupportsWebAuthn())throw Error('يلزم متصفح يدعم مفاتيح المرور واتصال HTTPS. لا يمكن تجاوز التحقق.');
  try{

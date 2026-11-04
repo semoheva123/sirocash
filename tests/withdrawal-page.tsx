@@ -22,7 +22,7 @@ async function main(){
  await act(async()=>Source.current.snapshot(false,false));
  assert(document.querySelector('form'),'Direct form remains visible while gated');assert(document.querySelector('fieldset')!.disabled);
  assert(document.body.textContent!.includes('Withdrawal history'));assert(document.body.textContent!.includes('Processing'));assert(!document.body.textContent!.includes('unrelated-deposit-tx'));
- assert(!document.querySelector('.deposit-studio'));assert.equal(document.querySelectorAll('select').length,1,'Network only; no command-kind selector');
+ assert(!document.querySelector('.deposit-studio'));assert.equal(document.querySelector('form.card')!.querySelectorAll('select').length,1,'Network only; no command-kind selector');
  for(const word of ['held','ledger','BEFORE YOU PROCEED'])assert(!document.body.textContent!.includes(word));
  await submit();assert.equal(calls,0,'Disabled finance must not even prepare');
  await act(async()=>Source.current.snapshot(true,false));await submit();assert.equal(calls,0,'Withdrawal capability independently required');

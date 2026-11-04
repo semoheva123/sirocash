@@ -50,3 +50,18 @@ Historical records without a saved sender still show unavailable with a valid ex
 - `npm run test:financial-stream`, `npm run test:financial-sync`, `npm run test:support`: restricted read role/full schema, owner isolation, signed-payload exclusion, pushed updates, existing financial capability and idempotency contracts.
 - `npm run test:csp-browser`: actual component/CSS at 390/1280px, RTL/LTR, changing computed transform, no page overflow, reduced-motion scrollable fallback; original production-CSP negative/positive controls retained. All data is synthetic and no live source, authenticated production session or financial network operation is used.
 - Full `npm test` and CI/build gates must pass before release. Build/CI success does not prove the historical real-device freezing issue solved; authenticated production-device acceptance is separate.
+
+## Repair follow-up — 2026-11-05
+
+Implemented in the account UI (not a financial activation):
+
+- Authenticated, owner-scoped read-only keyset history, 30 rows per explicit page; independent withdrawal snapshot and deposit/withdrawal history. Exact operation resolver also permits the legitimate transfer counterparty only.
+- Explicit global reference/name/UID/address/hash, date (UTC), kind and network search; parameterized literal substring matches. Filtered history never overwrites account balance or capabilities.
+- Pending requests plus uncredited chain observations, exact USDT base-unit conversion, deduplication and known-completed exclusion. Pending pages invalidate on pushed snapshot changes, not a polling timer. Loading older pages is explicit.
+- Exact transaction deep links from notifications; exact detail hides global search/pagination. Support can prefill the real reference. Notification operation IDs are resolved instead of mistaken for transaction IDs.
+- Settings mount network-backed identity/profile/session panels only when selected. Browser network calls have a 20-second header/body deadline, cancellation and no automatic replay, including timed-out writes whose outcome may be unknown.
+- Completed transfer receipt sharing/clipboard fallback, truthful cancellation/errors, reset copy feedback on changed values. Financial requests page starts at pending history instead of duplicating execution forms; home no longer repeats the full wallet service grid.
+
+Verified locally: complete `npm test` and production `npm run build` passed; restricted-role full-migration fixture covers tied-date pagination, 35 withdrawals behind 40 newer transfers, owner isolation, pending pagination, literal search and date filters. Client fixtures cover single-attempt deadlines including a stuck body, pre-abort, 204, lazy settings, copy reset and late old-owner responses. Further follow-up edits are rerun before release.
+
+Limits: no real-device freeze acceptance has been demonstrated. No real financial operation, provider request, migration, historical sender backfill, price-source activation change, custody/resource gate change or deferred-service activation was performed. Hardware passkey management, KYC, exchange, ShamCash and mobile top-up remain unavailable where operationally disabled; no fake completion or verification is supplied. Independent price workflow scheduling freshness remains unproved by these tests.

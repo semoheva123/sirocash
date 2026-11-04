@@ -1,4 +1,5 @@
 'use client';
+import {clientRequest} from '@/lib/client-request';
 import Link from 'next/link';
 import {Bell,Check} from 'lucide-react';
 import {createContext,useContext,useEffect,useRef,useState} from 'react';
@@ -32,11 +33,11 @@ export function NotificationsPage(){
  const readLock=useRef(false);
  const [readConfirmed,setReadConfirmed]=useState(false);
  const t=(a:string,e:string)=>ar?a:e;
- async function read(id:string){if(readLock.current)return;readLock.current=true;setReadConfirmed(false);setBusy(id);setError(false);try{const r=await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});if(!r.ok)throw Error();setReadConfirmed(true);await data?.refresh()}catch{setError(true)}finally{readLock.current=false;setBusy(null)}}
+ async function read(id:string){if(readLock.current)return;readLock.current=true;setReadConfirmed(false);setBusy(id);setError(false);try{const r=await clientRequest('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});if(!r.ok)throw Error();setReadConfirmed(true);await data?.refresh()}catch{setError(true)}finally{readLock.current=false;setBusy(null)}}
  return <main id="main-content" className="notifications-page" dir={ar?'rtl':'ltr'}><header><h1>{t('الإشعارات','Notifications')}</h1><Link prefetch={false} href="/settings">{t('الإعدادات','Settings')}</Link></header>
   {data?.sync!=='current'&&<p role="status">{t(data?.sync==='syncing'?'جارٍ تحميل الإشعارات…':'تعذّر تحديث الإشعارات.',data?.sync==='syncing'?'Loading notifications…':'Could not update notifications.')}{data?.sync!=='syncing'&&<button onClick={()=>void data?.refresh().catch(()=>setError(true))}>{t('إعادة المحاولة','Retry')}</button>}</p>}
   {data?.inbox&&(data.inbox.notifications.length?<ul>{data.inbox.notifications.map(n=>{
-   const href=n.kind.startsWith('SUPPORT_')?(n.staff?'/operations/support':'/settings/support')+'?ticket='+encodeURIComponent(n.reference):n.kind.startsWith('SECURITY_')?'/settings#active-sessions':n.kind.includes('DEPOSIT')?'/deposit':'/activity';
+   const href=n.kind.startsWith('SUPPORT_')?(n.staff?'/operations/support':'/settings/support')+'?ticket='+encodeURIComponent(n.reference):n.kind.startsWith('SECURITY_')?'/settings#active-sessions':n.kind==='DEPOSIT_OBSERVED'?'/transactions/deposits/'+encodeURIComponent(n.reference):(n.kind.startsWith('OPERATION_')||n.kind==='TRANSFER_RECEIVED')?'/transactions/operation/'+encodeURIComponent(n.reference):'/activity';
    return <li key={n.id} data-unread={!n.readAt}><div><strong>{labels[n.kind]?.[ar?0:1]??t('تحديث في حسابك','Account update')}</strong><time dateTime={n.createdAt}>{new Intl.DateTimeFormat(ar?'ar-SY':'en-GB',{dateStyle:'medium',timeStyle:'short'}).format(new Date(n.createdAt))}</time><Link prefetch={false} href={href}>{t('عرض التفاصيل','View details')}</Link></div>{!n.readAt&&<button disabled={busy!==null} onClick={()=>void read(n.id)}><Check size={16}/>{t('تحديد كمقروء','Mark read')}</button>}</li>;
   })}</ul>:<p>{t('لا توجد إشعارات','No notifications') }</p>)}
   {readConfirmed&&<p role="status">{t('تم تحديد الإشعار كمقروء.','Notification marked as read.')}</p>}

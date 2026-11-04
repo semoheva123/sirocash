@@ -1,4 +1,5 @@
 'use client';
+import {clientRequest} from '@/lib/client-request';
 import Link from 'next/link';
 import {PlatformPreview} from './platform-preview';
 import {useEffect,useRef,useState} from 'react';
@@ -11,7 +12,7 @@ export function EmailAuth(){
  useEffect(()=>{document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr'},[ar]);
  useEffect(()=>{if(wait<=0)return;const timer=setTimeout(()=>setWait(wait-1),1000);return()=>clearTimeout(timer)},[wait]);
  const strength=password.length===0?0:password.length<12?1:password.length>=16&&/[0-9]/.test(password)&&/[^a-zA-Z0-9]/.test(password)?4:password.length>=16||(/[0-9]/.test(password)&&/[a-zA-Z]/.test(password))?3:2;
- async function post(path:string,payload:unknown){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw Error(d.error||t('Request failed.','تعذر تنفيذ الطلب.'));return d}
+ async function post(path:string,payload:unknown){const r=await clientRequest(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw Error(d.error||t('Request failed.','تعذر تنفيذ الطلب.'));return d}
  async function send(e?:React.FormEvent){e?.preventDefault();if(locked.current)return;if(mode==='signup'&&password!==confirmation){setError(t('Passwords do not match.','كلمتا المرور غير متطابقتين.'));return}locked.current=true;setBusy(true);setError('');try{const d=await post('/api/auth/request',{email,password,mode});setChallenge(d.challengeId);setCode('');setWait(d.resendAfter)}catch(e){setError(e instanceof Error?e.message:'Request failed')}finally{setBusy(false);locked.current=false}}
  async function verify(e:React.FormEvent){e.preventDefault();if(locked.current)return;locked.current=true;setBusy(true);setError('');try{const d=await post('/api/auth/verify',{challengeId:challenge,code});setUser(d.user);setCode('');setChallenge('');setPassword('');setConfirmation('');window.location.replace('/dashboard')}catch(e){setError(e instanceof Error?e.message:'Request failed')}finally{setBusy(false);locked.current=false}}
  async function signOut(){setBusy(true);setError('');try{await post('/api/auth/logout',{});setUser(null)}catch(e){setError(e instanceof Error?e.message:'Request failed')}finally{setBusy(false)}}

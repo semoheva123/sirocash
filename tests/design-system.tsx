@@ -28,7 +28,8 @@ for(const ar of [true,false]){
 const settings=renderToStaticMarkup(<AccountSettings user={{id:'11111111-2222-4333-8444-555555555555',email:'design@example.test',emailVerifiedAt:'2026-10-30'}}/>);
 for(const id of ['preferences','password-change','active-sessions','identity-verification']){
  assert.ok(settings.includes(`href="#${id}"`));
- assert.ok(settings.includes(`id="${id}"`));
+ // Network-backed panels mount only after explicit section selection.
+ assert.equal(settings.includes(`id="${id}"`),!['active-sessions','identity-verification'].includes(id));
 }
 const signatureCss=await readFile('app/signature.css','utf8');
 for(const rule of ['prefers-reduced-motion','.signature-scene','.signature-settings-index','.receive-card','.dashboard-balance'])assert.ok(signatureCss.includes(rule));

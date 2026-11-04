@@ -1,4 +1,5 @@
 'use client';
+import {clientRequest} from '@/lib/client-request';
 import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeftRight,ArrowUpRight,Globe2,ShieldCheck,Mail,LockKeyhole,CheckCircle2} from 'lucide-react';
@@ -12,7 +13,7 @@ export function RecoveryForm(){
   if(challengeId&&password!==confirmation){setError(t('Passwords do not match.','كلمتا المرور غير متطابقتين.'));return}
   locked.current=true;setBusy(true);
   try{
-   const response=await fetch('/api/auth/recovery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(challengeId?{challengeId,code,newPassword:password,confirmation}:{email})});
+   const response=await clientRequest('/api/auth/recovery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(challengeId?{challengeId,code,newPassword:password,confirmation}:{email})});
    const result=await response.json();if(!response.ok)throw Error(result.error||t('Please retry later.','يُرجى المحاولة لاحقاً.'));
    if(challengeId){setPassword('');setConfirmation('');setCode('');setDone(true)}else{setChallengeId(result.challengeId);setNotice(t('If this email belongs to an eligible account, a code will be sent. Wait at least one minute before requesting another.','إذا كان البريد مرتبطاً بحساب مؤهّل، فسيُرسل إليه رمز تحقق. يُرجى الانتظار دقيقة على الأقل قبل طلب رمز آخر.'))}
   }catch(e){setError(e instanceof Error?e.message:t('Please retry later.','يُرجى المحاولة لاحقاً.'))}finally{setBusy(false);locked.current=false}

@@ -1,4 +1,5 @@
 'use client';
+import {clientRequest} from '@/lib/client-request';
 import {ActionNotice} from './action-notice';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Monitor,ShieldCheck,Mail,RefreshCw} from 'lucide-react';
@@ -12,7 +13,7 @@ export function SecurityCenter({ar}:{ar:boolean}){
  const load=useCallback(async()=>{
   setLoading(true);setFailed(false);setError('');
   try{
-   const responses=await Promise.all([fetch('/api/auth/sessions',{cache:'no-store'}),fetch('/api/auth/security-events',{cache:'no-store'})]);
+   const responses=await Promise.all([clientRequest('/api/auth/sessions',{cache:'no-store'}),clientRequest('/api/auth/security-events',{cache:'no-store'})]);
    if(responses.some(r=>r.status===401)){window.location.replace('/auth');return}
    if(responses.some(r=>!r.ok))throw Error();
    const [s,e]=await Promise.all(responses.map(r=>r.json()));setSessions(s.sessions);setEvents(e.events);
@@ -22,7 +23,7 @@ export function SecurityCenter({ar}:{ar:boolean}){
  async function revoke(){
   if(!confirmAction||lock.current)return;lock.current=true;setBusy(true);setError('');setSuccess('');
   try{
-   const response=await fetch('/api/auth/sessions',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify(confirmAction)});
+   const response=await clientRequest('/api/auth/sessions',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify(confirmAction)});
    const result=await response.json();if(!response.ok){if(response.status===401){window.location.replace('/auth');return}throw Error(result.error)}
    setConfirmAction(null);setSuccess(t('Selected sessions ended.','تم إنهاء الجلسات المحددة.'));if(result.reauthenticate){window.location.replace('/auth');return}await load();
   }catch{setError(t('The session could not be ended. Please retry.','تعذّر إنهاء الجلسة. يُرجى إعادة المحاولة.'))}finally{lock.current=false;setBusy(false)}
@@ -36,7 +37,7 @@ export function EmailChangeForm({ar}:{ar:boolean}){
  async function submit(e:React.FormEvent){
   e.preventDefault();if(locked.current)return;locked.current=true;setBusy(true);setError('');
   try{
-   const response=await fetch('/api/auth/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(challengeId?{challengeId,oldCode,newCode}:{currentPassword:password,newEmail})});
+   const response=await clientRequest('/api/auth/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(challengeId?{challengeId,oldCode,newCode}:{currentPassword:password,newEmail})});
    const result=await response.json();if(!response.ok){if(response.status===401){window.location.replace('/auth');return}throw Error(result.error)}
    setPassword('');if(result.challengeId){setChallengeId(result.challengeId);setOldCode('');setNewCode('')}else window.location.replace('/auth?email=changed');
   }catch(e){setError(e instanceof Error?e.message:t('Please retry.','يُرجى إعادة المحاولة.'))}finally{setBusy(false);locked.current=false}
