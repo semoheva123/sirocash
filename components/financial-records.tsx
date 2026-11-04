@@ -11,7 +11,7 @@ export function depositTokenAmount(baseUnits:string,network:string){
 /** Owner-bound persisted fields only. No chain RPC, key material, inferred sender or default fees. */
 export function FinancialRecords({status,ar,scope}:{status:FinancialStatus;ar:boolean;scope:'deposits'|'withdrawals'}){
  const t=(a:string,e:string)=>ar?a:e, deposits=scope==='deposits';
- const rows=deposits?(status.deposits??[]).map(d=>({id:d.id,amount:depositTokenAmount(d.amountBaseUnits,d.network)+' USDT',network:d.network,reference:d.txId,state:d.state,accountState:d.state,date:d.createdAt,sender:undefined as string|undefined,recipient:d.recipient,fee:undefined as string|undefined,gross:undefined as string|undefined,debit:undefined as string|undefined})):(status.operations??[]).filter(o=>o.kind==='WITHDRAWAL').map(o=>{
+ const rows=deposits?(status.deposits??[]).map(d=>({id:d.id,amount:depositTokenAmount(d.amountBaseUnits,d.network)+' USDT',network:d.network,reference:d.txId,state:d.state,accountState:d.state,date:d.createdAt,sender:d.sender??undefined,recipient:d.recipient,fee:undefined as string|undefined,gross:undefined as string|undefined,debit:undefined as string|undefined})):(status.operations??[]).filter(o=>o.kind==='WITHDRAWAL').map(o=>{
   const payout=status.payouts?.find(p=>p.operationId===o.id),network=payout?.network||o.network||'';
   return {id:o.id,amount:payout?.amountBaseUnits?depositTokenAmount(payout.amountBaseUnits,network)+' USDT':o.netTokens?o.netTokens+' USDT':o.amount+' USD',network,reference:payout?.txId||'',state:payout?.state??o.state,accountState:o.state,date:o.createdAt,sender:payout?.sender,recipient:payout?.recipient||o.recipient,fee:o.feeTokens,gross:o.grossTokens,debit:o.amount};
  });

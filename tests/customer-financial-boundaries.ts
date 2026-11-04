@@ -35,7 +35,7 @@ async function main(){
  }finally{for(const [key,value] of saved){if(value===undefined)delete process.env[key];else process.env[key]=value}}
  const ui=await readFile('components/customer-payments.tsx','utf8');
  assert(ui.includes('authorizePayment(prepared.path,prepared.payload)'));assert(ui.includes('quoteId:prepared.id'));
- assert(!ui.includes('verifyDemoPin'));assert(!ui.includes('123456'));assert(ui.includes('Preserve exact request/quote for retry'));assert(ui.includes('if(attempted&&!submitted)return'));assert(ui.includes('setAttempted(true)'));
+ assert(!ui.includes('verifyDemoPin'));assert(!ui.includes('123456'));assert(ui.includes('Preserve exact request/quote for retry'));assert(ui.includes('if(actionLock.current||(attempted&&!submitted))return'));assert(ui.includes('setAttempted(true)'));
  console.log('Customer finance boundaries PASS: fixed bounded non-peg price source, decimal floor, token/currency/size/redirect rejection, fail-closed HTTP gates, no demo PIN and quote-bound device approval UI.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1});

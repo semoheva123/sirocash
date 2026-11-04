@@ -15,11 +15,11 @@ async function stageVerifiedDeposit(db:WalletDb,event:ReturnType<typeof verifyTr
   // Beneficiary ownership comes from the durable address assignment, never a supplied user ID.
   const {rows:[assignment]}=await tx.query('SELECT id,"ownerId" FROM "UserDepositAddress" WHERE network=$2 AND address=$1 FOR SHARE',[event.to,event.network]);
   if(!assignment)throw new Error('UNASSIGNED_DEPOSIT_ADDRESS');
-  await tx.query(`INSERT INTO "ChainDepositInbox" (id,"eventKey","addressId","txId","logIndex","blockNumber","blockHash","amountBaseUnits",fingerprint,network)
-   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT ("eventKey") DO NOTHING`,
-   [randomUUID(),event.eventKey,assignment.id,event.txId,event.logIndex,event.blockNumber,event.blockHash,event.amountBaseUnits,fingerprint,event.network]);
-  const {rows:[row]}=await tx.query('SELECT id,state,fingerprint,"addressId" FROM "ChainDepositInbox" WHERE "eventKey"=$1 FOR UPDATE',[event.eventKey]);
-  if(!row||row.fingerprint!==fingerprint||row.addressId!==assignment.id)throw new Error('DEPOSIT_EVIDENCE_CONFLICT');
+  await tx.query(`INSERT INTO "ChainDepositInbox" (id,"eventKey","addressId","txId","logIndex","blockNumber","blockHash","amountBaseUnits",fingerprint,network,sender)
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT ("eventKey") DO NOTHING`,
+   [randomUUID(),event.eventKey,assignment.id,event.txId,event.logIndex,event.blockNumber,event.blockHash,event.amountBaseUnits,fingerprint,event.network,event.from]);
+  const {rows:[row]}=await tx.query('SELECT id,state,fingerprint,"addressId",sender FROM "ChainDepositInbox" WHERE "eventKey"=$1 FOR UPDATE',[event.eventKey]);
+  if(!row||row.fingerprint!==fingerprint||row.addressId!==assignment.id||(row.sender!==null&&row.sender!==event.from))throw new Error('DEPOSIT_EVIDENCE_CONFLICT');
   return {id:String(row.id),state:String(row.state),ownerId:String(assignment.ownerId),eventKey:event.eventKey};
  });
 }

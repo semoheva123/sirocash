@@ -286,6 +286,7 @@ model UserDepositAddress {
 }
 
 model ChainDepositInbox {
+ sender String?
  valuation ApprovedDepositValuation?
  id String @id @db.Uuid
  eventKey String @unique

@@ -22,6 +22,7 @@ for(const ar of [true,false]){
  const deposit=renderToStaticMarkup(<FinancialRecords status={status} ar={ar} scope="deposits"/>);
  for(const text of ['deposit-recipient','1.000000000000000001 USDT','bscscan.com',ar?'غير متاح في السجل':'Not available in this record'])assert(deposit.includes(text),text);
  assert(!deposit.includes('saved-sender'));assert(!deposit.includes(ar?'أُضيفت إلى الرصيد':'Credited'));assert(!deposit.includes('tronscan.org'));
+ const identified=renderToStaticMarkup(<FinancialRecords status={{...status,deposits:status.deposits!.map(d=>({...d,sender:'verified-transfer-event-source'}))}} ar={ar} scope="deposits"/>);assert(identified.includes('verified-transfer-event-source'));
  const pending=renderToStaticMarkup(<FinancialRecords status={{...status,payouts:[]}} ar={ar} scope="withdrawals"/>);
  assert(pending.includes('saved-recipient'));assert(!pending.includes('tronscan.org'));assert(pending.includes(ar?'لم يتوفر بعد':'Not available yet'));
 }
