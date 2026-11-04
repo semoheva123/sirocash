@@ -12,3 +12,5 @@
 @media(max-width:1150px){.exchange-ticker{margin-inline-start:220px}.exchange-ticker-group{min-width:calc(100vw - 244px)}}
 @media(max-width:900px){.exchange-ticker{margin-inline-start:0;padding-inline:8px}.exchange-ticker-group{min-width:calc(100vw - 16px)}}
 @media(prefers-reduced-motion:reduce){.exchange-ticker-track{animation:none;will-change:auto}.exchange-ticker-window{overflow-x:auto;scrollbar-width:none}.exchange-ticker-group[aria-hidden=true]{display:none}}
+/* Static feed rollout: one compact scrollable row, no compositor animation. */
+.exchange-ticker-static .exchange-ticker-track{animation:none;will-change:auto}.exchange-ticker-static .exchange-ticker-group{min-width:0}.exchange-ticker-static .exchange-ticker-group[aria-hidden="true"]{display:none}.exchange-ticker-static .exchange-ticker-window{overflow-x:auto;scrollbar-width:none}

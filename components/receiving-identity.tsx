@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {useFinancialStatus} from "./use-financial-status";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, Share2, UserRound } from "lucide-react";
@@ -10,6 +10,7 @@ import {
   type ReceivingIdentity,
 } from "@/lib/receiving-uid";
 function useReceivingIdentitySource(ownerId: string, enabled=true, initialIdentity:ReceivingIdentity|null=null) {
+  const seededOwner=useRef(initialIdentity?ownerId:null);
   const [stored, setStored] = useState<{
       ownerId: string;
       identity: ReceivingIdentity;
@@ -17,7 +18,7 @@ function useReceivingIdentitySource(ownerId: string, enabled=true, initialIdenti
     [error, setError] = useState(false),
     [version, setVersion] = useState(0);
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || (version===0 && initialIdentity && seededOwner.current===ownerId)) return;
     const controller = new AbortController();
     let active = true;
     setError(false);

@@ -31,7 +31,9 @@ try{
   assert.equal(await page.getByTestId('uid').textContent(),'1234567897');
   assert.equal(await page.getByTestId('language').textContent(),'ar');
  }
- assert.equal(reads,1,'navigation must not refetch the same profile');
+ assert.equal(reads,0,'verified bootstrap identity must not be refetched on mount/navigation');
+ const reloaded=page.waitForResponse(response=>response.url().includes('/api/account/receiving-identity'));await page.getByRole('button',{name:'Reload identity',exact:true}).click();await reloaded;await page.waitForFunction(()=>document.querySelector('[data-testid=uid]').textContent==='1234567897');
+ assert.equal(reads,1,'explicit reload still works');
  assert.equal(await page.evaluate(()=>window.__streams.length),1,'one shared SSE');
  await page.evaluate(()=>window.__streams[0].emit('snapshot',{enabled:true,readable:true,userId:'11111111-2222-4333-8444-555555555555',balance:{posted:'1500.000000',held:'0'}}));
  await page.waitForFunction(()=>document.querySelector('[data-testid=balance]').textContent==='1500.000000');
@@ -44,5 +46,5 @@ try{
  assert.deepEqual(errors,[]);
  await page.close();
  }
- console.log('Navigation lifecycle PASS: seeded display before SSE, background failure retention, one profile read/stream across remounts, live update, persistent language, session-end clearing (360/1440). Synthetic fixture, not production Next navigation or load test.');
+ console.log('Navigation lifecycle PASS: seeded display before SSE, background failure retention, no duplicate profile read/one stream across remounts, live update, persistent language, session-end clearing (360/1440). Synthetic fixture, not production Next navigation or load test.');
 }finally{await browser.close()}
