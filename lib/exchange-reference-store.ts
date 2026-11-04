@@ -21,9 +21,9 @@ export async function claimExchangeAttempt(db:DB,requestId=randomUUID(),diagnost
  return rows.length?requestId:null;
 }
 export async function readExchangeSnapshot(db:DB):Promise<ExchangeSnapshot|null>{
- const {rows}=await db.query(`SELECT snapshot FROM "ExchangeReference" WHERE id='sp-today'`);
+ const {rows}=await db.query(`SELECT snapshot,"publicEnabled" FROM "ExchangeReference" WHERE id='sp-today'`);
  const parsed=exchangeSnapshotSchema.safeParse(rows[0]?.snapshot);
- return parsed.success?parsed.data:null;
+ return parsed.success&&(!rows[0]?.publicEnabled||parsed.data.observation==='public-page')?parsed.data:null;
 }
 /** Honor exhaustion even if the body is invalid. A missing/malformed reset blocks to
  * next UTC month. Cap provider-controlled reset to 32 days; never trust an arbitrary URL. */
@@ -46,7 +46,7 @@ export async function loadExchangeReference(deps:{db:DB;key?:string;fetch:typeof
  let previous:ExchangeSnapshot|null=null;
  try{
   previous=await readExchangeSnapshot(deps.db);
-  if(!deps.key)return previous;
+  if(!deps.key||previous?.observation==='public-page')return previous;
   const requestId=await claimExchangeAttempt(deps.db,randomUUID(),deps.diagnostic);
   if(!requestId)return previous;
   let httpStatus:number|null=null;
@@ -74,7 +74,7 @@ export async function loadExchangeReference(deps:{db:DB;key?:string;fetch:typeof
    shape={rates:type(data.rates),global_fx:type(data.global_fx),updated_at:type(data.updated_at),usd_updated_at:type(usd.updated_at),cities:type(usd.cities),buy:type(city.buy),sell:type(city.sell),fx_rate:type(fx.rate)};
    const snapshot=parseExchangeOverview(raw,deps.now());
    // A delayed provider response must never roll source time backwards.
-   if(previous&&(Date.parse(snapshot.market.updatedAt)<Date.parse(previous.market.updatedAt)||snapshot.fx.some(quote=>{const older=previous!.fx.find(row=>row.pair===quote.pair);return older&&Date.parse(quote.updatedAt)<Date.parse(older.updatedAt)})))return previous;
+   if(previous&&(Date.parse(snapshot.market.updatedAt!)<Date.parse(previous.market.updatedAt??previous.fetchedAt)||snapshot.fx.some(quote=>{const older=previous!.fx.find(row=>row.pair===quote.pair);return older&&Date.parse(quote.updatedAt!)<Date.parse(older.updatedAt??previous!.fetchedAt)})))return previous;
    const {rows}=await deps.db.query(`UPDATE "ExchangeReference" SET snapshot=$2::jsonb WHERE id='sp-today' AND "requestId"=$1 RETURNING id`,[requestId,JSON.stringify(snapshot)]);
    await outcome('OK');
    return rows.length?snapshot:previous;

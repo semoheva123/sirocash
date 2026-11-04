@@ -6,8 +6,8 @@ on:
       - '.github/workflows/exchange-collector.yml'
       - 'api/exchange_collect.py'
   schedule:
-    # Asia/Damascus is UTC+3: opening / midpoint / closing. Best effort, not exact-time SLA.
-    - cron: '0 7,11,15 * * *'
+    # Shared public page; DB enforces >=5 minutes even for delayed/duplicate jobs.
+    - cron: '3-58/5 * * * *'
   workflow_dispatch:
     inputs:
       bootstrap:
@@ -49,7 +49,7 @@ jobs:
                       health = urllib.request.Request('https://www.sirocash.online/api/exchange_collect', headers={'Authorization':'Bearer '+token})
                       try:
                           with opener.open(health, timeout=12) as r:
-                              if r.status == 204: break
+                              if r.status == 204 and r.headers.get('X-Exchange-Collector') == 'public-page-v1': break
                       except urllib.error.HTTPError as e:
                           last_health = 'HTTP_' + str(e.code)
                           try:

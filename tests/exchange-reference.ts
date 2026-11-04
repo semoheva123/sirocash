@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import type {PoolClient} from 'pg';
 import {exchangeAge,parseExchangeOverview} from '../lib/exchange-reference';
-import {claimExchangeAttempt,loadExchangeReference,blockExhaustedExchange} from '../lib/exchange-reference-store';
+import {claimExchangeAttempt,loadExchangeReference,blockExhaustedExchange,readExchangeSnapshot} from '../lib/exchange-reference-store';
 import {exchangeProviderHeaders,exchangeProviderFailure} from '../lib/exchange-provider-http';
 import {GET} from '../app/api/exchange-rates/route';
 async function main(){
@@ -36,9 +36,13 @@ async function main(){
  assert.equal(unauthorized.status,401);assert.equal(unauthorized.headers.get('cache-control'),'no-store');
  const pg=new PGlite();
  try{
-  await pg.exec('CREATE ROLE sirocash_app;CREATE ROLE anon;CREATE ROLE authenticated;');
+  await pg.exec('CREATE ROLE sirocash_app;CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE sirocash_financial_worker;');
   await pg.exec(await readFile('prisma/migrations/20261103200000_exchange_reference/migration.sql','utf8'));
   await pg.exec(await readFile('prisma/migrations/20261103210000_exchange_diagnostics/migration.sql','utf8'));
+  await pg.exec(await readFile('prisma/migrations/20261104000000_exchange_tls_collector/migration.sql','utf8'));
+  await pg.exec(await readFile('prisma/migrations/20261104160000_public_exchange_feed/migration.sql','utf8'));
+  // Legacy API regression fixtures explicitly retain the old mode only here.
+  await pg.exec('ALTER TABLE "ExchangeReference" ALTER COLUMN "publicEnabled" SET DEFAULT false; UPDATE "ExchangeReference" SET "publicEnabled"=false');
   const db={query:async(sql:string,values?:unknown[])=>pg.query(sql,values)} as unknown as Pick<PoolClient,'query'>;
   let calls=0;
   const deps={db,key:'private-test-key',now:()=>now,fetch:(async(url,options)=>{
@@ -101,6 +105,12 @@ async function main(){
   const {rows:[priv]}=await pg.query(`SELECT has_table_privilege('anon','"ExchangeReference"','SELECT') anon,has_table_privilege('authenticated','"ExchangeReference"','INSERT') browser,has_table_privilege('sirocash_app','"ExchangeReference"','UPDATE') backend,has_table_privilege('sirocash_app','"ExchangeReference"','DELETE') erase`);
   assert.deepEqual(priv,{anon:false,browser:false,backend:true,erase:false});
   await pg.exec('SET ROLE anon');await assert.rejects(()=>pg.query('SELECT * FROM "ExchangeReference"'));await pg.exec('RESET ROLE');
+  await pg.exec('UPDATE "ExchangeReference" SET "publicEnabled"=true');
+  assert.equal(await readExchangeSnapshot(db),null,'Do not label retained unverified API units as new public-page SYP');
+  const publicSnapshot={...snapshot,city:'syria-general',observation:'public-page',market:{buy:144,sell:144.5},fx:[{pair:'USD/TRY',rate:50.0213},{pair:'EUR/USD',rate:1.1246}]};
+  await pg.query('UPDATE "ExchangeReference" SET snapshot=$1::jsonb',[JSON.stringify(publicSnapshot)]);
+  assert.deepEqual(await readExchangeSnapshot(db),publicSnapshot);
+  const callsBefore=calls;assert.deepEqual(await loadExchangeReference(deps),publicSnapshot);assert.equal(calls,callsBefore,'Public mode must not fall back to authenticated API');
   const broken={query:async()=>{throw Error('DB_DOWN')}} as unknown as Pick<PoolClient,'query'>;
   assert.equal(await loadExchangeReference({...deps,db:broken}),null);
   console.log('Exchange reference PASS: documented shape/new SYP/no conversion, source timestamps, AR/EN stale/expired/unavailable views, unauthorized no-store, real PostgreSQL durable shared claims/cooldown/month cap/reset, timeout/error/oversize retention, 429/header exhaustion, fail-closed DB and browser isolation. No live API or financial I/O.');

@@ -1,6 +1,9 @@
 """Vercel Python function. GitHub OIDC authenticates the isolated collector."""
 from http.server import BaseHTTPRequestHandler
 import hmac
+import hashlib
+import time
+import re
 import json
 import os
 import tempfile
@@ -11,6 +14,16 @@ ISSUER = 'https://token.actions.githubusercontent.com'
 WORKFLOW = 'semoheva123/sirocash/.github/workflows/exchange-collector.yml@refs/heads/main'
 _jwks = None
 
+
+def public_authorized(value):
+    # Dedicated purpose-bound, short-lived server-to-server MAC. Never a browser
+    # credential; never sent to SP Today. Existing OIDC checks remain unchanged.
+    secret=os.environ.get('AUTH_SECRET','')
+    if len(secret)<32 or not isinstance(value,str):return False
+    match=re.fullmatch(r'PublicFeed (\d{10})\.([a-f0-9]{64})',value)
+    if not match or abs(time.time()-int(match[1]))>90:return False
+    expected=hmac.new(secret.encode(),('public-exchange:POST:/api/exchange_collect:'+match[1]).encode(),hashlib.sha256).hexdigest()
+    return hmac.compare_digest(match[2],expected)
 
 def authorization_result(value):
     global _jwks
@@ -59,6 +72,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Exchange-Collector', 'public-page-v1')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
@@ -69,7 +83,7 @@ class handler(BaseHTTPRequestHandler):
         self.reply(204 if ok else 401, None if ok else {'auth': reason})
 
     def do_POST(self):
-        if not authorized(self.headers.get('Authorization')):
+        if not (authorized(self.headers.get('Authorization')) or public_authorized(self.headers.get('Authorization'))):
             self.reply(401, {'state': 'UNAUTHORIZED'})
             return
         ca_path = None
@@ -86,16 +100,15 @@ class handler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict) or set(payload) - {'bootstrap'} or type(payload.get('bootstrap', False)) is not bool:
                 self.reply(400, {'state': 'INVALID_INPUT'})
                 return
-            key = os.environ.get('SP_TODAY_API_KEY', '').strip()
             url = os.environ.get('DATABASE_URL', '')
-            if not key or not url:
+            if not url:
                 self.reply(503, {'state': 'UNCONFIGURED'})
                 return
             phase = 'DEPENDENCIES'
             import certifi
             import psycopg
             from curl_cffi import requests
-            from exchange_worker.collector import collect
+            from exchange_worker.public_page import collect_public
             parsed = urlsplit(url)
             if parsed.scheme not in ('postgres', 'postgresql'):
                 raise ValueError('DB_CONFIG')
@@ -113,7 +126,7 @@ class handler(BaseHTTPRequestHandler):
                                  connect_timeout=8, prepare_threshold=None, options='-c statement_timeout=10000') as db:
                 with requests.Session(trust_env=False) as session:
                     phase = 'COLLECTION'
-                    result = collect(db, session, key, payload.get('bootstrap', False))
+                    result = collect_public(db, session)
             self.reply(200, result)
         except Exception:
             self.reply(503, {'state': 'UNAVAILABLE', 'phase': phase})

@@ -38,6 +38,7 @@ jobs:
           python3 tests/exchange-tls-inspection.py
           python3 tests/exchange-api-tls-inspection.py
           python3 tests/exchange-worker.py
+          python3 tests/exchange-public-page.py
       - name: Run offline regression suite
         run: |
           mkdir -p .cache

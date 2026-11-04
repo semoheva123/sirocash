@@ -7,10 +7,10 @@ export const EXCHANGE_EXPIRE_MS=7*24*60*60*1000;
 const price=z.number().finite().positive().max(1e12);
 const stamp=z.string().datetime({offset:true});
 export const exchangeSnapshotSchema=z.object({
- source:z.literal('sp-today'),city:z.literal('damascus'),unit:z.literal('SYP_NEW'),
- market:z.object({buy:price,sell:price,updatedAt:stamp}).refine(v=>v.buy<=v.sell),
- fx:z.array(z.object({pair:z.enum(['USD/TRY','EUR/USD']),rate:price,updatedAt:stamp})).max(2),
- fetchedAt:stamp,
+ source:z.literal('sp-today'),city:z.enum(['damascus','syria-general']),unit:z.literal('SYP_NEW'),
+ market:z.object({buy:price,sell:price,updatedAt:stamp.optional()}).refine(v=>v.buy<=v.sell),
+ fx:z.array(z.object({pair:z.enum(['USD/TRY','EUR/USD']),rate:price,updatedAt:stamp.optional()})).max(2),
+ fetchedAt:stamp,observation:z.literal('public-page').optional(),
 });
 export type ExchangeSnapshot=z.infer<typeof exchangeSnapshotSchema>;
 const overview=z.object({ok:z.literal(true),data:z.object({
@@ -30,7 +30,7 @@ export function parseExchangeOverview(raw:unknown,now:Date):ExchangeSnapshot{
  });
  const result=exchangeSnapshotSchema.parse({source:'sp-today',city:'damascus',unit:'SYP_NEW',market:{...market,updatedAt:usd[0].updated_at},fx,fetchedAt:now.toISOString()});
  for(const date of [result.market.updatedAt,...result.fx.map(r=>r.updatedAt)]){
-  const at=Date.parse(date);
+  const at=Date.parse(date!);
   if(at<Date.UTC(2000,0,1)||at>now.getTime()+5*60*1000)throw Error('EXCHANGE_INVALID');
  }
  return result;
