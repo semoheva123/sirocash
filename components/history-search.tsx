@@ -1,8 +1,9 @@
 'use client';
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {HistoryFilters} from './use-history-pages';
-export function HistorySearch({ar,busy,onApply,types=false}:{ar:boolean;busy:boolean;onApply:(filters:HistoryFilters)=>void;types?:boolean}){
+export function HistorySearch({ar,busy,onApply,types=false,value}:{ar:boolean;busy:boolean;onApply:(filters:HistoryFilters)=>void;types?:boolean;value?:HistoryFilters}){
  const [q,setQ]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState(''),[type,setType]=useState(''),[network,setNetwork]=useState(''),[error,setError]=useState(false);
+ useEffect(()=>{setQ(value?.q??'');setFrom(value?.from??'');setTo(value?.to??'');setType(value?.type??'');setNetwork(value?.network??'');setError(false)},[value?.q,value?.from,value?.to,value?.type,value?.network]);
  const t=(a:string,e:string)=>ar?a:e;
  return <form className="history-search" onSubmit={e=>{e.preventDefault();if(busy)return;if(from&&to&&from>to){setError(true);return}setError(false);onApply(Object.fromEntries(Object.entries({q:q.trim(),from,to,type,network}).filter(([,v])=>v)))}}>
   <fieldset disabled={busy}><legend>{t('البحث في كامل السجل','Search entire history')}</legend><label>{t('المرجع أو العنوان أو UID','Reference, address or UID')}<input type="search" value={q} maxLength={80} onChange={e=>setQ(e.target.value)}/></label>

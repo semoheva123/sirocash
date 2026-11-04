@@ -47,6 +47,17 @@ try{
   assert.equal(await page.locator('.exchange-ticker-group[aria-hidden="true"]').isVisible(),false);
   await page.close();
  }
+ for(const width of [320,390,1440])for(const language of ['ltr','rtl']){
+  const page=await browser.newPage({viewport:{width,height:900},reducedMotion:'reduce'}),errors=[];page.on('pageerror',error=>errors.push(String(error)));
+  await page.goto(`http://127.0.0.1:${port}/precision-${language}`);
+  assert.equal(await page.locator('.wallet-ledger-day').count(),2);
+  assert.equal(await page.locator('.wallet-transaction-card').count(),2);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Precision overflow: ${width} ${language}`);
+  assert.equal(await page.locator('.wallet-ledger-columns').isVisible(),width>=1280);
+  assert.equal(await page.locator('.wallet-ledger-reference').count(),2);
+  assert.deepEqual(errors,[]);await page.close();
+ }
+ console.log('Precision ledger browser PASS: real feed/navigation/account CSS at 320/390/1440px in RTL/LTR, UTC date grouping, desktop columns/mobile cards and no horizontal overflow. Isolated synthetic SSR fixture, not device acceptance.');
  console.log('Ticker browser PASS: actual component/CSS animates at phone/desktop sizes in RTL/LTR, no page overflow, reduced motion disables animation and keeps prices scrollable. Synthetic only.');
  console.log('Production CSP browser PASS: old policy reproduces blocked prices; real fixed proxy policy + actual reader loads only the exact public JSON without cookies/referrer. Sibling paths/external hosts blocked; nonce scripts, self fetch and local interaction preserved. Synthetic response, no production auth or financial I/O.');
 }finally{
