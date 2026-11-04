@@ -69,13 +69,14 @@ jobs:
                   headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'}, method='POST')
               # Reject redirects: never forward the short-lived token to another URL.
               with opener.open(req, timeout=80) as r:
+                  post_mode = r.headers.get('X-Exchange-Collector')
                   result = json.loads(r.read(2048))
               state = result.get('state')
               reason = result.get('reason')
               allowed = {'OK','OUTSIDE_SLOT','CLAIM_DENIED','SCHEMA','SOURCE_TIME_REGRESSION','NETWORK_OR_TIMEOUT','HTTP','QUOTA','AUTH_OR_CHALLENGE','INVALID_RESPONSE','BODY_LIMIT'}
               summary = {'state': state if state in ('COLLECTED','SKIPPED','FAILED') else 'UNKNOWN',
                          'reason': reason if reason in allowed else 'UNKNOWN'}
-              summary['mode'] = 'public-page-v2' if result.get('mode') == 'public-page-v2' else 'UNCONFIRMED'
+              summary['mode'] = 'public-page-v2' if post_mode == 'public-page-v2' else 'UNCONFIRMED'
               eligibility = result.get('eligibility')
               if isinstance(eligibility,dict):
                   summary['eligibility'] = {k:v for k,v in eligibility.items() if k in ('rows','enabled','unblocked','due','snapshotAvailable','appRole') and type(v) in (int,bool)}
