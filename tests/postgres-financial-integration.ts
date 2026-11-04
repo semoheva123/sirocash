@@ -1,3 +1,4 @@
+import {passkeySessionAcceptance} from './postgres-passkey-session';
 import {accountNotificationAcceptance} from './postgres-account-notifications';
 import {receivingIdentityAcceptance} from './receiving-identity-postgres';
 import {schedulerHttpAcceptance} from './postgres-scheduler-http';
@@ -63,6 +64,7 @@ async function main(){
   await pool.query('INSERT INTO "User" (id,email,"emailVerifiedAt","kycStatus") VALUES ($1,\'race-alice@example.test\',now(),\'VERIFIED\'),($2,\'race-bob@example.test\',now(),\'VERIFIED\')',[alice,bob]);
   await pool.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[settlement,revenue]);
   await receivingIdentityAcceptance(pool,db,alice,bob);
+  await passkeySessionAcceptance(pool,alice);
   await accountNotificationAcceptance(pool,testUrl.toString(),alice,bob);
   await financialNotificationFixture(pool,testUrl.toString(),alice);
   // Read-only display is independent of command activation, using actual restricted-role SQL.

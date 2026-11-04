@@ -28,7 +28,7 @@ export async function handlePasskey(request:Request){
   return NextResponse.json(result,{headers:{'Cache-Control':'no-store'}});
  }catch{
   // Never return SQL/provider/credential details through apiError.
-  throw Error('تعذّر اعتماد التحقق من الجهاز. يرجى إعادة المحاولة أو تسجيل الدخول مجدداً.');
+  throw new PublicApiError('تعذّر اعتماد التحقق من الجهاز. لم يصدر تفويض لهذا الطلب.');
  }
 }
 export async function requirePasskey(request:Request,_payload:unknown){
