@@ -1,4 +1,5 @@
 "use client";
+import {TransferParties} from "./transfer-parties";
 import { ArrowDownLeft, ArrowUpRight, MapPin, Layers } from "lucide-react";
 import {FinancialRecords} from "./financial-records";
 import { FinancialActivity } from "./financial-activity";
@@ -52,6 +53,7 @@ export function FinancialHistory({
                     </span>
                   </div>
                   <FinancialReference value={o.id} ar={ar} />
+                  {o.kind==='TRANSFER'&&<TransferParties entry={o} ar={ar}/>}
                   <div className="pro-record-footer">
                     <FinancialState state={o.state} ar={ar} />
                     <FinancialDate value={o.createdAt} ar={ar} />

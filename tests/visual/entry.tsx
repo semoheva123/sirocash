@@ -1,3 +1,4 @@
+import {InternalTransferSuccess} from '../../components/internal-transfer-success';
 import {ExchangeTicker} from '../../components/exchange-ticker';
 import {AccountLanguageProvider} from '../../components/account-language';
 import '../../app/exchange-ticker.css';
@@ -27,5 +28,5 @@ import {FinancialStatusProvider} from '../../components/use-financial-status';
 const params=new URLSearchParams(location.search),screen=params.get('screen')??'home';
 localStorage.setItem('siro-language',params.get('lang')??'ar');
 const owner='11111111-2222-4333-8444-555555555555';
-const view=screen==='support'||screen==='staff-support'?<SupportCenter staff={screen==='staff-support'}/>:screen==='settings'?<AccountSettings user={{id:owner,email:'visual-fixture@example.test',emailVerifiedAt:'2026-11-03'}}/>:screen==='deposit'?<DepositWorkspace ownerId={owner}/>:screen==='send'||screen==='withdraw'?<CustomerPayments view={screen}/>:<MobileWallet ownerId={owner} view={screen as 'home'|'wallet'|'activity'|'exchange'}/>;
+const view=screen==='transfer-receipt'?<main className="section-width app-main pro-payments"><section className="card"><h2>{params.get('lang')==='en'?'Review command':'راجع تفاصيل الطلب'}</h2><InternalTransferSuccess ar={params.get('lang')!=='en'} result={{state:'COMPLETED',id:'00000000-0000-0000-0000-000000000001',transactionId:'00000000-0000-0000-0000-000000000002'}} amount="1.000000" identity={{uid:'9876543217',displayName:'مستفيد تجريبي · Recipient fixture',username:'fixture',identityVerified:false}}/></section></main>:screen==='support' ||screen==='staff-support'?<SupportCenter staff={screen==='staff-support'}/>:screen==='settings'?<AccountSettings user={{id:owner,email:'visual-fixture@example.test',emailVerifiedAt:'2026-11-03'}}/>:screen==='deposit'?<DepositWorkspace ownerId={owner}/>:screen==='send'||screen==='withdraw'?<CustomerPayments view={screen}/>:<MobileWallet ownerId={owner} view={screen as 'home'|'wallet'|'activity'|'exchange'}/>;
 createRoot(document.getElementById('root')!).render(screen==='navigation'?<NavigationFixture/>:<AccountLanguageProvider initialLanguage={params.get('lang')==='en'?'en':'ar'}><ExchangeTicker/><FinancialStatusProvider userId={owner}>{view}</FinancialStatusProvider></AccountLanguageProvider>);

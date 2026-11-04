@@ -109,6 +109,15 @@ async function main(){
   const prepared=await commands.prepare(context,customerTransfer),approval=await approve(prepared.digest);
   await assert.rejects(()=>commands.transfer(context,{...customerTransfer,amount:'6'},approval.token),/PAYMENT_APPROVAL_REQUIRED/);
   const moved=await commands.transfer(context,customerTransfer,approval.token);
+  for(const owner of [alice,bob]){
+   const snapshot=await db.transaction(tx=>readFinancialSnapshot(tx,owner));
+   const entry=snapshot.activity.find(a=>a.id===moved.transactionId);assert(entry);
+   const profiles:{rows:{userId:string;uid:string}[]}=await pool.query('SELECT "userId",uid FROM "ReceivingIdentity" WHERE "userId"=ANY($1::uuid[])',[[alice,bob]]);
+   assert.equal(entry.senderUid,profiles.rows.find(p=>p.userId===alice)!.uid);
+   assert.equal(entry.recipientUid,profiles.rows.find(p=>p.userId===bob)!.uid);
+   assert(!('senderId' in entry));assert(!('receiverId' in entry));
+   if(owner===alice)assert.equal(snapshot.operations.find(o=>o.id===moved.id)?.recipientUid,entry.recipientUid);
+  }
   assert.equal((await commands.transfer(context,customerTransfer,approval.token)).id,moved.id);
   await assert.rejects(()=>commands.transfer(context,{...customerTransfer,amount:'6'},approval.token),/IDEMPOTENCY_CONFLICT/);
   await assert.rejects(()=>commands.prepare({...context,userId:bob},customerTransfer),/PASSKEY_SESSION_EXPIRED/);
