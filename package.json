@@ -99,7 +99,7 @@
     "test:account-continuity": "tsx tests/account-continuity.tsx",
     "test:canonical-domain": "tsx tests/canonical-domain.ts",
     "test:support": "node --conditions=react-server --import tsx tests/support-center.ts && node --conditions=react-server --import tsx tests/account-notifications.ts && node tests/notifications-copy.mjs",
-    "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts && node --conditions=react-server --import tsx tests/exchange-currencies-probe.ts && node --conditions=react-server --import tsx tests/exchange-method-checks.ts && node --conditions=react-server --import tsx tests/exchange-api-tls-check.ts",
+    "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts && node --conditions=react-server --import tsx tests/exchange-currencies-probe.ts && node --conditions=react-server --import tsx tests/exchange-method-checks.ts && node --conditions=react-server --import tsx tests/exchange-api-tls-check.ts && tsx tests/exchange-source-schedule.ts",
     "notifications:check": "node --conditions=react-server --import tsx scripts/check-account-notifications.ts"
   },
   "dependencies": {
