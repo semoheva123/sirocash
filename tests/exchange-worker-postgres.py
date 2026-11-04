@@ -51,6 +51,8 @@ class Tests(unittest.TestCase):
         with self.c.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute('SELECT attempts,snapshot,"lastIssues","lastOutcome","blockedUntil"::text AS legacy_pause,"collectorBlockedUntil"::text AS collector_pause FROM "ExchangeReference"');return cur.fetchone()
     def test_public_claim_and_preservation(self):
+        listener=psycopg.connect(DSN,autocommit=True);self.addCleanup(listener.close)
+        listener.execute('LISTEN siro_account_notifications')
         barrier=threading.Barrier(8);lock=threading.Lock();calls=[]
         class S(pub.Session):
             def get(self,*args,**kwargs):
@@ -61,6 +63,8 @@ class Tests(unittest.TestCase):
                 barrier.wait();return collect_public(DB(c),S(pub.Response()))
         with concurrent.futures.ThreadPoolExecutor(8) as pool:results=list(pool.map(run,range(8)))
         self.assertEqual(len(calls),1);self.assertEqual(sum(r['state']=='COLLECTED' for r in results),1)
+        events=list(listener.notifies(timeout=0.2,stop_after=1));self.assertEqual(len(events),1)
+        self.assertEqual(json.loads(events[0].payload),{'ownerId':'exchange-feed'})
         self.assertEqual(self.state()['attempts'],7,'Public reads must not consume/reset API budget')
         old=self.state()['snapshot'];self.assertEqual(old['market']['buy'],144.0)
         s=S(pub.Response());self.assertEqual(collect_public(DB(self.c,f.NOW+timedelta(minutes=4)),s)['state'],'SKIPPED');self.assertEqual(s.calls,0)
