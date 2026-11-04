@@ -1,5 +1,6 @@
 import {exchangeSnapshotSchema,type ExchangeSnapshot} from './exchange-reference';
-export const STATIC_EXCHANGE_URL='https://semoheva123.github.io/sirocash/rates.json';
+import {STATIC_EXCHANGE_URL} from './static-exchange-location';
+export {STATIC_EXCHANGE_URL} from './static-exchange-location';
 /** Public CDN only. Never use wallet endpoints, cookies, SSE, or financial credentials. */
 export function createStaticExchangeReader(o:{active:()=>boolean;data:(snapshot:ExchangeSnapshot)=>void;unavailable:()=>void;fetch?:typeof fetch;timer?:typeof setTimeout;clear?:typeof clearTimeout;now?:()=>number}){
  const fetcher=o.fetch??fetch,timer=o.timer??setTimeout,clear=o.clear??clearTimeout,now=o.now??Date.now;
