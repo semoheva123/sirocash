@@ -1,6 +1,11 @@
 name: Inspect public exchange webpage
-# One live comparison completed; never repeat automatically on PR edits.
-on: workflow_dispatch
+# One bounded public-page check for the explicitly authorized source-only repair.
+# No API key, paid API call, retry, proxy or challenge solver.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['arena/d2df4f44-sirocash']
+    paths: ['.github/workflows/exchange-web-inspection.yml']
 permissions:
   contents: read
 concurrency:
