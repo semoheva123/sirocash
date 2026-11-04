@@ -11,15 +11,22 @@ class Source implements FinancialEventSource{
 }
 async function main(){
  const sources:Source[]=[],states:string[]=[],snapshots:unknown[]=[],timers=new Map<number,{fn:()=>void;ms:number}>();let active=true,n=0;
- const stream=createFinancialStream<{enabled:boolean;userId:string;balance:string}>({open:()=>{const s=new Source();sources.push(s);return s},active:()=>active,expectedUserId:'alice',state:s=>states.push(s),data:d=>snapshots.push(d),setTimer:(fn,ms)=>{const id=++n;timers.set(id,{fn:()=>{timers.delete(id);fn()},ms});return id as unknown as ReturnType<typeof setTimeout>},clearTimer:id=>{timers.delete(id as unknown as number)}});
- stream.wake();const initial=sources[0];initial.emit('snapshot',{enabled:true,userId:'alice',balance:'1'});assert.equal(states.at(-1),'current');
+ const stream=createFinancialStream<{enabled:boolean;userId:string;balance:string}>({random:()=>0,open:()=>{const s=new Source();sources.push(s);return s},active:()=>active,expectedUserId:'alice',state:s=>states.push(s),data:d=>snapshots.push(d),setTimer:(fn,ms)=>{const id=++n;timers.set(id,{fn:()=>{timers.delete(id);fn()},ms});return id as unknown as ReturnType<typeof setTimeout>},clearTimer:id=>{timers.delete(id as unknown as number)}});
+ stream.wake();assert.deepEqual([...timers.values()].map(t=>t.ms),[45000]);const initial=sources[0];initial.emit('snapshot',{enabled:true,userId:'alice',balance:'1'});assert.equal(states.at(-1),'current');
  // Healthy transport timers only watch silence. Heartbeats never request snapshots or reopen.
  for(let i=0;i<100;i++)initial.emit('heartbeat');assert.equal(sources.length,1);assert.equal(snapshots.length,1);assert.deepEqual([...timers.values()].map(t=>t.ms),[45000]);
  initial.emit('snapshot',{enabled:true,userId:'alice',balance:'2'});assert.equal(snapshots.length,2);
  const fresh=stream.refresh();assert(initial.closed);initial.emit('snapshot',{enabled:true,userId:'alice',balance:'stale'});assert.equal(snapshots.length,2);sources.at(-1)!.emit('snapshot',{enabled:true,userId:'alice',balance:'3'});await fresh;
- sources.at(-1)!.emit('error');assert.equal(states.at(-1),'retrying');const retry=[...timers.values()].find(t=>t.ms===1000)!;retry.fn();assert.equal(sources.length,3);
+ sources.at(-1)!.emit('error');assert.equal(states.at(-1),'retrying');const retry=[...timers.values()].find(t=>t.ms===1000)!;const before=sources.length;for(let i=0;i<100;i++)stream.wake();assert.equal(sources.length,before);assert.equal([...timers.values()].filter(t=>t.ms===1000).length,1);retry.fn();assert.equal(sources.length,3);
  active=false;stream.pause();assert(sources.at(-1)!.closed);assert.equal(timers.size,0);assert.equal(states.at(-1),'paused');
  active=true;stream.wake();sources.at(-1)!.emit('snapshot',{enabled:true,userId:'bob',balance:'secret'});assert.equal(states.at(-1),'unauthenticated');assert.equal(snapshots.length,3);const count=sources.length;stream.wake();assert.equal(sources.length,count);stream.stop();
+
+ // Deterministic maximum jitter, capped retries, initial watchdog and server reconnect.
+ const jitterSources:Source[]=[],jitterTimers=new Map<number,{fn:()=>void;ms:number}>();let jn=0;
+ const jitter=createFinancialStream({random:()=>1,open:()=>{const s=new Source();jitterSources.push(s);return s},active:()=>true,data:()=>{},state:()=>{},setTimer:(fn,ms)=>{const id=++jn;jitterTimers.set(id,{fn:()=>{jitterTimers.delete(id);fn()},ms});return id as unknown as ReturnType<typeof setTimeout>},clearTimer:id=>{jitterTimers.delete(id as unknown as number)}});
+ jitter.wake();assert.equal([...jitterTimers.values()][0].ms,45000);[...jitterTimers.values()][0].fn();
+ for(const expected of [1250,2500,5000,10000,20000,30000,30000]){assert.equal(jitterTimers.size,1);const scheduled=[...jitterTimers.values()][0];assert.equal(scheduled.ms,expected);jitter.wake();assert.equal(jitterTimers.size,1);scheduled.fn();jitterSources.at(-1)!.emit('reconnect')}
+ jitter.stop();assert.equal(jitterTimers.size,0);
  let notify!:(payload:string)=>void,lost!:()=>void,connections=0,closes=0,a=0,b=0,disconnected=0;
  const hub=createFinancialChangeHub(async(n,l)=>{connections++;notify=n;lost=l;return async()=>{closes++}});
  const offA=await hub.subscribe('a',()=>a++,()=>disconnected++),offB=await hub.subscribe('b',()=>b++,()=>disconnected++);

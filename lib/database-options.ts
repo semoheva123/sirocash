@@ -8,7 +8,7 @@ export function databaseOptions(connectionString:string,production:boolean,ca?:s
  }
  return {
   connectionString:url.toString(),max:1,connectionTimeoutMillis:8000,idleTimeoutMillis:10000,
-  query_timeout:10000,
+  query_timeout:10000,statement_timeout:10000,idle_in_transaction_session_timeout:15000,keepAlive:true,
   ...(tls?{ssl:{rejectUnauthorized:true,...(ca?{ca:ca.replace(/\\n/g,'\n')}: {})}}:{}),
  };
 }

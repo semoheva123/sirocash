@@ -1,4 +1,6 @@
 import 'server-only';
+import {observeDatabasePool,createOwnerSnapshotReader} from './database-resilience';
+import {readFinancialSnapshot} from './financial-status';
 import {internalTransfersEnabled} from './internal-transfer-mode';
 import {financialReadTransactions} from './financial-read-transactions';
 import {financialConnectionString} from './financial-connection';
@@ -10,7 +12,7 @@ const cache=globalThis as unknown as {siroFinancialPool?:Pool};
 export function financialDatabase(scope:'outbox'|'internal-transfer'='outbox'):WalletDb{
  const connection=financialConnectionString(process.env);
  if(process.env.VERCEL_ENV!=='production'||(scope==='internal-transfer'?!internalTransfersEnabled():process.env.SIRO_OUTBOX_WORKER_ENABLED!=='true')||!connection)throw new Error('FINANCIAL_DATABASE_DISABLED');
- const pool=cache.siroFinancialPool??(cache.siroFinancialPool=new Pool({...databaseOptions(connection,true,process.env.DATABASE_SSL_CA),options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000 -c timezone=UTC'}));
+ const pool=cache.siroFinancialPool??(cache.siroFinancialPool=observeDatabasePool(new Pool({...databaseOptions(connection,true,process.env.DATABASE_SSL_CA),options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000 -c timezone=UTC'}),'financial-write'));
  return {transaction:async run=>{
   const c=await pool.connect();
   try{
@@ -26,6 +28,9 @@ export function financialReadDatabase():WalletDb{
  const connection=financialConnectionString(process.env);
  if(process.env.VERCEL_ENV!=='production'||!connection)throw Error('FINANCIAL_READ_DATABASE_DISABLED');
  const readCache=globalThis as unknown as {siroFinancialReadPool?:Pool};
- const pool=readCache.siroFinancialReadPool??(readCache.siroFinancialReadPool=new Pool({...databaseOptions(connection,true,process.env.DATABASE_SSL_CA),options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000 -c timezone=UTC'}));
+ const pool=readCache.siroFinancialReadPool??(readCache.siroFinancialReadPool=observeDatabasePool(new Pool({...databaseOptions(connection,true,process.env.DATABASE_SSL_CA),options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000 -c timezone=UTC'}),'financial-read'));
  return financialReadTransactions(pool);
 }
+
+const sharedRead=createOwnerSnapshotReader((owner:string)=>financialReadDatabase().transaction(tx=>readFinancialSnapshot(tx,owner)));
+export const sharedFinancialSnapshot=sharedRead;
