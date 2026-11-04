@@ -14,7 +14,7 @@ export function ExchangeTicker(){
    active:()=>document.visibilityState!=='hidden'&&navigator.onLine,
    open:()=>new EventSource('/api/exchange-rates/events'),
    data:body=>{const parsed=exchangeSnapshotSchema.safeParse(body.snapshot);setSnapshot(parsed.success?parsed.data:null);setLoading(false);setClock(Date.now())},
-   state:state=>{if(state==='unauthenticated'){setSnapshot(null);setLoading(false)}},
+   state:state=>{if(state==='retrying')setLoading(false);if(state==='unauthenticated'){setSnapshot(null);setLoading(false)}},
   });
   const changed=()=>{if(document.visibilityState==='hidden'||!navigator.onLine)stream.pause();else stream.wake()};
   document.addEventListener('visibilitychange',changed);window.addEventListener('online',changed);window.addEventListener('offline',changed);window.addEventListener('focus',changed);stream.wake();

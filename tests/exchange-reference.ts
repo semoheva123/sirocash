@@ -42,7 +42,7 @@ async function main(){
   await pg.exec(await readFile('prisma/migrations/20261104000000_exchange_tls_collector/migration.sql','utf8'));
   await pg.exec(await readFile('prisma/migrations/20261104160000_public_exchange_feed/migration.sql','utf8'));
   // Legacy API regression fixtures explicitly retain the old mode only here.
-  await pg.exec('ALTER TABLE "ExchangeReference" ALTER COLUMN "publicEnabled" SET DEFAULT false');
+  await pg.exec('ALTER TABLE "ExchangeReference" ALTER COLUMN "publicEnabled" SET DEFAULT false; UPDATE "ExchangeReference" SET "publicEnabled"=false');
   const db={query:async(sql:string,values?:unknown[])=>pg.query(sql,values)} as unknown as Pick<PoolClient,'query'>;
   let calls=0;
   const deps={db,key:'private-test-key',now:()=>now,fetch:(async(url,options)=>{

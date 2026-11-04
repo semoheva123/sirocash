@@ -1,14 +1,8 @@
 name: Inspect public exchange webpage
-# One bounded public-page check for the explicitly authorized source-only repair.
-# No API key, paid API call, retry, proxy or challenge solver.
-on:
-  workflow_dispatch:
-  push:
-    branches: ['arena/d2df4f44-sirocash']
-    paths: ['.github/workflows/exchange-web-inspection.yml']
+# One live comparison completed; never repeat automatically on PR edits.
+on: workflow_dispatch
 permissions:
   contents: read
-  actions: read
 concurrency:
   group: exchange-public-inspection-${{ github.ref }}
   cancel-in-progress: false
@@ -29,19 +23,7 @@ jobs:
         run: |
           python -m pip install --only-binary=:all: --require-hashes -r scripts/exchange-inspection-requirements.txt
       - name: One public-page TLS-profile request (no API key)
-        if: github.event_name == 'workflow_dispatch'
         run: python scripts/inspect-exchange-tls.py
-      - name: Reuse the single successful public response (no source request)
-        if: github.event_name == 'push'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: public-exchange-tls-inspection
-          run-id: '41854494181'
-          github-token: ${{ github.token }}
-          path: .cache/exchange-tls-inspection
-      - name: Validate public units and parser against saved real response
-        if: github.event_name == 'push'
-        run: python scripts/inspect-public-exchange-fields.py
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

@@ -6,6 +6,7 @@ ALTER TABLE public."ExchangeReference"
  ADD COLUMN "publicRequestId" uuid,
  ADD COLUMN "publicOutcome" text,
  ADD COLUMN "publicHttpStatus" integer;
+INSERT INTO public."ExchangeReference"(id) VALUES('sp-today') ON CONFLICT DO NOTHING;
 -- Stop the API path without resetting its budget, pause state or retained snapshot.
 UPDATE public."ExchangeReference" SET "collectorEnabled"=false WHERE id='sp-today';
 CREATE FUNCTION public.exchange_feed_changed() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
