@@ -30,12 +30,12 @@ for(const ar of [true,false]){
  for(const html of [summary,pending,deposits,withdrawals])assert(!/محجوز|دفتري|held|ledger|Funds reserved/i.test(html.replace(/<[^>]*>/g,'')));
 }
 // Regression: scoped history is outside .financial-history; long chain hashes must
-// have a compact display, an exact copy source and an expandable full reference.
+// wrap the full hash without obscuring the exact copy source, with a safe explorer.
 for(const ar of [true,false]){
  const hash='0x'+'a'.repeat(64);
  const html=renderToStaticMarkup(<FinancialRecords status={{...status,deposits:[{id:'long-hash',network:'BEP20',txId:hash,amountBaseUnits:'4990000000000000000',state:'CREDITED',createdAt:'2026-11-03T09:24:00Z'}]}} ar={ar} scope="deposits"/>);
- assert(html.includes('4.99 USDT'));assert(html.includes('financial-record-card'));assert(html.includes('0xaaaaaaaa…aaaaaaaa'));
- assert(html.includes(`<code dir="ltr">${hash}</code>`));assert(html.includes('<details'));assert(html.includes('2026-11-03T09:24:00.000Z'));
+ assert(html.includes('4.99 USDT'));assert(html.includes('financial-record-card'));assert(html.includes(hash));assert(!html.includes('0xaaaaaaaa…aaaaaaaa'));
+ assert(html.includes(`>${hash}</code>`));assert(html.includes(`https://bscscan.com/tx/${hash}`));assert(html.includes('2026-11-03T09:24:00.000Z'));
  const defaultReference=renderToStaticMarkup(<FinancialReference value={hash} ar={ar}/>);assert(defaultReference.includes(`>${hash}</code>`));assert(!defaultReference.includes('…'));
  const empty=renderToStaticMarkup(<FinancialRecords status={{enabled:true,userId:'alice'}} ar={ar} scope="deposits"/>);assert(empty.includes(ar?'لا توجد إيداعات بعد':'No deposits yet'));
 }

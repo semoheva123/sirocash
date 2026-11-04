@@ -35,7 +35,7 @@ async function persistence(){
  const pg=new PGlite();
  try{
   await pg.exec('CREATE TABLE "User" (id UUID PRIMARY KEY)');
-  for(const name of ['20261031030000_deposit_addresses','20261031040000_deposit_inbox','20261031060000_bep20_deposit_addresses','20261031080000_bep20_deposit_inbox'])await pg.exec(await readFile('prisma/migrations/'+name+'/migration.sql','utf8'));
+  for(const name of ['20261031030000_deposit_addresses','20261031040000_deposit_inbox','20261031060000_bep20_deposit_addresses','20261031080000_bep20_deposit_inbox','20261104210000_deposit_sender'])await pg.exec(await readFile('prisma/migrations/'+name+'/migration.sql','utf8'));
   const db:WalletDb={transaction:run=>pg.transaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows as Record<string,unknown>[]})}))};
   await assert.rejects(()=>stageTronDeposit(db,input),/UNASSIGNED_DEPOSIT_ADDRESS/);
   await pg.exec(`INSERT INTO "User" VALUES ('00000000-0000-0000-0000-000000000001');
@@ -43,6 +43,9 @@ async function persistence(){
   await pg.query(`INSERT INTO "UserDepositAddress" (id,"ownerId","vaultId",network,address,"derivationIndex") VALUES ('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','TRC20',$1,0)`,[to]);
   const staged=await stageTronDeposit(db,input);
   assert.equal(staged.state,'AWAITING_VALUATION');
+  assert.equal((await pg.query<{sender:string}>('SELECT sender FROM "ChainDepositInbox"')).rows[0].sender,verified.from);
+  await assert.rejects(()=>pg.query('UPDATE "ChainDepositInbox" SET sender=NULL'),/DEPOSIT_SENDER_IMMUTABLE/);
+  await assert.rejects(()=>pg.query('UPDATE "ChainDepositInbox" SET sender=$1',['forged']),/DEPOSIT_SENDER_IMMUTABLE/);
   assert.equal(staged.ownerId,'00000000-0000-0000-0000-000000000001');
   assert.deepEqual(await stageTronDeposit(db,input),staged);
   await assert.rejects(()=>stageTronDeposit(db,{...input,receipt:{...receipt,logs:[{...receipt.logs[0],data:(21000000n).toString(16).padStart(64,'0')}]}}),/DEPOSIT_EVIDENCE_CONFLICT/);

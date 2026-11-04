@@ -92,7 +92,7 @@
     "test:internal-transfers": "node --conditions=react-server --import tsx tests/internal-transfers.ts",
     "deposit:monitor-check": "node --conditions=react-server --import tsx scripts/check-deposit-monitor.ts",
     "deposit:monitor-reads": "node --conditions=react-server --import tsx scripts/probe-deposit-monitor-reads.ts",
-    "test:deposit-ui": "tsx tests/deposit-panel.tsx && tsx tests/withdrawal-page.tsx && tsx tests/mobile-wallet.tsx",
+    "test:deposit-ui": "tsx tests/deposit-panel.tsx && tsx tests/withdrawal-page.tsx && tsx tests/mobile-wallet.tsx && tsx tests/wallet-feedback.tsx",
     "deposit:prelaunch-audit": "node --conditions=react-server --import tsx scripts/audit-prelaunch-deposit-start.ts",
     "test:prelaunch-audit": "node --conditions=react-server --import tsx tests/prelaunch-tron-audit.ts",
     "test:receiving-identity": "tsx tests/receiving-uid.ts && node --conditions=react-server --import tsx tests/receiving-identity.ts && tsx tests/receiving-budget-window.ts",

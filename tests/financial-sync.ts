@@ -15,10 +15,16 @@ async function main(){
   CREATE TABLE "ReceivingIdentity"("userId" UUID PRIMARY KEY,uid TEXT,"displayName" TEXT,username TEXT);
   INSERT INTO "ReceivingIdentity" VALUES('00000000-0000-0000-0000-000000000001','1234567897','Recipient name','recipient'),('00000000-0000-0000-0000-000000000002','9876543217','Sender name','sender');
   UPDATE "Transaction" SET "senderId"='00000000-0000-0000-0000-000000000002',"receiverId"='00000000-0000-0000-0000-000000000001';`);
+  await pg.exec(`ALTER TABLE "ChainDepositInbox" ADD COLUMN sender TEXT;
+  UPDATE "ChainDepositInbox" SET sender='alice-source' WHERE id='da';
+  CREATE TABLE "UsdtWithdrawalQuote"("operationId" TEXT,"ownerId" UUID,network TEXT,recipient TEXT,"grossTokens" NUMERIC,"feeTokens" NUMERIC,"netTokens" NUMERIC);
+  ALTER TABLE "SignedWithdrawalOutbox" ADD COLUMN sender TEXT,ADD COLUMN recipient TEXT,ADD COLUMN "amountBaseUnits" NUMERIC;
+  UPDATE "SignedWithdrawalOutbox" SET sender='persisted-sender',recipient='persisted-recipient',"amountBaseUnits"=1000000;
+  INSERT INTO "UsdtWithdrawalQuote" VALUES ('wa','00000000-0000-0000-0000-000000000001','TRC20','persisted-recipient',6,5,1);`);
   const data=await readFinancialSnapshot({query:async(sql,params)=>({rows:(await pg.query(sql,params)).rows as Record<string,unknown>[]})},'00000000-0000-0000-0000-000000000001');
   assert.equal(data.balance.posted,'100');assert.equal(data.balance.held,'6');
-  assert.deepEqual(data.deposits.map(d=>d.txId),['alice-deposit']);assert.equal(data.deposits[0].state,'AWAITING_VALUATION');
-  assert.deepEqual(data.payouts.map(p=>p.txId),['alice-payout']);assert.equal(data.payouts[0].state,'BROADCAST_UNKNOWN');
+  assert.deepEqual(data.deposits.map(d=>d.txId),['alice-deposit']);assert.equal(data.deposits[0].state,'AWAITING_VALUATION');assert.equal(data.deposits[0].recipient,'alice-address');assert.equal(data.deposits[0].sender,'alice-source');
+  assert.deepEqual(data.payouts.map(p=>p.txId),['alice-payout']);assert.equal(data.payouts[0].state,'BROADCAST_UNKNOWN');assert.equal(data.payouts[0].sender,'persisted-sender');assert.equal(data.payouts[0].recipient,'persisted-recipient');assert.equal(data.operations[0].feeTokens,'5');
   assert.deepEqual(data.addresses.map(a=>a.address),['alice-address']);assert(!JSON.stringify(data).includes('SECRET'));
   assert.equal(data.activity[0].senderName,'Sender name');assert.equal(data.activity[0].recipientName,'Recipient name');assert.equal(data.activity[0].recipientUid,'1234567897');
   const other=await readFinancialSnapshot({query:async(sql,params)=>({rows:(await pg.query(sql,params)).rows as Record<string,unknown>[]})},'00000000-0000-0000-0000-000000000002');

@@ -9,6 +9,7 @@ async function main(){
  const pg=new PGlite();try{
   const schema=(await readFile('tests/financial-sync.ts','utf8')).match(/await pg\.exec\(`([^`]+)`\);/)![1].split('INSERT INTO')[0];await pg.exec(schema);
   await pg.exec(`ALTER TABLE "WalletOperation" ADD COLUMN "transactionId" TEXT; ALTER TABLE "Transaction" ADD COLUMN "senderId" UUID,ADD COLUMN "receiverId" UUID; CREATE TABLE "ReceivingIdentity"("userId" UUID PRIMARY KEY,uid TEXT,"displayName" TEXT,username TEXT);`);
+  await pg.exec(`ALTER TABLE "ChainDepositInbox" ADD COLUMN sender TEXT;CREATE TABLE "UsdtWithdrawalQuote"("operationId" TEXT,"ownerId" UUID,network TEXT,recipient TEXT,"grossTokens" NUMERIC,"feeTokens" NUMERIC,"netTokens" NUMERIC);ALTER TABLE "SignedWithdrawalOutbox" ADD COLUMN sender TEXT,ADD COLUMN recipient TEXT,ADD COLUMN "amountBaseUnits" NUMERIC;`);
   const owner='00000000-0000-0000-0000-000000000001',foreign='00000000-0000-0000-0000-000000000002';
   let released=0;const sqls:string[]=[];
   const safe={correct:true,read_only:true,rolsuper:false,rolbypassrls:false,rolcreaterole:false,rolcreatedb:false,app_member:false,password_access:false,auth_access:false};

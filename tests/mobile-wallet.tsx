@@ -29,7 +29,7 @@ const balance=()=>document.querySelector('.mobile-balance-value strong')!.textCo
 function Methods(){const [method,setMethod]=useState<DeliveryMethod>('internal');return <DeliveryMethods ar={false} value={method} onChange={setMethod}/>}
 async function main(){
  await act(async()=>root.render(<MobileWallet ownerId="owner"/>));
- assert(balance().includes('••••••'));assert(document.body.textContent!.includes('Welcome to Siro Cash'));
+ assert.equal(balance(),'— USD');assert(document.body.textContent!.includes('Welcome to Siro Cash'));
  const nav=document.querySelector('.pro-mobile-nav')!;
  assert.deepEqual(Array.from(nav.querySelectorAll('a')).map(a=>a.getAttribute('href')),['/dashboard','/wallet','/activity','/settings']);
  assert.equal(nav.querySelector('[aria-current="page"]')!.getAttribute('href'),'/dashboard');
@@ -39,6 +39,8 @@ async function main(){
  await act(async()=>Source.current.snapshot());
  assert(document.querySelector('.mobile-recent time'));assert(document.body.textContent!.includes('4.981691'));
  const eye=()=>document.querySelector<HTMLButtonElement>('.mobile-balance-value button')!;
+ assert.equal(balance(),'94.00 USD');assert.equal(eye().getAttribute('aria-label'),'Hide balance');
+ await act(async()=>eye().click());assert(balance().includes('••••••'));assert.equal(eye().getAttribute('aria-label'),'Show balance');
  await act(async()=>eye().click());assert.equal(balance(),'94.00 USD');
  await act(async()=>Source.current.snapshot('100','10'));assert.equal(balance(),'90.00 USD');
  await act(async()=>Source.current.snapshot('90','0'));assert.equal(balance(),'90.00 USD','Settlement does not double-debit');
@@ -59,6 +61,6 @@ async function main(){
   const html=renderToStaticMarkup(<AccountNavigation active="/settings" ar={ar}/>);const page=new JSDOM(html).window.document;
   assert.equal(page.querySelectorAll('.pro-mobile-nav a').length,4);assert.equal(page.querySelector('.pro-mobile-nav [aria-current="page"]')!.getAttribute('href'),'/settings');
  }
- console.log('Mobile wallet PASS: four destinations plus send-sheet action, exact quick-action order, default privacy, live available balance and release/settlement, owner isolation, real activity, disabled delivery/exchange rails, bilingual navigation, exact preview/server fee parity. Mock only; no funds.');
+ console.log('Mobile wallet PASS: four destinations plus send-sheet action, exact quick-action order, default visible balance and opt-in privacy, live available balance and release/settlement, owner isolation, real activity, disabled delivery/exchange rails, bilingual navigation, exact preview/server fee parity. Mock only; no funds.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

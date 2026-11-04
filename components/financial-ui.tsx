@@ -60,10 +60,12 @@ export function FinancialReference({
   value,
   ar,
   compact = false,
+  label,
 }: {
   value: string;
   ar: boolean;
   compact?: boolean;
+  label?: string;
 }) {
   const [copied, setCopied] = useState(false),
     [failed, setFailed] = useState(false);
@@ -75,8 +77,9 @@ export function FinancialReference({
       <button
         type="button"
         className="pro-icon-button"
-        aria-label={ar ? "نسخ المرجع" : "Copy reference"}
+        aria-label={label ? (ar ? "نسخ " : "Copy ")+label : ar ? "نسخ المرجع" : "Copy reference"}
         onClick={async () => {
+          setCopied(false);setFailed(false);
           try {
             await navigator.clipboard.writeText(value);
             setCopied(true);
@@ -119,6 +122,7 @@ export function FinancialDate({ value, ar }: { value: string; ar: boolean }) {
     <time dateTime={d.toISOString()}>
       {d.toLocaleString(ar ? "ar" : "en-GB", {
         timeZone: "UTC",
+        year: "numeric",
         day: "2-digit",
         month: "short",
         hour: "2-digit",

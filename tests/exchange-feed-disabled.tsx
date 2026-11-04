@@ -4,7 +4,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {exchangeFeedEnabled} from '../lib/exchange-feed-control';
 import {ExchangeTicker} from '../components/exchange-ticker';
 assert.equal(exchangeFeedEnabled,false);
-assert(renderToStaticMarkup(<ExchangeTicker/>).includes('exchange-ticker-static'));
+assert(renderToStaticMarkup(<ExchangeTicker/>).includes('exchange-ticker-animated'));
 const text=(path:string)=>readFileSync(path,'utf8');
 assert(text('app/(account)/layout.tsx').includes('<ExchangeTicker/>'));
 assert(!text('app/(account)/layout.tsx').includes('wakePublicExchange'));
