@@ -5,9 +5,10 @@ export function proxy(request:NextRequest){
  const nonce=btoa(crypto.randomUUID());
  const production=process.env.VERCEL_ENV==='production';
  const policy=["default-src 'self'",`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.NODE_ENV==='development'?" 'unsafe-eval'":''}`,"style-src 'self' 'unsafe-inline'","img-src 'self' data: blob:","font-src 'self'",`connect-src 'self' ${STATIC_EXCHANGE_URL}`, "worker-src 'self' blob:","object-src 'none'","base-uri 'none'","form-action 'self'",...(production?["frame-ancestors 'none'","upgrade-insecure-requests"]:[])].join('; ');
- const headers=new Headers(request.headers);headers.set('Content-Security-Policy',policy);
+ const headers=new Headers(request.headers);headers.set('x-siro-pathname',request.nextUrl.pathname);headers.set('Content-Security-Policy',policy);
  const response=NextResponse.next({request:{headers}});
  response.headers.set('Content-Security-Policy',policy);
+ if(!['/','/features','/install','/en','/support','/privacy','/terms','/trust','/robots.txt','/sitemap.xml'].includes(request.nextUrl.pathname))response.headers.set('X-Robots-Tag','noindex, nofollow, nosnippet');
  response.headers.set('Cache-Control','private, no-store');
  if(production){response.headers.set('X-Frame-Options','DENY');response.headers.set('Strict-Transport-Security','max-age=31536000')}
  return response;
