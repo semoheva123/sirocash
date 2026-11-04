@@ -27,9 +27,9 @@ async function main(){
   await pg.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES ($1,\'outbox@example.test\',now())',[owner]);
   await pg.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[pool,fees]);
   await creditConfirmedDeposit(db,{ownerId:owner,requestKey:'fixture:fund:001',amount:'200',providerReference:'fixture:funding:event1',settlementAccountId:pool});
-  await pg.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt") VALUES (\'fixture-session\',$1,now()+interval \'1 day\')',[owner]);
+  await pg.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt") VALUES (\'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\',$1,now()+interval \'1 day\')',[owner]);
   await pg.query('INSERT INTO "DurablePasskeyCredential" (id,"userId","rpId","publicKey",counter) VALUES (\'fixture-key\',$1,\'wallet.example.test\',\'AQID\',0)',[owner]);
-  const context={userId:owner,sessionHash:'fixture-session',rpID:'wallet.example.test',origin:'https://wallet.example.test'};
+  const context={userId:owner,sessionHash:'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',rpID:'wallet.example.test',origin:'https://wallet.example.test'};
   const approvalToken='ab'.repeat(32),approvalHash=createHash('sha256').update(approvalToken).digest('hex');
   // Public deterministic private-key fixtures only. NEVER FUND. Not platform operating keys.
   const evmKey='01'.padStart(64,'0'),tronKey='02'.padStart(64,'0');
@@ -41,7 +41,7 @@ async function main(){
    return quote;
   };
   const reserve=async(quote:Awaited<ReturnType<typeof makeQuote>>)=>{
-   await pg.query('INSERT INTO "DurablePaymentApproval" ("tokenHash","sessionHash","credentialId",digest,"expiresAt") VALUES ($1,\'fixture-session\',\'fixture-key\',$2,now()+interval \'1 minute\') ON CONFLICT ("tokenHash") DO UPDATE SET digest=EXCLUDED.digest,"consumedAt"=NULL',[approvalHash,quote.digest]);
+   await pg.query('INSERT INTO "DurablePaymentApproval" ("tokenHash","sessionHash","credentialId",digest,"expiresAt") VALUES ($1,\'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\',\'fixture-key\',$2,now()+interval \'1 minute\') ON CONFLICT ("tokenHash") DO UPDATE SET digest=EXCLUDED.digest,"consumedAt"=NULL',[approvalHash,quote.digest]);
    return reserveQuotedUsdtWithdrawal(db,context,{quoteId:quote.id,approvalToken});
   };
   const bep=await makeQuote('BEP20','payout:test:bep01');

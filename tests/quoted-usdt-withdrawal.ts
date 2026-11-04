@@ -13,9 +13,9 @@ async function main(){
   await pg.query('INSERT INTO "User" (id,email,"emailVerifiedAt") VALUES ($1,\'withdrawal@example.test\',now())',[owner]);
   await pg.query('INSERT INTO "LedgerAccount" (id,"accountType") VALUES ($1,\'MASTER_POOL\'),($2,\'MASTER_POOL\')',[pool,fees]);
   await creditConfirmedDeposit(db,{ownerId:owner,requestKey:'funding:fixture:001',amount:'200',providerReference:'fixture:deposit:001',settlementAccountId:pool});
-  await pg.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt") VALUES (\'fixture-session\',$1,now()+interval \'1 day\')',[owner]);
+  await pg.query('INSERT INTO "AuthSession" ("tokenHash","userId","expiresAt") VALUES (\'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\',$1,now()+interval \'1 day\')',[owner]);
   await pg.query('INSERT INTO "DurablePasskeyCredential" (id,"userId","rpId","publicKey",counter) VALUES (\'fixture-key\',$1,\'wallet.example.test\',\'AQID\',0)',[owner]);
-  const context={userId:owner,sessionHash:'fixture-session',rpID:'wallet.example.test',origin:'https://wallet.example.test'};
+  const context={userId:owner,sessionHash:'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',rpID:'wallet.example.test',origin:'https://wallet.example.test'};
   const command={ownerId:owner,requestKey:'withdraw:quoted:001',network:'TRC20' as const,recipient:'TQo4n7EhrucXUbcNGdkiqoHjyqgvVQxyuV',grossTokens:'100',rateUsdMicrosPerToken:980000n,rateReference:'approved:fixture:rate001',expiresAt:new Date(Date.now()+90000).toISOString(),settlementAccountId:pool,feeAccountId:fees};
   const quote=await createUsdtWithdrawalQuote(db,command);
   assert.equal(quote.payload.fee,'5.000000');assert.equal(quote.payload.netAmount,'95.000000');assert.equal(quote.grossUsd,'98.000000');assert.equal(quote.feeUsd,'4.900000');assert.equal(quote.netUsd,'93.100000');
@@ -24,7 +24,7 @@ async function main(){
   await assert.rejects(()=>createUsdtWithdrawalQuote(db,{...command,requestKey:'quote:expired',expiresAt:new Date(Date.now()-1000).toISOString()}),/EXPIRY_INVALID/);
   await assert.rejects(()=>pg.query('UPDATE "UsdtWithdrawalQuote" SET "feeTokens"=6,"netTokens"=94 WHERE id=$1',[quote.id]),/IMMUTABLE_WITHDRAWAL_QUOTE/);
   const token='ab'.repeat(32),tokenHash=createHash('sha256').update(token).digest('hex');
-  const approve=async(digest=quote.digest)=>pg.query('INSERT INTO "DurablePaymentApproval" ("tokenHash","sessionHash","credentialId",digest,"expiresAt") VALUES ($1,\'fixture-session\',\'fixture-key\',$2,now()+interval \'1 minute\') ON CONFLICT ("tokenHash") DO UPDATE SET digest=EXCLUDED.digest,"consumedAt"=NULL',[tokenHash,digest]);
+  const approve=async(digest=quote.digest)=>pg.query('INSERT INTO "DurablePaymentApproval" ("tokenHash","sessionHash","credentialId",digest,"expiresAt") VALUES ($1,\'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\',\'fixture-key\',$2,now()+interval \'1 minute\') ON CONFLICT ("tokenHash") DO UPDATE SET digest=EXCLUDED.digest,"consumedAt"=NULL',[tokenHash,digest]);
   await approve('ff'.repeat(32));await assert.rejects(()=>reserveQuotedUsdtWithdrawal(db,context,{quoteId:quote.id,approvalToken:token}),/APPROVAL_REQUIRED/);
   await approve();
   const broken:WalletDb={transaction:run=>db.transaction(tx=>run({query:async(sql,params)=>{if(sql.startsWith('UPDATE "UsdtWithdrawalQuote"'))throw Error('injected reservation failure');return tx.query(sql,params)}}))};
