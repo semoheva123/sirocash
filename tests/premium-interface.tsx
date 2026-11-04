@@ -34,7 +34,7 @@ async function main(){
  assert(payments.includes("status?.enabled===true"));
  assert(payments.includes("status.capabilities?.withdrawals===true"));
  assert(payments.includes("sync==='current'"));
- assert(payments.includes('if(!prepared||!canExecute)return'));
+ assert(payments.includes('if(actionLock.current||submitted||!prepared||!canExecute)return'));
  assert(payments.includes('href="/dashboard"'));
  console.log('Premium interface PASS: bilingual grouped navigation, truthful resource footer, availability escape routes, release transparency and retained financial execution/liveness gates.');
 }

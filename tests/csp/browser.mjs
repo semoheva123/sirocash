@@ -32,6 +32,22 @@ try{
   }
   assert.equal(allowedReads,path==='/before'?0:1);assert.deepEqual(errors,[]);await page.close();
  }
+ for(const width of [390,1280])for(const language of ['ltr','rtl']){
+  const page=await browser.newPage({viewport:{width,height:800},reducedMotion:'no-preference'});
+  await page.goto(`http://127.0.0.1:${port}/motion-${language}`);
+  const track=page.locator('.exchange-ticker-track');
+  assert.equal(await track.evaluate(e=>getComputedStyle(e).animationName),'exchange-news');
+  const transform=await track.evaluate(e=>getComputedStyle(e).transform);
+  await page.waitForFunction(previous=>getComputedStyle(document.querySelector('.exchange-ticker-track')).transform!==previous,transform);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  assert.equal(await page.locator('.exchange-ticker-group[aria-hidden="true"]').count(),1);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await track.evaluate(e=>getComputedStyle(e).animationName),'none');
+  assert.equal(await page.locator('.exchange-ticker-window').evaluate(e=>getComputedStyle(e).overflowX),'auto');
+  assert.equal(await page.locator('.exchange-ticker-group[aria-hidden="true"]').isVisible(),false);
+  await page.close();
+ }
+ console.log('Ticker browser PASS: actual component/CSS animates at phone/desktop sizes in RTL/LTR, no page overflow, reduced motion disables animation and keeps prices scrollable. Synthetic only.');
  console.log('Production CSP browser PASS: old policy reproduces blocked prices; real fixed proxy policy + actual reader loads only the exact public JSON without cookies/referrer. Sibling paths/external hosts blocked; nonce scripts, self fetch and local interaction preserved. Synthetic response, no production auth or financial I/O.');
 }finally{
  await browser?.close();if(server.exitCode===null&&server.signalCode===null){const exit=once(server,'exit');server.kill('SIGTERM');await exit;}
