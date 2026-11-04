@@ -1,10 +1,12 @@
 # Independent static prices and responsiveness audit
 
-## Release status — do not misread this as activation
+## Release/activation gates
 
-Implementation is prepared. GitHub Pages is not enabled/visible through the current integration: repository Pages GET returned 404 and create returned 403 `Resource not accessible by integration`. The user selected enabling **Settings → Pages → Build and deployment → Source: GitHub Actions** themselves. That administrative step and a successful publication/CORS check are outstanding. The account layout intentionally still does **not** mount the ticker. Legacy wallet exchange routes, server wake and collector remain disabled. Do not re-enable them to work around this blocker.
+GitHub Pages was initially blocked (GET404/create403 through the integration). The user enabled **Settings → Pages → Source: GitHub Actions**; the repository now reports build_type=workflow at https://semoheva123.github.io/sirocash/.
 
-After Pages is configured: merge the prepared workflow; verify `Isolated static exchange prices` succeeded, that the public file exists, its source/unit/timestamps are valid, and a real browser can fetch it cross-origin without cookies. Only then mount `ExchangeTicker` in the account layout. Do not declare the feature active before those checks.
+The first independent collection/publication **41898300158** succeeded at commit d3464b15c0b6903fa72c7e0afac91132e5a1aa04. No wallet database/key/source API key was supplied. The follow-up activation change mounts the independent static ticker only, and has an activation-only public-file/CORS proof for both platform origins. Merge requires that proof plus normal CI. Ordinary future wallet builds do **not** depend on source/CDN availability. Production release identifiers/status are recorded in the PR audit, not inferred from a successful Pages deployment.
+
+Legacy wallet exchange routes, server wake and DB-backed collector remain disabled. Do not re-enable those paths to recover this feature. The initial preparatory implementation deliberately kept the ticker unmounted until separate publication succeeded.
 
 ## Isolation implemented
 
