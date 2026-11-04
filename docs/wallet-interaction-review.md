@@ -65,3 +65,12 @@ Implemented in the account UI (not a financial activation):
 Verified locally: complete `npm test` and production `npm run build` passed; restricted-role full-migration fixture covers tied-date pagination, 35 withdrawals behind 40 newer transfers, owner isolation, pending pagination, literal search and date filters. Client fixtures cover single-attempt deadlines including a stuck body, pre-abort, 204, lazy settings, copy reset and late old-owner responses. Further follow-up edits are rerun before release.
 
 Limits: no real-device freeze acceptance has been demonstrated. No real financial operation, provider request, migration, historical sender backfill, price-source activation change, custody/resource gate change or deferred-service activation was performed. Hardware passkey management, KYC, exchange, ShamCash and mobile top-up remain unavailable where operationally disabled; no fake completion or verification is supplied. Independent price workflow scheduling freshness remains unproved by these tests.
+
+## Account presentation refinement — 2026-11-05
+
+- Home now uses a responsive two-column account overview on wide desktops and a single-column mobile layout, with consistent charcoal surfaces, typographic balance hierarchy and a quieter recent-activity panel.
+- Header quick navigation is usable on mobile as well as the sidebar. Only the original search instance owns the keyboard shortcut, preventing duplicate dialogs; focus restoration and Escape remain in DialogFrame.
+- Account service availability is informational, derived exclusively from an owner-matching current snapshot's explicit capabilities. Stale, missing, foreign and absent capability values remain unknown. These labels never authorize execution.
+- Direct links to real session/security, installation/device-notification and support tools; dormant wallet service cards explicitly say Soon. No fictional chart/market movement, balance, verified badge or count.
+- Shared focus visibility, safe-area navigation, readable form typography, 320/360px layouts and reduced motion; no new polling, provider, migration, authorization or financial endpoint calls. No hardware/GPU animation or backdrop-filter effects.
+- Local complete `npm test` and production `npm run build` passed. Added owner/current/capability presentation tests and actual mobile/keyboard quick-access interaction tests. Physical device acceptance and broad claims of global-wallet equivalence remain unproved.

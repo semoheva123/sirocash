@@ -17,6 +17,7 @@ import './mobile-wallet.css';
 import './support-center.css';
 import './exchange-ticker.css';
 import './wallet-feedback.css';
+import './wallet-premium.css';
 export const metadata: Metadata = {
  metadataBase:new URL(siteOrigin),title:'SiroCash | سيرو كاش — محفظة رقمية بالعربية والإنجليزية',
  description:'تعرّف إلى محفظة سيرو كاش: إدارة الحساب وسجل العمليات وحماية الجلسات وتطبيق ويب قابل للتثبيت على أندرويد وآيفون. راجع حالة الخدمات وحدود النسخة الحالية.',
