@@ -78,7 +78,7 @@ jobs:
               summary['mode'] = 'public-page-v1' if result.get('mode') == 'public-page-v1' else 'UNCONFIRMED'
               eligibility = result.get('eligibility')
               if isinstance(eligibility,dict):
-                  summary['eligibility'] = {k:v for k,v in eligibility.items() if k in ('rows','enabled','unblocked','due','snapshotAvailable') and type(v) in (int,bool)}
+                  summary['eligibility'] = {k:v for k,v in eligibility.items() if k in ('rows','enabled','unblocked','due','snapshotAvailable','appRole') and type(v) in (int,bool)}
               print('::notice title=Exchange collection::' + json.dumps(summary))
               if summary['mode'] != 'public-page-v1': sys.exit(1)
               if os.environ.get('BOOTSTRAP','false').lower() == 'true' and summary['state'] == 'SKIPPED' and not (eligibility or {}).get('snapshotAvailable'): sys.exit(1)

@@ -16,6 +16,13 @@ async function main(){
    EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='exchange_public_snapshot' AND tgenabled='O' AND NOT tgisinternal) AS installed,
    NOT has_function_privilege('sirocash_app','public.exchange_feed_changed()','EXECUTE') AND NOT has_function_privilege('anon','public.exchange_feed_changed()','EXECUTE') AS private`);
   await c.query('SELECT "publicEnabled","publicNextAttemptAt","publicBlockedUntil","publicNextWakeAt","publicRequestId","publicOutcome","publicHttpStatus" FROM "ExchangeReference" WHERE false');
+  const {rows:[state]}=await c.query(`SELECT count(*)::int AS rows,
+   coalesce(bool_or("publicEnabled"),false) AS enabled,
+   coalesce(bool_or("publicBlockedUntil"<=now()),false) AS unblocked,
+   coalesce(bool_or("publicNextAttemptAt"<=now()),false) AS due,
+   coalesce(bool_or(snapshot->>'observation'='public-page'),false) AS available
+   FROM public."ExchangeReference" WHERE id='sp-today'`);
+  console.log('Public feed app-role readiness: '+JSON.stringify(state));
   if(!feed?.installed||!feed.private)throw Error('PUBLIC_FEED_SCHEMA_UNSAFE');
   if(!schema?.triggers||!schema.rls||!schema.private)throw Error('NOTIFICATION_SCHEMA_UNSAFE');
   await c.query('SELECT n.id,n.kind,n.reference,n.staff,n."createdAt",r."readAt" FROM public."AccountNotification" n LEFT JOIN public."AccountNotificationRead" r ON r."notificationId"=n.id WHERE false');

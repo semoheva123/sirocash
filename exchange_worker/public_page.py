@@ -84,9 +84,10 @@ def collect_public(db,session):
           coalesce(bool_or("publicEnabled"),false),
           coalesce(bool_or("publicBlockedUntil"<=now()),false),
           coalesce(bool_or("publicNextAttemptAt"<=now()),false),
-          coalesce(bool_or(snapshot->>'observation'='public-page'),false)
+          coalesce(bool_or(snapshot->>'observation'='public-page'),false),
+          current_user='sirocash_app'
           FROM public."ExchangeReference" WHERE id='sp-today'""").fetchone()
-        return dict(state='SKIPPED',reason='CLAIM_DENIED',eligibility=dict(zip(('rows','enabled','unblocked','due','snapshotAvailable'),flags)))
+        return dict(state='SKIPPED',reason='CLAIM_DENIED',eligibility=dict(zip(('rows','enabled','unblocked','due','snapshotAvailable','appRole'),flags)))
     now=row[0].astimezone(timezone.utc)
     snapshot,outcome,status=public_request(session,now)
     # Pause challenge/schema failures for operator inspection. Transient failures
