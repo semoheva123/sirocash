@@ -16,5 +16,13 @@ BEGIN
 END;
 $$;
 REVOKE ALL ON FUNCTION public.financial_deposit_sender_immutable() FROM PUBLIC;
+-- Hosted default function privileges may name roles directly, not only PUBLIC.
+DO $$ DECLARE role_name TEXT; BEGIN
+ FOREACH role_name IN ARRAY ARRAY['anon','authenticated','sirocash_app','sirocash_financial_worker','service_role'] LOOP
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN
+   EXECUTE format('REVOKE ALL ON FUNCTION public.financial_deposit_sender_immutable() FROM %I',role_name);
+  END IF;
+ END LOOP;
+END $$;
 CREATE TRIGGER financial_deposit_sender_immutable BEFORE UPDATE OF sender ON public."ChainDepositInbox"
  FOR EACH ROW EXECUTE FUNCTION public.financial_deposit_sender_immutable();
