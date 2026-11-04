@@ -1,4 +1,5 @@
 'use client';
+import {clientRequest} from '@/lib/client-request';
 import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {QRCodeSVG} from 'qrcode.react';
@@ -18,7 +19,7 @@ export function DepositPanel({ar,userId}:{ar:boolean;userId:string}){
  async function generate(){
   clear();const id=generation.current,controller=new AbortController();request.current=controller;setBusy(true);
   try{
-   const response=await fetch('/api/deposit/generate-address',{method:'POST',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({chain:network,asset:'USDT'})});
+   const response=await clientRequest('/api/deposit/generate-address',{method:'POST',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({chain:network,asset:'USDT'})});
    const data=await response.json();
    if(!response.ok||data.chain!==network||data.asset!=='USDT'||data.demo!==false||typeof data.address!=='string'||!(network==='TRC20'?/^T[1-9A-HJ-NP-Za-km-z]{33}$/:/^0x[0-9a-fA-F]{40}$/).test(data.address))throw Error('ADDRESS_UNAVAILABLE');
    if(id===generation.current)setResult(data);

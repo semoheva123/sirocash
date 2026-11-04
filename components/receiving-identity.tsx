@@ -1,4 +1,5 @@
 "use client";
+import {clientRequest} from '@/lib/client-request';
 import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {useFinancialStatus} from "./use-financial-status";
@@ -22,7 +23,7 @@ function useReceivingIdentitySource(ownerId: string, enabled=true, initialIdenti
     const controller = new AbortController();
     let active = true;
     setError(false);
-    fetch("/api/account/receiving-identity", {
+    clientRequest("/api/account/receiving-identity", {
       cache: "no-store",
       signal: controller.signal,
     })
@@ -167,7 +168,7 @@ export function ReceivingIdentityPanel({
     setBusy(true);
     setNotice("");
     try {
-      const response = await fetch("/api/account/receiving-identity", {
+      const response = await clientRequest("/api/account/receiving-identity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

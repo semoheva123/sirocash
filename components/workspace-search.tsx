@@ -4,6 +4,12 @@ import Link from 'next/link';
 import {Search,ArrowUpRight,LayoutDashboard,ArrowDownLeft,ArrowLeftRight,Smartphone,Settings2,LifeBuoy} from 'lucide-react';
 import {DialogFrame} from './dialog-frame';
 const destinations=[
+ {href:'/wallet',en:'Wallet',ar:'المحفظة',keywords:'wallet محفظة',icon:LayoutDashboard},
+ {href:'/activity',en:'Activity',ar:'النشاط',keywords:'history transactions سجل معاملات',icon:LayoutDashboard},
+ {href:'/send',en:'Send money',ar:'إرسال الأموال',keywords:'send transfer إرسال تحويل',icon:ArrowUpRight},
+ {href:'/notifications',en:'Notifications',ar:'الإشعارات',keywords:'notifications إشعارات',icon:LifeBuoy},
+ {href:'/settings/support',en:'Contact support',ar:'تواصل مع الدعم',keywords:'ticket support طلب دعم',icon:LifeBuoy},
+ {href:'/exchange',en:'Exchange · soon',ar:'التبديل · قريبًا',keywords:'exchange تبديل',icon:ArrowLeftRight},
  {href:'/dashboard',en:'Wallet overview',ar:'ملخص المحفظة',keywords:'overview balance رصيد نظرة عامة',icon:LayoutDashboard},
  {href:'/deposit',en:'Digital asset deposit',ar:'إيداع العملات الرقمية',keywords:'deposit USDT USDC crypto إيداع ايداع عملات',icon:ArrowDownLeft},
  {href:'/withdraw',en:'Withdraw funds',ar:'سحب الأموال',keywords:'withdraw سحب اموال',icon:ArrowUpRight},

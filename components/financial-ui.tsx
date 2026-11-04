@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect,useState } from "react";
 import { Check, Copy, Inbox, ShieldCheck } from "lucide-react";
 const states: Record<string, [string, string, string]> = {
   COMPLETED: ["مكتملة", "Completed", "success"],
@@ -69,6 +69,7 @@ export function FinancialReference({
 }) {
   const [copied, setCopied] = useState(false),
     [failed, setFailed] = useState(false);
+  useEffect(()=>{setCopied(false);setFailed(false)},[value]);
   return (
     <span className="pro-reference">
       <code dir="ltr" title={value}>

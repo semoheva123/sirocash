@@ -1,4 +1,5 @@
 'use client';
+import {clientRequest} from '@/lib/client-request';
 import Link from 'next/link';
 import {useNotifications} from './account-notifications';
 import {useEffect,useRef,useState,useCallback} from 'react';
@@ -17,7 +18,7 @@ export function SupportCenter({staff=false}:{staff?:boolean}){
  const [loading,setLoading]=useState(true),[threadLoading,setThreadLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[sent,setSent]=useState(false),[pending,setPending]=useState(false);
  const active=useRef<string|null>(null),epoch=useRef(0),mounted=useRef(true),lock=useRef(false),key=useRef<string|null>(null);
  const api=useCallback(async(path:string,init?:RequestInit)=>{
-  const response=await fetch('/api/support'+path+(path.includes('?')?'&':'?')+(staff?'staff=1':'staff=0'),{cache:'no-store',...init});
+  const response=await clientRequest('/api/support'+path+(path.includes('?')?'&':'?')+(staff?'staff=1':'staff=0'),{cache:'no-store',...init});
   if(response.status===401){window.location.replace('/auth?mode=login');throw Error()}
   if(!response.ok)throw Error(response.status===429?'LIMIT':response.status===409?'CONFLICT':response.status===400?'INVALID':'UNAVAILABLE');
   return response.json();
@@ -42,7 +43,9 @@ export function SupportCenter({staff=false}:{staff?:boolean}){
   void (async()=>{if(active.current)await open(active.current);await load()})().catch(()=>{});
  },[notifications?.inbox,pending,load]);
  useEffect(()=>{
-  const id=new URLSearchParams(window.location.search).get('ticket');
+  const params=new URLSearchParams(window.location.search),reference=params.get('reference');
+  if(reference&&/^[0-9a-f-]{36}$/i.test(reference)){setCompose(true);setSubject(t('استفسار عن معاملة','Transaction inquiry'));setBody(t('مرجع المعاملة: ','Transaction reference: ')+reference+'\n');}
+  const id=params.get('ticket');
   if(id&&/^[0-9a-f-]{36}$/i.test(id))void open(id);
  },[]);
  async function submit(event:React.FormEvent){
