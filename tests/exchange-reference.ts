@@ -1,3 +1,4 @@
+import {exchangeFeedEnabled} from '../lib/exchange-feed-control';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
@@ -33,7 +34,7 @@ async function main(){
   {...raw,data:{...raw.data,updated_at:new Date(now.getTime()+3600000).toISOString()}},
  ])assert.throws(()=>parseExchangeOverview(change,now));
  const unauthorized=await GET(new Request('https://wallet.test/api/exchange-rates'));
- assert.equal(unauthorized.status,401);assert.equal(unauthorized.headers.get('cache-control'),'no-store');
+ assert.equal(unauthorized.status,exchangeFeedEnabled?401:204);assert.equal(unauthorized.headers.get('cache-control'),'no-store');
  const pg=new PGlite();
  try{
   await pg.exec('CREATE ROLE sirocash_app;CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE sirocash_financial_worker;');

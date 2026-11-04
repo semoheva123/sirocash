@@ -1,3 +1,4 @@
+import {exchangeFeedEnabled} from '@/lib/exchange-feed-control';
 import {wakePublicExchange} from '@/lib/exchange-public-wake';
 import {NextResponse} from 'next/server';
 import {currentUser} from '@/lib/email-auth';
@@ -7,6 +8,7 @@ import {securityHeaders} from '@/lib/security-http';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export async function GET(request:Request){
+ if(!exchangeFeedEnabled)return new Response(null,{status:204,headers:{'Cache-Control':'no-store'}});
  try{
   const user=await currentUser(request);
   if(!user)return NextResponse.json({error:'SIGN_IN_REQUIRED'},{status:401,headers:securityHeaders});
