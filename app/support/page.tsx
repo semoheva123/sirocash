@@ -1,6 +1,7 @@
+import {siteOrigin} from '@/lib/public-seo';
 import Link from 'next/link';
 import {TrustDocument} from '@/components/trust-document';
-export const metadata={title:'المساعدة والأمان | SiroCash'};
+export const metadata={alternates:{canonical:siteOrigin+'/support'},robots:{index:true,follow:true},title:'المساعدة والأمان | SiroCash'};
 export default function Page(){
  const email=process.env.SUPPORT_EMAIL;
  const valid=email&&/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)&&email.length<255;

@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "npm run deposit:prelaunch-audit && node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:monitor-reads && npm run deposit:probe && npm run receiving:readiness && npm run notifications:check && npm run passkey:check && next build --webpack",
+    "build": "npm run deposit:prelaunch-audit && node --conditions=react-server --import tsx scripts/probe-tronrental-live.ts && node scripts/probe-catfee-live.mjs && npm run db:verify && npm run db:financial-check && npm run financial:events-check && npm run financial:read-check && npm run identity:deployment-check && npm run financial:readiness && npm run internal:readiness && npm run deposit:monitor-check && npm run deposit:monitor-reads && npm run deposit:probe && npm run receiving:readiness && npm run notifications:check && npm run passkey:check && npm run push:check && next build --webpack",
     "start": "next start -H 0.0.0.0",
     "lint": "tsc --noEmit",
     "passkey:check": "node --conditions=react-server --import tsx scripts/check-passkey-readiness.ts",
     "db:generate": "prisma generate",
     "test:api": "node tests/api.mjs",
     "test:ledger": "node tests/ledger.mjs",
-    "test": "npm run lint && npm run test:ledger && npm run test:wallet && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:database-resilience && npm run test:email-template && npm run test:account && npm run test:routing && npm run test:settings && npm run test:password-change && npm run test:design && npm run test:account-security && npm run test:reconciliation && npm run test:atelier && npm run test:modern && npm run test:identity && npm run test:energy && npm run test:treasury && npm run test:addresses && npm run test:withdrawal-fees && npm run test:tron-deposits && npm run test:tron-funding && npm run test:treasury-addresses && npm run test:signer && npm run test:withdrawal-limits && npm run test:catfee && npm run test:deposit-setup && npm run test:hd-signer && npm run test:sweep-outbox && npm run test:bep20-deposits && npm run test:bep20-observer && npm run test:bep20-rpc && npm run test:durable-passkey && npm run test:deposit-valuation && npm run test:quoted-withdrawal && npm run test:payout-outbox && npm run test:security-boundaries && npm run test:http-hardening && npm run test:financial-isolation && npm run test:custody-probe && npm run test:energy-purchase && npm run test:chain-network && npm run test:network-readiness && npm run test:financial-worker && npm run test:catfee-orders && npm run test:energy-delivery && npm run test:financial-worker-role && npm run test:financial-worker-route && npm run test:autonomous-financial && npm run test:financial-readiness && npm run test:customer-financial && npm run test:deposit-discovery && npm run test:financial-connection && npm run test:financial-sync && npm run test:financial-stream && npm run test:tronrental && npm run test:internal-transfers && npm run test:deposit-ui && npm run test:prelaunch-audit && npm run test:receiving-identity && npm run test:account-continuity && npm run test:canonical-domain && npm run test:support && npm run test:exchange-reference",
+    "test": "npm run lint && npm run test:ledger && npm run test:wallet && npm run test:email && npm run test:password && npm run test:copy && npm run test:crypto && npm run test:database && npm run test:database-options && npm run test:database-resilience && npm run test:email-template && npm run test:account && npm run test:routing && npm run test:settings && npm run test:password-change && npm run test:design && npm run test:account-security && npm run test:reconciliation && npm run test:atelier && npm run test:modern && npm run test:identity && npm run test:energy && npm run test:treasury && npm run test:addresses && npm run test:withdrawal-fees && npm run test:tron-deposits && npm run test:tron-funding && npm run test:treasury-addresses && npm run test:signer && npm run test:withdrawal-limits && npm run test:catfee && npm run test:deposit-setup && npm run test:hd-signer && npm run test:sweep-outbox && npm run test:bep20-deposits && npm run test:bep20-observer && npm run test:bep20-rpc && npm run test:durable-passkey && npm run test:deposit-valuation && npm run test:quoted-withdrawal && npm run test:payout-outbox && npm run test:security-boundaries && npm run test:http-hardening && npm run test:financial-isolation && npm run test:custody-probe && npm run test:energy-purchase && npm run test:chain-network && npm run test:network-readiness && npm run test:financial-worker && npm run test:catfee-orders && npm run test:energy-delivery && npm run test:financial-worker-role && npm run test:financial-worker-route && npm run test:autonomous-financial && npm run test:financial-readiness && npm run test:customer-financial && npm run test:deposit-discovery && npm run test:financial-connection && npm run test:financial-sync && npm run test:financial-stream && npm run test:tronrental && npm run test:internal-transfers && npm run test:deposit-ui && npm run test:prelaunch-audit && npm run test:receiving-identity && npm run test:account-continuity && npm run test:canonical-domain && npm run test:support && npm run test:exchange-reference && npm run test:pwa",
     "test:email": "node tests/email-schema.mjs",
     "test:password": "node --experimental-strip-types tests/password.mjs",
     "test:copy": "node tests/arabic-copy.mjs",
@@ -103,7 +103,9 @@
     "test:exchange-reference": "tsx tests/exchange-ticker.tsx && node --conditions=react-server --import tsx tests/exchange-reference.ts && node --conditions=react-server --import tsx tests/exchange-currencies-probe.ts && node --conditions=react-server --import tsx tests/exchange-method-checks.ts && node --conditions=react-server --import tsx tests/exchange-api-tls-check.ts && tsx tests/exchange-source-schedule.ts && tsx tests/exchange-feed-disabled.tsx && node --conditions=react-server --import tsx tests/exchange-feed-disabled-server.ts && tsx tests/static-exchange-client.ts",
     "notifications:check": "node --conditions=react-server --import tsx scripts/check-account-notifications.ts",
     "test:database-resilience": "tsx tests/database-resilience.ts",
-    "test:csp-browser": "node tests/csp/browser.mjs"
+    "test:csp-browser": "node tests/csp/browser.mjs",
+    "test:pwa": "node --conditions=react-server --import tsx tests/web-push.ts && tsx tests/pwa-seo.ts && tsx tests/pwa-client.tsx",
+    "push:check": "node --conditions=react-server --import tsx scripts/check-web-push.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
@@ -130,6 +132,7 @@
     "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0",
     "tronweb": "^6.5.1",
+    "web-push": "^3.6.7",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -139,6 +142,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.20",
     "jsdom": "^30.1.3",
     "miniflare": "^4.20260730.0",

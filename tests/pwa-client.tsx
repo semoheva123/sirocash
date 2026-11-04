@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {JSDOM} from 'jsdom';
+import {PushSettings} from '../components/push-settings';
+import {AppInstall} from '../components/app-install';
+const dom=new JSDOM('<div id="root"></div>',{url:'https://www.sirocash.online/settings',pretendToBeVisual:true});Object.assign(globalThis,{window:dom.window,document:dom.window.document,IS_REACT_ACT_ENVIRONMENT:true});Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});Object.defineProperty(window,'isSecureContext',{value:true});Object.assign(window,{PushManager:class{},matchMedia:()=>({matches:false})});Object.assign(globalThis,{matchMedia:window.matchMedia});
+let requested=0,subscribed=0,unsubscribed=0,permission='granted',current:any=null;
+const permissionApi={requestPermission:async()=>{requested++;return permission}};Object.assign(globalThis,{Notification:permissionApi});Object.assign(window,{Notification:permissionApi});
+const registration={pushManager:{getSubscription:async()=>current,subscribe:async()=>{subscribed++;current={endpoint:'https://fcm.googleapis.com/fixture',toJSON:()=>({endpoint:'https://fcm.googleapis.com/fixture',expirationTime:null,keys:{p256dh:'fixture',auth:'fixture'}}),unsubscribe:async()=>{unsubscribed++;current=null;return true}};return current}}};
+Object.defineProperty(navigator,'serviceWorker',{value:{getRegistration:async()=>registration,register:async()=>registration,ready:Promise.resolve(registration)}});
+const calls:{method:string;body:any}[]=[];globalThis.fetch=(async(_url,init)=>{calls.push({method:init?.method??'GET',body:init?.body?JSON.parse(String(init.body)):null});return Response.json(init?.method?{ok:true}:{enabled:true,publicKey:Buffer.concat([Buffer.from([4]),Buffer.alloc(64,1)]).toString('base64url'),subscriptions:[]})}) as typeof fetch;
+async function main(){const root=createRoot(document.getElementById('root')!);
+ await act(async()=>root.render(<PushSettings ar={false}/>));assert.equal(requested,0);assert.equal(calls.length,0,'No automatic permission or registration requests');
+ await act(async()=>document.querySelector('button')!.click());assert.equal(requested,1);assert.equal(subscribed,1);assert.equal(calls[1].method,'POST');assert.equal(calls[1].body.language,'en');assert(!('expirationTime' in calls[1].body));assert(document.body.textContent!.includes('Notifications enabled'));
+ await act(async()=>document.querySelector('button')!.click());assert.equal(calls.at(-1)!.method,'DELETE');assert.equal(unsubscribed,1);assert(document.body.textContent!.includes('Notifications disabled'));
+ permission='denied';const count=calls.length;await act(async()=>document.querySelector('button')!.click());assert.equal(calls.length,count);assert(document.body.textContent!.includes('Notifications not allowed'));
+ await act(async()=>root.render(<AppInstall ar={false}/>));let prompted=0;const event=new dom.window.Event('beforeinstallprompt',{cancelable:true});Object.assign(event,{prompt:async()=>{prompted++},userChoice:Promise.resolve({outcome:'dismissed'})});await act(async()=>window.dispatchEvent(event));assert(event.defaultPrevented);await act(async()=>document.querySelector('button')!.click());assert.equal(prompted,1);assert(document.body.textContent!.includes('Installation cancelled'));assert(!document.body.textContent!.includes('The app is installed on this device'));
+ await act(async()=>window.dispatchEvent(new dom.window.Event('appinstalled')));assert(document.body.textContent!.includes('The app is installed on this device'));await act(async()=>root.unmount());console.log('PWA client PASS: explicit permission, opt-in/out, denied permission without registration, strict subscription payload, install prompt cancellation vs actual installation. Mock only.');}
+main().catch(e=>{console.error(e);process.exitCode=1});
