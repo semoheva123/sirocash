@@ -21,7 +21,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   collect:
-    if: github.ref == 'refs/heads/main'
+    # Temporarily isolated with the wallet ticker during the freezing investigation.
+    # Retain credentials/source configuration; do not fetch or update the shared cache.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:

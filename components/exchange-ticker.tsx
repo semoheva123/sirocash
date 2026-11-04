@@ -1,4 +1,5 @@
 'use client';
+import {exchangeFeedEnabled} from '@/lib/exchange-feed-control';
 import {useEffect,useState} from 'react';
 import {createFinancialStream} from '@/lib/financial-stream-client';
 import {useAccountLanguage} from './account-language';
@@ -10,6 +11,7 @@ export function ExchangeTicker(){
  const [ar]=useAccountLanguage(),[snapshot,setSnapshot]=useState<ExchangeSnapshot|null>(null),[loading,setLoading]=useState(true);
  const [clock,setClock]=useState(()=>Date.now());
  useEffect(()=>{
+  if(!exchangeFeedEnabled)return;
   const stream=createFinancialStream<{enabled:boolean;userId:string;snapshot:unknown}>({
    active:()=>document.visibilityState!=='hidden'&&navigator.onLine,
    open:()=>new EventSource('/api/exchange-rates/events'),
@@ -21,6 +23,7 @@ export function ExchangeTicker(){
   const timer=setInterval(()=>setClock(Date.now()),60000);
   return()=>{stream.stop();clearInterval(timer);document.removeEventListener('visibilitychange',changed);window.removeEventListener('online',changed);window.removeEventListener('offline',changed);window.removeEventListener('focus',changed)};
  },[]);
+ if(!exchangeFeedEnabled)return null;
  return <ExchangeTickerView ar={ar} snapshot={snapshot} loading={loading} now={clock}/>;
 }
 export function ExchangeTickerView({ar,snapshot,loading=false,now}:{ar:boolean;snapshot:ExchangeSnapshot|null;loading?:boolean;now:number}){
