@@ -36,6 +36,11 @@ async function main(){
  const actions=document.querySelector('.wallet-actions')!;
  assert.deepEqual(Array.from(actions.children).map(e=>e.textContent),['Send','Receive','Deposit','Exchange']);
  assert.equal(actions.querySelector('a')!.getAttribute('href'),'/send');
+ await act(async()=>document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true})));assert.equal(document.querySelectorAll('[role="dialog"]').length,1,'One command palette, not duplicate keyboard handlers');
+ await act(async()=>document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(document.querySelectorAll('[role="dialog"]').length,0);
+ await act(async()=>document.querySelector<HTMLButtonElement>('.wallet-header-actions .wallet-search-compact')!.click());assert.equal(document.querySelectorAll('[role="dialog"]').length,1,'Mobile quick access is operable');
+ await act(async()=>document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+
  await act(async()=>Source.current.snapshot());
  assert(document.querySelector('.mobile-recent time'));assert(document.body.textContent!.includes('4.981691'));
  const eye=()=>document.querySelector<HTMLButtonElement>('.mobile-balance-value button')!;
