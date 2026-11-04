@@ -1,0 +1,40 @@
+name: Verify saved public response classification
+on:
+  push:
+    branches: ['arena/d2df4f44-sirocash']
+    paths: ['.github/workflows/public-exchange-proof.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-exchange-tls-inspection
+          run-id: '41854494181'
+          github-token: ${{ github.token }}
+          path: saved
+      - name: Classify the saved real response without any source request
+        shell: python
+        run: |
+          import json,sys
+          from pathlib import Path
+          from datetime import datetime
+          sys.path.insert(0,str(Path.cwd()))
+          from exchange_worker.public_page import parse_public
+          raw=Path('saved/home.html').read_text()
+          metadata=json.loads(Path('saved/result.json').read_text())
+          valid=parse_public(raw,datetime.fromisoformat(metadata['observedAt']))
+          old_match=[x for x in ('/cdn-cgi/challenge-platform/','cf-chl-','just a moment...') if x in raw.lower()]
+          assert metadata['status']==200 and metadata['challenge'] is False
+          assert valid['market']=={'buy':144.0,'sell':144.5}
+          print('::notice title=Real public classification proof::'+json.dumps({'http':metadata['status'],'challengeHeader':metadata['challenge'],'legacyFalsePositiveMarkers':old_match,'validNewSYP':valid['market']}))

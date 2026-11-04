@@ -72,7 +72,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Cache-Control', 'no-store')
-        self.send_header('X-Exchange-Collector', 'public-page-v1')
+        self.send_header('X-Exchange-Collector', 'public-page-v2')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
@@ -127,7 +127,7 @@ class handler(BaseHTTPRequestHandler):
                 with requests.Session(trust_env=False) as session:
                     phase = 'COLLECTION'
                     result = collect_public(db, session)
-                    result['mode']='public-page-v1'
+                    result['mode']='public-page-v2'
             self.reply(200, result)
         except Exception:
             self.reply(503, {'state': 'UNAVAILABLE', 'phase': phase})
