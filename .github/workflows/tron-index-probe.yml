@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/tron-index-probe.yml'
+      - 'scripts/probe-tron-index-public.ts'
+      - 'lib/tron-index-read.ts'
+      - 'lib/tron-receipt-observer.ts'
   workflow_dispatch:
     inputs:
       address:
@@ -13,61 +16,21 @@ permissions: {}
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       # Public, keyless, read-only shape check of the TronGrid indexed TRC20 history API.
       # No secrets, database, signing, broadcast or production endpoint is touched.
-      - name: Query indexed TRC20 history with timestamp bounds
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      # Keyless public diagnostic of the real discovery modules: header-only anchors,
+      # recipient-filtered indexed listing, receipt, timestamp and ordering consistency.
+      - name: Exercise indexed discovery modules against public TronGrid
         env:
-          ADDRESS: ${{ inputs.address || 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL' }}
-        run: |
-          set -eu
-          case "$ADDRESS" in T[1-9A-HJ-NP-Za-km-z]*) test "${#ADDRESS}" = 34 ;; *) echo 'INVALID_ADDRESS'; exit 1 ;; esac
-          usdt=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
-          base="https://api.trongrid.io/v1/accounts/${ADDRESS}/transactions/trc20"
-          get() { sleep 6; curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --header 'Accept: application/json' "$1"; }
-          get "${base}?only_to=true&only_confirmed=true&contract_address=${usdt}&limit=3&order_by=block_timestamp%2Cdesc" > recent.json
-          python3 - <<'PYTHON'
-          import json,os
-          raw=open('recent.json').read()
-          print('::notice title=RECENT_RAW::'+raw[:600].replace('\n',' '))
-          r=json.loads(raw); data=r.get('data') or []
-          meta=r.get('meta') or {}
-          print('::notice title=RECENT::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(data))+' META='+','.join(sorted(meta.keys()))+' FP='+str(bool(meta.get('fingerprint'))))
-          if data:
-              i=data[0]; ti=i.get('token_info') or {}
-              print('::notice title=ITEM::KEYS='+','.join(sorted(i.keys()))+' TYPE='+str(i.get('type'))+' TO_OK='+str(i.get('to')==os.environ['ADDRESS'])+' TOKEN='+str(ti.get('address'))+' VALUE_TYPE='+type(i.get('value')).__name__+' TXID_LEN='+str(len(str(i.get('transaction_id'))))+' TS='+str(i.get('block_timestamp')))
-              open('ts.txt','w').write(str(i.get('block_timestamp')))
-          PYTHON
-          if [ -f ts.txt ]; then
-            ts=$(cat ts.txt)
-            for d in 0 1 -1; do
-              t=$((ts+d))
-              get "${base}?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=${t}&max_timestamp=${t}&limit=200" > "b${d}.json"
-              D=$d python3 - <<'PYTHON'
-          import json,os
-          d=os.environ['D']; raw=open('b'+d+'.json').read(); r=json.loads(raw)
-          data=r.get('data') or []
-          print('::notice title=BOUND_'+d+'::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(data))+' TS='+str(sorted(set(i.get('block_timestamp') for i in data)))+' RAW='+raw[:160].replace('\n',' '))
-          PYTHON
-            done
-            get "${base}?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=$((ts-600000))&max_timestamp=${ts}&limit=5&order_by=block_timestamp%2Casc" > asc.json
-            python3 - <<'PYTHON'
-          import json
-          r=json.load(open('asc.json')); data=r.get('data') or []; meta=r.get('meta') or {}
-          print('::notice title=ASC::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(data))+' TS='+str([i.get('block_timestamp') for i in data])+' FP='+str(bool(meta.get('fingerprint')))+' FP_LEN='+str(len(str(meta.get('fingerprint') or '')))+' LINKS='+str(bool((meta.get('links') or {}).get('next'))))
-          PYTHON
-          fi
-          # Header-only block read availability on the solidity path (detail=false) by height.
-          sleep 6; code3=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output header.json --write-out '%{http_code}' --header 'Content-Type: application/json' --data '{"id_or_num":"87741244","detail":false}' 'https://api.trongrid.io/walletsolidity/getblock')
-          export CODE3=$code3
-          python3 - <<'PYTHON'
-          import json,os
-          raw=open('header.json').read()
-          try:
-              r=json.loads(raw)
-              num=(r.get('block_header',{}).get('raw_data',{}).get('number') if isinstance(r,dict) else None)
-              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' KEYS='+(','.join(sorted(r.keys())) if isinstance(r,dict) else type(r).__name__)+' HAS_TX='+str(isinstance(r,dict) and 'transactions' in r)+' NUMBER='+str(num)+' BYTES='+str(len(raw))+' RAW='+raw[:200])
-          except Exception as e:
-              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' PARSE_FAILED='+type(e).__name__+' RAW='+raw[:200])
-          PYTHON
+          PROBE_ADDRESS: ${{ inputs.address || 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL' }}
+        run: node --conditions=react-server --import tsx scripts/probe-tron-index-public.ts

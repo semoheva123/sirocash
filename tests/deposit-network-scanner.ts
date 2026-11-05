@@ -36,14 +36,35 @@ async function main(){const pg=new PGlite();try{
  const addressHex=(a:string)=>Buffer.from(base58.decode(a)).subarray(1,21).toString('hex');
  const tronLogs=tron.map(a=>({address:addressHex(tronUsdtContract),topics:[topic,'0'.repeat(24)+'1'.repeat(40),'0'.repeat(24)+addressHex(String(a.address))],data:(20n*1000000n).toString(16).padStart(64,'0')}));
  const tronTxs=[...txs,...Array.from({length:1000},(_,i)=>hex(10000+i))];
+ const failedTx=hex(7777),selfTx=hex(7778),farTx=hex(7779);
  const tronReceipts=txs.map((id,i)=>({id,blockNumber:100,receipt:{result:'SUCCESS'},log:[tronLogs[i]]})).concat(tronTxs.slice(2).map(id=>({id,blockNumber:100,receipt:{result:'SUCCESS'},log:[]})));
+ // Block 105 holds a FAILED transfer and a self-transfer to tron[0]: indexed, never credited.
+ tronReceipts.push({id:failedTx,blockNumber:105,receipt:{result:'OUT_OF_ENERGY'},log:[tronLogs[0]]},{id:selfTx,blockNumber:105,receipt:{result:'SUCCESS'},log:[{...tronLogs[0],topics:[topic,tronLogs[0].topics[2],tronLogs[0].topics[2]]}]},{id:farTx,blockNumber:140,receipt:{result:'SUCCESS'},log:[tronLogs[0]]});
+ const tronTs=(n:number)=>1700000000000+n*3000;
+ const blockTxs=(n:number)=>n===100?tronTxs:n===105?[failedTx,selfTx]:n===140?[farTx]:[];
+ let fullBlockReads=0,headerReads=0,indexReads=0,latestFullReads=0,indexDown=false,wrongRecipient=false,dense=false,misplaced=false;
  const read=async(path:string,body:Record<string,unknown>)=>{
-  if(path==='/walletsolidity/getblockbynum'||path==='/walletsolidity/getnowblock'){const n=path.endsWith('getnowblock')?head:Number(body.num);return {blockID:n===0?genesis:tronHash(n),block_header:{raw_data:{number:n,parentHash:tronHash(n-1)}},transactions:n===100?tronTxs.map(txID=>({txID,ret:[{contractRet:'SUCCESS'}]})):[]}}
-  if(path==='/wallet/gettransactioninfobyblocknum'){bulkReads++;return Number(body.num)===100?incomplete?tronReceipts.slice(1):tronReceipts:[]}
-  if(path==='/walletsolidity/gettransactioninfobyid')return tronReceipts.find(r=>r.id===body.value);
+  if(path==='/walletsolidity/getblock'){headerReads++;assert.equal(body.detail,false);const n=body.id_or_num===undefined?head:Number(body.id_or_num);return {blockID:n===0?genesis:tronHash(n),block_header:{raw_data:{number:n,parentHash:tronHash(n-1),timestamp:tronTs(n)}}}}
+  if(path==='/walletsolidity/getblockbynum'){fullBlockReads++;const n=Number(body.num);return {blockID:n===0?genesis:tronHash(n),block_header:{raw_data:{number:n,parentHash:tronHash(n-1),timestamp:tronTs(n)}},transactions:blockTxs(n).map(txID=>({txID,ret:[{contractRet:'SUCCESS'}]}))}}
+  if(path==='/walletsolidity/getnowblock'){latestFullReads++;return {blockID:tronHash(head),block_header:{raw_data:{number:head,parentHash:tronHash(head-1),timestamp:tronTs(head)}},transactions:[]}}
+  if(path==='/wallet/gettransactioninfobyblocknum'){bulkReads++;const inBlock=tronReceipts.filter(r=>r.blockNumber===Number(body.num));return incomplete&&Number(body.num)===100?inBlock.slice(1):inBlock}
+  if(path==='/walletsolidity/gettransactioninfobyid')return tronReceipts.find(r=>r.id===body.value)??{};
   throw Error('unexpected TRON path');
  };
- const options={bep20:rpc,tron:read,genesisId:genesis,minimumConfirmations:15,maxAmount:()=>10n**30n,maxEvents:1};
+ // Indexed listing: USDT transfers INTO one address, second-granularity inclusive timestamp bounds.
+ const index=async(address:string,q:{minTimestamp:number;maxTimestamp:number})=>{
+  indexReads++;
+  if(indexDown)return {success:false,error:'unavailable'};
+  const inWindow=(n:number)=>Math.floor(tronTs(n)/1000)>=Math.floor(q.minTimestamp/1000)&&Math.floor(tronTs(n)/1000)<=Math.floor(q.maxTimestamp/1000);
+  const owner=tron.find(a=>a.address===address);
+  if(dense&&owner===tron[0]&&inWindow(100))return {success:true,data:Array.from({length:200},(_,i)=>({transaction_id:hex(10000+i),to:address,block_timestamp:tronTs(100),type:'Transfer',value:'1'})),meta:{at:Date.now(),page_size:200,fingerprint:'next-page'}};
+  const data=[] as {transaction_id:string;to:string;block_timestamp:number;type:string;value:string}[];
+  if(owner){const i=tron.indexOf(owner);if(inWindow(100))data.push({transaction_id:txs[i],to:wrongRecipient?String(tron[1-i].address):address,block_timestamp:tronTs(100),type:'Transfer',value:'20000000'});
+   if(i===0&&inWindow(105))data.push({transaction_id:failedTx,to:address,block_timestamp:tronTs(105),type:'Transfer',value:'20000000'},{transaction_id:selfTx,to:address,block_timestamp:tronTs(105),type:'Transfer',value:'20000000'});
+   if(i===0&&misplaced&&inWindow(100))data.push({transaction_id:farTx,to:address,block_timestamp:tronTs(100),type:'Transfer',value:'1'});}
+  return {success:true,data,meta:{at:Date.now(),page_size:data.length}};
+ };
+ const options={bep20:rpc,tron:read,tronIndex:index,genesisId:genesis,minimumConfirmations:15,maxAmount:()=>10n**30n,maxEvents:1,tronWindow:2000};
  const scan=createNetworkDepositScanner(worker,options),signal=()=>AbortSignal.timeout(10000);
  const broken:WalletDb={transaction:run=>worker.transaction(tx=>run({query:(q,p)=>{if(q.startsWith('UPDATE "DepositScanCursor" SET'))throw Error('CHECKPOINT_FAILURE');return tx.query(q,p)}}))};
  await assert.rejects(()=>createNetworkDepositScanner(broken,options).scan('BEP20',signal()),/CHECKPOINT_FAILURE/);assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,0);
@@ -59,35 +80,34 @@ async function main(){const pg=new PGlite();try{
  // A new assignment behind the network checkpoint must be backfilled, not skipped.
  const third=randomUUID();await sql('INSERT INTO "User"(id,email,"emailVerifiedAt") VALUES($1,$2,now())',[third,third+'@scanner.test']);await allocateDepositAddress(worker,third,vaults.BEP20,'BEP20',100);
  await scan.scan('BEP20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,2,'rewind deduplicates prior events');
- head=130;incomplete=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),100);
- incomplete=false;await scan.scan('TRC20',signal());await scan.scan('TRC20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4);assert.equal(bulkReads,3,'one full receipt request per network block, not per transaction/customer');
+ head=130;
+ const tronCursor=async()=>{const r=(await sql('SELECT "nextBlock","transactionOffset" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0];return [Number(r.nextBlock),Number(r.transactionOffset)]};
+ indexDown=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/SCAN_INDEX_UNAVAILABLE/);assert.deepEqual(await tronCursor(),[100,0]);indexDown=false;
+ wrongRecipient=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/UNREQUESTED_RECIPIENT/);assert.deepEqual(await tronCursor(),[100,0]);wrongRecipient=false;
+ misplaced=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/SCAN_INDEX_CONTEXT/);assert.deepEqual(await tronCursor(),[100,0]);misplaced=false;
+ assert.equal(bulkReads,0,'no whole-block receipt sets before discovery');
+ const tronFirst=await scan.scan('TRC20',signal());assert.equal(tronFirst.state,'PROGRESSED');assert.equal('staged' in tronFirst&&tronFirst.staged,1);
+ assert.deepEqual(await tronCursor(),[100,1],'partial replay resumes after the first transaction of the block');
+ indexReads=0;fullBlockReads=0;headerReads=0;latestFullReads=0;
+ const tronSecond=await scan.scan('TRC20',signal());assert.equal(tronSecond.state,'PROGRESSED');assert.equal('blocks' in tronSecond&&tronSecond.blocks,31,'one indexed window covers the whole catch-up range');
+ assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4);
+ assert.equal(indexReads,2,'one recipient-filtered listing per address per window');
+ assert.equal(latestFullReads,1,'the full latest block is read only inside canonical receipt observation');
+ assert.equal(bulkReads,0,'indexed discovery never parses every receipt of every block');
+ assert.equal(fullBlockReads,5,'full blocks: two candidate blocks for transaction order, plus genesis/inclusion/recheck inside canonical observation of the single staged event');
+ assert(headerReads<=8,'anchors use header-only reads');
+ assert.deepEqual(await tronCursor(),[131,0]);
+ assert.equal((await sql('SELECT count(*)::int AS n FROM "ChainDepositInbox" WHERE "txId" IN ($1,$2)',[failedTx,selfTx])).rows[0].n,0,'failed and self transfers are never credited');
  assert.equal(await depositScannerHealthy(worker),true);
- // Multi-block catch-up must be atomic on an incomplete middle block.
- const nextBefore=Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock);
- const corrupt=async(path:string,body:Record<string,unknown>)=>path==='/wallet/gettransactioninfobyblocknum'&&body.num===nextBefore+4?[{id:hex(9999),blockNumber:body.num}]:read(path,body);
- await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:corrupt,tronWindow:16}).scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);
- assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore);
- let rangeCalls=0;
- const ranged=async(path:string,body:Record<string,unknown>)=>{
-  if(path==='/walletsolidity/getblockbylimitnext'){
-   rangeCalls++;assert(Number(body.endNum)-Number(body.startNum)<=2);
-   return {block:await Promise.all(Array.from({length:Number(body.endNum)-Number(body.startNum)},(_,i)=>read('/walletsolidity/getblockbynum',{num:Number(body.startNum)+i})))};
-  }
-  return read(path,body);
- };
- const missingRange=async(path:string,body:Record<string,unknown>)=>path==='/walletsolidity/getblockbylimitnext'?{block:[]}:read(path,body);
- await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:missingRange,tronWindow:16,tronBlockBatch:2}).scan('TRC20',signal()),/BLOCK_MISMATCH/);
- assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore);
- const corruptRangeReceipts=async(path:string,body:Record<string,unknown>)=>path==='/wallet/gettransactioninfobyblocknum'&&body.num===nextBefore+4?[{id:hex(9999),blockNumber:body.num}]:ranged(path,body);
- await assert.rejects(()=>createNetworkDepositScanner(worker,{...options,tron:corruptRangeReceipts,tronWindow:16,tronBlockBatch:2}).scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);
- assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore);
- rangeCalls=0;
- const multi=await createNetworkDepositScanner(worker,{...options,tron:ranged,tronWindow:16,tronBlockBatch:2}).scan('TRC20',signal());
- assert.equal(rangeCalls,8,'16 blocks use eight bounded range calls');
- assert.equal(multi.state,'PROGRESSED');assert.equal('blocks' in multi&&multi.blocks,16);
- assert.equal(Number((await sql('SELECT "nextBlock" FROM "DepositScanCursor" WHERE "addressId"=$1',[tron[0].id])).rows[0].nextBlock),nextBefore+16);
- assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4,'batch catch-up cannot duplicate credits');
- assert.throws(()=>createNetworkDepositScanner(worker,{...options,tronWindow:33}),/CONFIGURATION/);
+ // Dense single block: a full indexed page falls back to the complete canonical block/receipt set.
+ await sql('UPDATE "DepositScanCursor" SET "nextBlock"=100,"transactionOffset"=0,"blockHash"=NULL,"previousBlockHash"=NULL WHERE "addressId"=ANY($1::uuid[])',[tron.map(a=>a.id)]);
+ await sql('UPDATE "DepositNetworkScanner" SET "lastBlock"=NULL,"lastHash"=NULL WHERE network=\'TRC20\'');
+ dense=true;bulkReads=0;incomplete=true;await assert.rejects(()=>scan.scan('TRC20',signal()),/INCOMPLETE_RECEIPTS/);assert.deepEqual(await tronCursor(),[100,0]);incomplete=false;
+ const denseScan=await scan.scan('TRC20',signal());assert.equal(denseScan.state,'PROGRESSED');assert.equal(bulkReads,2,'dense fallback reads the single block receipt set, never trusting a truncated listing');
+ assert.deepEqual(await tronCursor(),[100,1]);dense=false;
+ await scan.scan('TRC20',signal());assert.equal((await sql('SELECT * FROM "ChainDepositInbox"')).rows.length,4,'rewind deduplicates prior TRON events');
+ assert.throws(()=>createNetworkDepositScanner(worker,{...options,tronWindow:4001}),/CONFIGURATION/);
+ assert.throws(()=>createNetworkDepositScanner(worker,{...options,tronCandidateLimit:201}),/CONFIGURATION/);
  const pool=randomUUID();await sql('INSERT INTO "LedgerAccount"(id,"accountType") VALUES($1,\'MASTER_POOL\')',[pool]);
  const valuer=createDepositValuationWorker(worker,{enabled:true,settlementAccountId:pool,price:()=>observeUsdtUsdPrice(async()=>new Response(JSON.stringify({data:{base:'USDT',currency:'USD',amount:'0.998'}})))});
  for(const row of (await sql('SELECT id FROM "ChainDepositInbox"')).rows){await valuer(String(row.id),signal());await valuer(String(row.id),signal())}
@@ -98,6 +118,6 @@ async function main(){const pg=new PGlite();try{
  head=130;await sql('UPDATE "DepositNetworkScanner" SET "lastBlock"=116,"lastHash"=$1 WHERE network=\'BEP20\'',[hex(116)]);reorg=true;
  await assert.rejects(()=>scan.scan('BEP20',signal()),/CHAIN_REORG/);assert.equal((await sql('SELECT paused FROM "DepositNetworkScanner" WHERE network=\'BEP20\'')).rows[0].paused,true);
  assert.equal((await scan.scan('BEP20',signal())).state,'BUSY_OR_PAUSED');assert.equal(await depositScannerHealthy(worker),false);
- console.log('Shared scanner PASS: 1000-block bounded range, OR recipients, complete bulk TRON receipts, partial replay, new-address backfill, owner-bound credits exactly once, balanced ledger and network-wide reorg pause. Isolated DB only.');
+ console.log('Shared scanner PASS: 1000-block bounded range, OR recipients, recipient-filtered indexed TRON discovery with header-only anchors and canonical receipts, dense-block fallback, partial replay, new-address backfill, owner-bound credits exactly once, balanced ledger and network-wide reorg pause. Isolated DB only.');
 }finally{await pg.close()}}
 main().catch(e=>{console.error(e);process.exitCode=1});

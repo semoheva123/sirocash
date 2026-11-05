@@ -1,6 +1,8 @@
 import {depositOnlyMode,assertDepositOnlyIsolation} from '../lib/deposit-only-mode';
 import {createBep20ReadRpc,productionBep20ReadRpc} from '../lib/bep20-rpc';
 import {productionTronRead} from '../lib/tron-receipt-observer';
+import {productionTronIndexRead} from '../lib/tron-index-read';
+import {tronUsdtContract} from '../lib/tron-deposit-verification';
 import {createNetworkDepositScanner} from '../lib/deposit-network-scanner';
 import {financialReadDatabase} from '../lib/financial-database';
 import {depositMonitorFailureCode} from '../lib/deposit-monitor-diagnostics';
@@ -8,8 +10,18 @@ import {bep20UsdtContract} from '../lib/bep20-deposit-verification';
 async function main(){
  if(process.env.VERCEL_ENV!=='production'||!depositOnlyMode()||process.env.SIRO_OUTBOX_WORKER_ENABLED!=='true'){console.log('Deposit monitor live reads: disabled.');return}
  assertDepositOnlyIsolation();
- const signal=AbortSignal.timeout(40000),bep20=productionBep20ReadRpc(signal,info=>console.log('DEPOSIT_RPC_FAILURE:'+JSON.stringify(info))),tron=productionTronRead(signal,info=>console.log('DEPOSIT_TRON_HTTP_FAILURE:'+JSON.stringify(info)));
- const scanner=createNetworkDepositScanner(financialReadDatabase(),{bep20,tron,genesisId:process.env.SIRO_TRON_GENESIS_ID??'',minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:()=>1n});
+ const signal=AbortSignal.timeout(40000),bep20=productionBep20ReadRpc(signal,info=>console.log('DEPOSIT_RPC_FAILURE:'+JSON.stringify(info))),tron=productionTronRead(signal,info=>console.log('DEPOSIT_TRON_HTTP_FAILURE:'+JSON.stringify(info))),tronIndex=productionTronIndexRead(signal,info=>console.log('DEPOSIT_TRON_INDEX_FAILURE:'+JSON.stringify(info)));
+ const header=async(height?:number)=>{
+  const b=await tron('/walletsolidity/getblock',height===undefined?{detail:false}:{id_or_num:String(height),detail:false}) as {blockID?:string;block_header?:{raw_data?:{number?:number;parentHash?:string;timestamp?:number}}};
+  const n=b.block_header?.raw_data?.number??0,timestamp=b.block_header?.raw_data?.timestamp;
+  if(height!==undefined&&n!==height||typeof b.blockID!=='string'||! /^[a-f0-9]{64}$/.test(b.blockID)||b.blockID.slice(0,16)!==n.toString(16).padStart(16,'0')||typeof timestamp!=='number'||!Number.isSafeInteger(timestamp)||timestamp<0||(n>0&&typeof b.block_header?.raw_data?.parentHash!=='string'))throw Error('SCAN_BLOCK_MISMATCH');
+  return {number:n,id:b.blockID,parent:b.block_header?.raw_data?.parentHash,timestamp};
+ };
+ const indexed=async(address:string,min:number,max:number)=>{
+  const r=await tronIndex(address,{minTimestamp:min,maxTimestamp:max}) as {success?:unknown;data?:unknown};
+  if(r?.success!==true||!Array.isArray(r.data))throw Error('SCAN_INDEX_UNAVAILABLE');
+ };
+ const scanner=createNetworkDepositScanner(financialReadDatabase(),{bep20,tron,tronIndex,genesisId:process.env.SIRO_TRON_GENESIS_ID??'',minimumConfirmations:Number(process.env.SIRO_BEP20_MIN_CONFIRMATIONS??'15'),maxAmount:()=>1n});
  const results=await Promise.all((['BEP20','TRC20'] as const).map(async network=>{
   let stage='FINALITY';
   try{
@@ -17,32 +29,21 @@ async function main(){
    if(network==='BEP20'){
     const logs=await bep20('eth_getLogs',[{fromBlock:'0x'+head.toString(16),toBlock:'0x'+head.toString(16),address:bep20UsdtContract,topics:['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',null,'0x'+'0'.repeat(64)]}]);
     if(!Array.isArray(logs))throw Error('SCAN_INVALID_OBJECT');
-   }else if(!Array.isArray(await tron('/wallet/gettransactioninfobyblocknum',{num:head})))throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
-   if(network==='TRC20'){
+   }else{
+    // Recipient-filtered indexed discovery + header-only anchors; no whole-block receipt parsing.
+    const tip=await header(head);await indexed(tronUsdtContract,tip.timestamp,tip.timestamp+2999);
     stage='CURSOR_LOOKUP';
     const cursor=await financialReadDatabase().transaction(async tx=>(await tx.query('SELECT MIN(s."nextBlock") AS height FROM "DepositScanCursor" s JOIN "UserDepositAddress" a ON a.id=s."addressId" WHERE a.network=\'TRC20\' AND NOT s.paused')).rows[0]);
     if(cursor?.height!==null&&cursor?.height!==undefined){
      const firstHeight=Number(cursor.height);if(!Number.isSafeInteger(firstHeight)||firstHeight<0)throw Error('SCAN_INVALID_HEIGHT');
-     let previousHash:string|undefined;
-     const hashes=new Map<number,string>();
+     let previous:{id:string;timestamp:number}|undefined,first:{id:string;timestamp:number}|undefined;
      for(let height=firstHeight;height<=Math.min(head,firstHeight+15);height++){
-      stage='CURSOR_BLOCK';
-      const block=await tron('/walletsolidity/getblockbynum',{num:height}) as {blockID?:string;block_header?:{raw_data?:{number?:number;parentHash?:string}};transactions?:{txID:string}[]};
-      if(block.block_header?.raw_data?.number!==height||typeof block.blockID!=='string'||! /^[a-f0-9]{64}$/.test(block.blockID)||block.blockID.slice(0,16)!==height.toString(16).padStart(16,'0')||typeof block.block_header.raw_data.parentHash!=='string')throw Error('SCAN_BLOCK_MISMATCH');
-      if(previousHash&&block.block_header.raw_data.parentHash!==previousHash)throw Error('SCAN_BLOCK_MISMATCH');
-      stage='CURSOR_RECEIPTS';
-      const receipts=await tron('/wallet/gettransactioninfobyblocknum',{num:height});
-      if(!Array.isArray(receipts))throw Error('SCAN_BULK_RECEIPTS_UNAVAILABLE');
-      const ids=new Set((block.transactions??[]).map(t=>t.txID));
-      if(ids.size!==(block.transactions??[]).length||receipts.length!==ids.size||new Set(receipts.map(r=>r.id)).size!==ids.size||receipts.some(r=>!ids.has(r.id)||r.blockNumber!==height))throw Error('SCAN_INCOMPLETE_RECEIPTS');
-      previousHash=block.blockID;hashes.set(height,block.blockID);
+      stage='CURSOR_HEADER';
+      const b=await header(height);
+      if(previous&&(b.parent!==previous.id||b.timestamp<previous.timestamp+3000))throw Error('SCAN_BLOCK_MISMATCH');
+      first??=b;previous=b;
      }
-     if(hashes.size){
-      stage='CURSOR_BLOCK_RANGE';
-      const endNum=Math.min(head+1,firstHeight+2);
-      const range=await tron('/walletsolidity/getblockbylimitnext',{startNum:firstHeight,endNum}) as {block?:{blockID?:string;block_header?:{raw_data?:{number?:number}}}[]};
-      if(!Array.isArray(range.block)||range.block.length!==endNum-firstHeight||range.block.some((b,i)=>b.blockID!==hashes.get(firstHeight+i)||b.block_header?.raw_data?.number!==firstHeight+i))throw Error('SCAN_BLOCK_MISMATCH');
-     }
+     if(first&&previous){stage='CURSOR_INDEX_WINDOW';await indexed(tronUsdtContract,first.timestamp,previous.timestamp+2999)}
     }
    }
    return {network,stage,status:'PASS'};
