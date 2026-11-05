@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict';
+import React,{act} from 'react';
+import {JSDOM} from 'jsdom';
+async function main(){
+ const dom=new JSDOM('<div id="root"></div>',{url:'https://wallet.test/send?route=internal',pretendToBeVisual:true});Object.assign(globalThis,{window:dom.window,document:dom.window.document,self:dom.window,localStorage:dom.window.localStorage,IS_REACT_ACT_ENVIRONMENT:true});Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});localStorage.setItem('siro-language','en');
+ class Source{static current:Source;listeners=new Map<string,(e:{data:string})=>void>();constructor(){Source.current=this}close(){}addEventListener(k:string,f:(e:{data:string})=>void){this.listeners.set(k,f)}snapshot(){this.listeners.get('snapshot')!({data:JSON.stringify({enabled:true,userId:'fixture',balance:{posted:'1000',held:'0'},capabilities:{transfers:true,withdrawals:false,deposits:false}})})}}
+ Object.assign(globalThis,{EventSource:Source});const {createRoot}=await import('react-dom/client'),{CustomerPayments}=await import('../components/customer-payments');
+ const requests:any[]=[];globalThis.fetch=(async(url,init)=>{assert.equal(url,'/api/financial/prepare');const body=JSON.parse(String(init?.body));requests.push(body);return Response.json({kind:'TRANSFER',path:'/api/wallet/transfer',payload:{amount:body.amount,recipient:body.recipient,requestKey:body.requestKey,fee:'1',totalDebit:'101'},recipientIdentity:{uid:'1234567897',displayName:'Fixture recipient',username:null,identityVerified:false}})}) as typeof fetch;
+ const root=createRoot(document.getElementById('root')!);await act(async()=>root.render(<CustomerPayments view="send"/>));await act(async()=>Source.current.snapshot());
+ const setInput=async(value:string)=>act(async()=>{const input=document.querySelector<HTMLInputElement>('form input')!;Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value')!.set!.call(input,value);input.dispatchEvent(new dom.window.Event('input',{bubbles:true}))});
+ const submit=async()=>act(async()=>{document.querySelector('form')!.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}))});
+ assert.equal(document.querySelectorAll('.transfer-progress li').length,5);
+ await setInput('0');await submit();assert.equal(document.querySelector('input')!.getAttribute('aria-invalid'),'true');assert(document.querySelector('#payment-amount-error')!.textContent!.includes('above zero'));assert.equal(requests.length,0);
+ await setInput('100');await submit();await setInput('123');await submit();assert.equal(document.querySelector('input')!.getAttribute('aria-invalid'),'true');assert.equal(requests.length,0);
+ await setInput('1234567897');await submit();assert.equal(requests.length,1);assert(document.querySelector('.payment-review'));assert.equal(document.querySelector('.transfer-progress [aria-current="step"]')!.textContent,'3Review');
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Edit amount')!.click());assert.equal(document.querySelector<HTMLInputElement>('form input')!.value,'100');await submit();assert.equal(document.querySelector<HTMLInputElement>('form input')!.value,'1234567897','Recipient survives a safe pre-approval edit');await submit();assert.equal(requests.length,2);assert.notEqual(requests[0].requestKey,requests[1].requestKey,'Editing an unsubmitted quote creates a new review identity');assert.equal(requests[1].amount,'100');
+ await act(async()=>root.unmount());console.log('Send procedure PASS: five visible stages, field-local validation, no preparation for invalid inputs, persisted inputs during guarded pre-approval editing and new quote identity only before submission. No authorization or payment requests.');
+}
+main().catch(e=>{console.error(e);process.exitCode=1});

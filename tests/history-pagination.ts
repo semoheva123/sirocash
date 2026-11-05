@@ -4,7 +4,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {historyRequest,readFinancialHistoryPage} from '../lib/financial-history-page';
 import {readFinancialSnapshot} from '../lib/financial-status';
 import {walletActivity} from '../lib/wallet-activity';
-import type {WalletTx} from '../lib/wallet-engine';
+import {creditConfirmedDeposit,transferWallet,type WalletDb,type WalletTx} from '../lib/wallet-engine';
 const uuid=(n:number)=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
 async function main(){
  const pg=new PGlite();try{
@@ -33,6 +33,19 @@ async function main(){
   await pg.exec('RESET ROLE');
   const activity=walletActivity({enabled:true,userId:owner,activity:[{id:'posted',type:'P2P',amount:'3',status:'COMPLETED',createdAt:'2026-11-01'}],operations:[{id:'pending',kind:'WITHDRAWAL',amount:'6',feeAmount:'0',state:'RESERVED',createdAt:'2026-11-03'},{id:'done',kind:'WITHDRAWAL',amount:'9',feeAmount:'0',state:'COMPLETED',createdAt:'2026-11-01'}],deposits:[{id:'observed',network:'BEP20',txId:'0x'+'a'.repeat(64),amountBaseUnits:'1000000000000000001',state:'AWAITING_VALUATION',createdAt:'2026-11-02'}]});
   assert.equal(activity.length,3);assert.equal(activity[0].status,'RESERVED');assert.equal(activity[0].amount,'-6');assert.equal(activity[1].amount,'1.000000000000000001');assert.equal(activity[1].currency,'USDT');assert(!activity.some(r=>r.id==='done'));
+  // Local, disposable migrated PostgreSQL fixtures only: never a production financial command.
+  await pg.exec('UPDATE "User" SET "emailVerifiedAt"=CURRENT_TIMESTAMP');
+  await pg.query(`INSERT INTO "LedgerAccount"(id,"accountType") VALUES ($1,'MASTER_POOL')`,[uuid(900)]);
+  const db:WalletDb={transaction:run=>pg.transaction(async connection=>run({query:async(sql,params)=>({rows:(await connection.query(sql,params)).rows as Record<string,unknown>[]})}))};
+  await creditConfirmedDeposit(db,{ownerId:owner,requestKey:'fixture:receipt:credit',amount:'1000',providerReference:'fixture:receipt:deposit',settlementAccountId:uuid(900)});
+  const sent=await transferWallet(db,{ownerId:owner,recipientId:foreign,requestKey:'fixture:receipt:transfer',amount:'100.000001',feeAccountId:uuid(900)});
+  await pg.exec('SET ROLE sirocash_financial_worker');
+  const senderReceipt=await readFinancialHistoryPage(tx,owner,historyRequest.parse({scope:'activity',id:sent.transactionId})),receiverReceipt=await readFinancialHistoryPage(tx,foreign,historyRequest.parse({scope:'activity',id:sent.transactionId}));
+  const senderRow=(senderReceipt.activity as Record<string,unknown>[])[0],receiverRow=(receiverReceipt.activity as Record<string,unknown>[])[0];
+  assert.equal(senderRow.amount,'-101.000002');assert.equal(senderRow.transferAmount,'100.000001');assert.equal(senderRow.transferFee,'1.000001');assert.equal(senderRow.totalDebit,'101.000002');
+  assert.equal(receiverRow.amount,'100.000001');assert.equal(receiverRow.transferFee,null,'Receiver sees own journal amount, not another owner operation fields');
+  assert.equal((await readFinancialHistoryPage(tx,uuid(999),historyRequest.parse({scope:'activity',id:sent.transactionId}))).activity instanceof Array,true);assert.deepEqual((await readFinancialHistoryPage(tx,uuid(999),historyRequest.parse({scope:'activity',id:sent.transactionId}))).activity,[]);
+  await pg.exec('RESET ROLE');
   console.log('History PASS: restricted-role real-schema reads, 35 withdrawals despite 40 newer transfers, deterministic tied-date keyset/no skips/duplicates, owner isolation and strict cursor validation; pending requests/observations without double counting posted activity. Offline only.');
  }finally{await pg.close()}
 }
