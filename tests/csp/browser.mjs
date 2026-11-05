@@ -63,6 +63,10 @@ try{
   assert.equal(await page.locator('.transaction-events time').count(),2);
   await page.emulateMedia({media:'print'});assert.equal(await page.locator('[data-receipt-document]').evaluate(e=>getComputedStyle(e).visibility),'visible');assert.equal(await page.locator('.receipt-tools button').first().isVisible(),false);await page.close();
  }
+ for(const width of [320,390,1440])for(const role of ['admin','customer']){
+  const page=await browser.newPage({viewport:{width,height:900}});await page.goto(`http://127.0.0.1:${port}/review-settings-${role}`);const link=page.locator('.mobile-settings-menu a[href="/identity-review"]');if(role==='admin')assert.equal(await link.isVisible(),true,`Reviewer menu hidden at ${width}`);else assert.equal(await link.count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.close();
+ }
+ console.log('Review navigation browser PASS: actual authorized settings link visible at 320/390/1440px; ordinary accounts have no entry. Synthetic SSR only.');
  console.log('Statement browser PASS: 320/390/1440px RTL/LTR layout, supplied event times only and print controls excluded. Synthetic SSR fixtures, not actual device receipt acceptance.');
  console.log('Precision ledger browser PASS: real feed/navigation/account CSS at 320/390/1440px in RTL/LTR, UTC date grouping, desktop columns/mobile cards and no horizontal overflow. Isolated synthetic SSR fixture, not device acceptance.');
  console.log('Ticker browser PASS: actual component/CSS animates at phone/desktop sizes in RTL/LTR, no page overflow, reduced motion disables animation and keeps prices scrollable. Synthetic only.');

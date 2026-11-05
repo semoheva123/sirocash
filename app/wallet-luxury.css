@@ -30,3 +30,5 @@
 .payment-field-hint{display:block;min-height:24px;color:#E0AEAE;font-size:11px;line-height:1.8;margin-top:6px}.account-workspace input[aria-invalid="true"]{border-color:#B88181!important}.transfer-success>[data-no-print]{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:18px}
 :root[data-theme="obsidian"] .account-workspace .account-bottom-nav>a[aria-current="page"]{background:#211F1B;color:var(--wallet-accent)}
 @media(prefers-reduced-motion:no-preference){.account-workspace :is(.button,.payment-review-edits>button){transition:background-color .12s ease,border-color .12s ease}}
+
+.identity-review-entry{margin:0 0 20px}.identity-review-entry>.button{display:inline-flex;align-items:center;justify-content:center;gap:10px;white-space:normal;max-width:100%;min-height:48px;line-height:1.8}.identity-review-entry svg{flex-shrink:0}

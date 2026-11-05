@@ -1,3 +1,4 @@
+import {JSDOM} from 'jsdom';
 import assert from 'node:assert/strict';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {AccountSettings} from '../components/account-settings';
@@ -14,3 +15,8 @@ assert.ok(html.includes('لن تتغيّر كلمة المرور إلا بعد �
 const unverified=renderToStaticMarkup(<AccountSettings user={{id:'other-account',email:'other@example.test',emailVerifiedAt:''}}/>);
 assert.ok(unverified.includes('لم يتم التحقق'));
 console.log('Account settings: own identity, verification state, private navigation, actual controls, honest unsupported features and no secrets in HTML passed.');
+
+const reviewer=new JSDOM(renderToStaticMarkup(<AccountSettings user={{id:'reviewer',email:'reviewer@example.test',emailVerifiedAt:'2026-10-30'}} canReviewIdentity/>)).window.document;
+const reviewMenu=reviewer.querySelector('.mobile-settings-menu a[href="/identity-review"]');assert(reviewMenu,'Authorized reviewer gets an entry in the visible settings menu');assert.equal(reviewMenu.closest('.settings-grid'),null,'Review entry must not live in the CSS-hidden grid');
+const customer=new JSDOM(html).window.document;assert.equal(customer.querySelector('a[href="/identity-review"]'),null,'Ordinary account must not see review navigation');
+console.log('Identity review navigation PASS: authorized entry is outside the hidden settings grid and absent for ordinary accounts.');
