@@ -85,3 +85,14 @@ changed. No ownership/privilege escalation was attempted.
 Supabase-installed extensions and cron alone do not guarantee service uptime.
 Watch their execution status alongside actual chain health. Catch-up must finish
 before customer reception becomes available; no synthetic success/reset is used.
+
+## 2026-11-05: duplicate GitHub schedule removed
+
+The `2-59/5` schedule in `.github/workflows/financial-worker.yml` invoked the same
+deposit-only scan as pg_cron (both compose `productionDepositOnlyWorkers`), added up to
+32 chained 90-second invocations per run while "catching up", and contended for the same
+scanner lease (`BUSY_OR_PAUSED` failures). It was removed with owner approval; only
+`workflow_dispatch` remains. pg_cron `sirocash-deposit-monitor` (every two minutes) is the
+sole automatic scheduler, so a pg_cron outage now delays discovery (cursors never skip)
+until noticed via `lastSuccessAt` or a manual dispatch. Full-execution scheduling, when
+approved, must be added deliberately.
