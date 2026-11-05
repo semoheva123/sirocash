@@ -6,7 +6,9 @@ import {spawnSync} from 'node:child_process';
 const source=await readFile('.github/workflows/financial-worker.yml','utf8');
 const manual=source.split('      - name: Verify worker credential without executing financial work')[1].split('      - name: Run isolated deposit monitor')[0];
 assert(manual.includes("if: github.event_name == 'workflow_dispatch'"));
-assert(source.split('      - name: Invoke authenticated bounded worker')[1].includes("if: github.event_name == 'schedule'"));
+// Manual dispatch only: pg_cron is the sole automatic scheduler, so no schedule trigger or schedule-gated step may exist.
+assert(!source.includes('\n  schedule:'));assert(!source.includes("github.event_name == 'schedule'"));assert(!source.includes('Invoke authenticated bounded worker'));
+assert(source.includes('on:\n  workflow_dispatch:'));assert(!source.includes('--request POST')||!source.split('--request POST')[1].includes('/api/internal/financial-worker'));
 const script=manual.split('        run: |\n')[1].split('\n').map(line=>line.replace(/^          /,'')).join('\n');
 assert(!script.includes('--request POST'));assert(!script.includes('--location'));assert(!script.includes('set -x'));assert(script.includes('--output /dev/null'));
 const route=await readFile('app/api/internal/financial-worker/route.ts','utf8');
@@ -23,7 +25,7 @@ if(process.env.MOCK_STATUS==='transport')process.exit(7);process.stdout.write(pr
   assert.equal(r.error,undefined);assert.equal(r.status===0,expected,status);assert(!(r.stdout+r.stderr).includes(secret));
   assert.equal(r.stdout.includes('AUTH_CHECK_PASS'),expected);
  }
- const monitor=source.split('      - name: Run isolated deposit monitor')[1].split('      - name: Invoke authenticated bounded worker')[0];
+ const monitor=source.split('      - name: Run isolated deposit monitor')[1];
  assert(monitor.includes("if: github.event_name == 'workflow_dispatch'"));
  const monitorScript=monitor.split('        run: |\n')[1].split('\n').map(line=>line.replace(/^          /,'')).join('\n');
  assert(!monitorScript.includes('--location'));assert(!monitorScript.includes('set -x'));
@@ -54,5 +56,5 @@ require('fs').writeFileSync(value('--output'),process.env.MOCK_BODY);process.std
   assert.equal(r.status===0,body.healthy===true);
  }
  console.log('Isolated monitor workflow PASS: dedicated endpoint only, exact 200 plus healthy/no-held schema, reject errors/redirects/partial results, no raw bodies or credentials.');
- console.log('Worker authentication workflow PASS: auth step GET only, scheduled worker POST only, exact 204 required, rejected redirects/errors/missing secrets, bounded no-retry transport and no secret output. Mocked curl only; no network or financial effects.');
+ console.log('Worker authentication workflow PASS: manual dispatch only (no GitHub schedule), auth step GET only, monitor POST only, exact 204 required, rejected redirects/errors/missing secrets, bounded no-retry transport and no secret output. Mocked curl only; no network or financial effects.');
 }finally{await rm(dir,{recursive:true,force:true})}
