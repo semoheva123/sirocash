@@ -13,7 +13,7 @@ permissions: {}
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       # Public, keyless, read-only shape check of the TronGrid indexed TRC20 history API.
       # No secrets, database, signing, broadcast or production endpoint is touched.
@@ -25,7 +25,7 @@ jobs:
           case "$ADDRESS" in T[1-9A-HJ-NP-Za-km-z]*) test "${#ADDRESS}" = 34 ;; *) echo 'INVALID_ADDRESS'; exit 1 ;; esac
           usdt=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
           base="https://api.trongrid.io/v1/accounts/${ADDRESS}/transactions/trc20"
-          get() { curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --header 'Accept: application/json' "$1"; }
+          get() { sleep 6; curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --header 'Accept: application/json' "$1"; }
           get "${base}?only_to=true&only_confirmed=true&contract_address=${usdt}&limit=3&order_by=block_timestamp%2Cdesc" > recent.json
           python3 - <<'PYTHON'
           import json,os
@@ -59,7 +59,7 @@ jobs:
           PYTHON
           fi
           # Header-only block read availability on the solidity path (detail=false) by height.
-          code3=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output header.json --write-out '%{http_code}' --header 'Content-Type: application/json' --data '{"id_or_num":"87741244","detail":false}' 'https://api.trongrid.io/walletsolidity/getblock')
+          sleep 6; code3=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output header.json --write-out '%{http_code}' --header 'Content-Type: application/json' --data '{"id_or_num":"87741244","detail":false}' 'https://api.trongrid.io/walletsolidity/getblock')
           export CODE3=$code3
           python3 - <<'PYTHON'
           import json,os
