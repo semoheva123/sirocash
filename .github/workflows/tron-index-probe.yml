@@ -27,35 +27,38 @@ jobs:
           usdt=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
           url="https://api.trongrid.io/v1/accounts/${ADDRESS}/transactions/trc20?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=${min}&max_timestamp=${now}&limit=3&order_by=block_timestamp%2Casc"
           code=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output body.json --write-out '%{http_code}' --header 'Accept: application/json' "$url")
-          echo "HTTP_STATUS:$code"
+          echo "::notice title=HTTP_STATUS::$code"
           python3 - <<'PYTHON'
-          import json
+          import json,os
           with open('body.json') as f: r=json.load(f)
-          print('SUCCESS:',r.get('success'))
-          meta=r.get('meta',{})
-          print('META_KEYS:',sorted(meta.keys()))
-          print('PAGE_SIZE:',meta.get('page_size'),'FINGERPRINT_PRESENT:',bool(meta.get('fingerprint')),'LINKS:',sorted((meta.get('links') or {}).keys()))
-          data=r.get('data',[])
-          print('ITEMS:',len(data))
-          for item in data[:3]:
-              print('ITEM_KEYS:',sorted(item.keys()))
-              print('TYPE:',item.get('type'),'TO_MATCHES:',item.get('to')==__import__('os').environ.get('ADDRESS'),'TOKEN:',(item.get('token_info') or {}).get('address'),'TS:',item.get('block_timestamp'),'VALUE_TYPE:',type(item.get('value')).__name__,'TXID_LEN:',len(str(item.get('transaction_id'))))
+          meta=r.get('meta',{}) or {}
+          data=r.get('data',[]) or []
+          out=['SUCCESS='+str(r.get('success')),'META_KEYS='+','.join(sorted(meta.keys())),'PAGE_SIZE='+str(meta.get('page_size')),'FP='+str(bool(meta.get('fingerprint'))),'LINKS='+','.join(sorted((meta.get('links') or {}).keys())),'ITEMS='+str(len(data))]
+          print('::notice title=WIDE::'+' '.join(out))
+          for item in data[:2]:
+              ti=item.get('token_info') or {}
+              print('::notice title=ITEM::'+' '.join(['KEYS='+','.join(sorted(item.keys())),'TYPE='+str(item.get('type')),'TO_MATCHES='+str(item.get('to')==os.environ.get('ADDRESS')),'TOKEN='+str(ti.get('address')),'TS='+str(item.get('block_timestamp')),'VALUE_TYPE='+type(item.get('value')).__name__,'TXID_LEN='+str(len(str(item.get('transaction_id'))))]))
           PYTHON
           # Narrow bound sanity: a 1ms window ending before now must return nothing or only in-window items.
           probe_max=$((now-1800000)); probe_min=$((probe_max-1))
           url2="https://api.trongrid.io/v1/accounts/${ADDRESS}/transactions/trc20?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=${probe_min}&max_timestamp=${probe_max}&limit=3"
           curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output narrow.json --header 'Accept: application/json' "$url2"
+          export PROBE_MIN=$probe_min PROBE_MAX=$probe_max
           python3 - <<'PYTHON'
           import json,os
           r=json.load(open('narrow.json'))
-          print('NARROW_SUCCESS:',r.get('success'),'NARROW_ITEMS:',len(r.get('data',[])),'NARROW_TS:',[i.get('block_timestamp') for i in r.get('data',[])])
+          print('::notice title=NARROW::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(r.get('data',[])))+' TS='+str([i.get('block_timestamp') for i in r.get('data',[])])+' MIN='+os.environ.get('PROBE_MIN','')+' MAX='+os.environ.get('PROBE_MAX',''))
           PYTHON
           # Header-only block read availability on the solidity path (detail=false).
           code3=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output header.json --write-out '%{http_code}' --header 'Content-Type: application/json' --data '{"detail":false}' 'https://api.trongrid.io/walletsolidity/getblock')
-          echo "GETBLOCK_HEADER_STATUS:$code3"
+          export CODE3=$code3
           python3 - <<'PYTHON'
-          import json
-          r=json.load(open('header.json'))
-          print('GETBLOCK_KEYS:',sorted(r.keys()) if isinstance(r,dict) else type(r).__name__)
-          print('GETBLOCK_HAS_TRANSACTIONS:','transactions' in r if isinstance(r,dict) else None,'NUMBER:',(r.get('block_header',{}).get('raw_data',{}).get('number') if isinstance(r,dict) else None),'BYTES:',len(open('header.json','rb').read()))
+          import json,os
+          try:
+              r=json.load(open('header.json'))
+              keys=','.join(sorted(r.keys())) if isinstance(r,dict) else type(r).__name__
+              num=(r.get('block_header',{}).get('raw_data',{}).get('number') if isinstance(r,dict) else None)
+              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' KEYS='+keys+' HAS_TX='+str('transactions' in r if isinstance(r,dict) else None)+' NUMBER='+str(num)+' BYTES='+str(len(open('header.json','rb').read())))
+          except Exception as e:
+              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' PARSE_FAILED='+type(e).__name__)
           PYTHON
