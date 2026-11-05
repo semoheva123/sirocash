@@ -23,42 +23,51 @@ jobs:
         run: |
           set -eu
           case "$ADDRESS" in T[1-9A-HJ-NP-Za-km-z]*) test "${#ADDRESS}" = 34 ;; *) echo 'INVALID_ADDRESS'; exit 1 ;; esac
-          now=$(date +%s000); min=$((now-3600000))
           usdt=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
-          url="https://api.trongrid.io/v1/accounts/${ADDRESS}/transactions/trc20?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=${min}&max_timestamp=${now}&limit=3&order_by=block_timestamp%2Casc"
-          code=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output body.json --write-out '%{http_code}' --header 'Accept: application/json' "$url")
-          echo "::notice title=HTTP_STATUS::$code"
+          base="https://api.trongrid.io/v1/accounts/${ADDRESS}/transactions/trc20"
+          get() { curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --header 'Accept: application/json' "$1"; }
+          get "${base}?only_to=true&only_confirmed=true&contract_address=${usdt}&limit=3&order_by=block_timestamp%2Cdesc" > recent.json
           python3 - <<'PYTHON'
           import json,os
-          with open('body.json') as f: r=json.load(f)
-          meta=r.get('meta',{}) or {}
-          data=r.get('data',[]) or []
-          out=['SUCCESS='+str(r.get('success')),'META_KEYS='+','.join(sorted(meta.keys())),'PAGE_SIZE='+str(meta.get('page_size')),'FP='+str(bool(meta.get('fingerprint'))),'LINKS='+','.join(sorted((meta.get('links') or {}).keys())),'ITEMS='+str(len(data))]
-          print('::notice title=WIDE::'+' '.join(out))
-          for item in data[:2]:
-              ti=item.get('token_info') or {}
-              print('::notice title=ITEM::'+' '.join(['KEYS='+','.join(sorted(item.keys())),'TYPE='+str(item.get('type')),'TO_MATCHES='+str(item.get('to')==os.environ.get('ADDRESS')),'TOKEN='+str(ti.get('address')),'TS='+str(item.get('block_timestamp')),'VALUE_TYPE='+type(item.get('value')).__name__,'TXID_LEN='+str(len(str(item.get('transaction_id'))))]))
+          raw=open('recent.json').read()
+          print('::notice title=RECENT_RAW::'+raw[:600].replace('\n',' '))
+          r=json.loads(raw); data=r.get('data') or []
+          meta=r.get('meta') or {}
+          print('::notice title=RECENT::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(data))+' META='+','.join(sorted(meta.keys()))+' FP='+str(bool(meta.get('fingerprint'))))
+          if data:
+              i=data[0]; ti=i.get('token_info') or {}
+              print('::notice title=ITEM::KEYS='+','.join(sorted(i.keys()))+' TYPE='+str(i.get('type'))+' TO_OK='+str(i.get('to')==os.environ['ADDRESS'])+' TOKEN='+str(ti.get('address'))+' VALUE_TYPE='+type(i.get('value')).__name__+' TXID_LEN='+str(len(str(i.get('transaction_id'))))+' TS='+str(i.get('block_timestamp')))
+              open('ts.txt','w').write(str(i.get('block_timestamp')))
           PYTHON
-          # Narrow bound sanity: a 1ms window ending before now must return nothing or only in-window items.
-          probe_max=$((now-1800000)); probe_min=$((probe_max-1))
-          url2="https://api.trongrid.io/v1/accounts/${ADDRESS}/transactions/trc20?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=${probe_min}&max_timestamp=${probe_max}&limit=3"
-          curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output narrow.json --header 'Accept: application/json' "$url2"
-          export PROBE_MIN=$probe_min PROBE_MAX=$probe_max
-          python3 - <<'PYTHON'
+          if [ -f ts.txt ]; then
+            ts=$(cat ts.txt)
+            for d in 0 1 -1; do
+              t=$((ts+d))
+              get "${base}?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=${t}&max_timestamp=${t}&limit=200" > "b${d}.json"
+              D=$d python3 - <<'PYTHON'
           import json,os
-          r=json.load(open('narrow.json'))
-          print('::notice title=NARROW::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(r.get('data',[])))+' TS='+str([i.get('block_timestamp') for i in r.get('data',[])])+' MIN='+os.environ.get('PROBE_MIN','')+' MAX='+os.environ.get('PROBE_MAX',''))
+          d=os.environ['D']; raw=open('b'+d+'.json').read(); r=json.loads(raw)
+          data=r.get('data') or []
+          print('::notice title=BOUND_'+d+'::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(data))+' TS='+str(sorted(set(i.get('block_timestamp') for i in data)))+' RAW='+raw[:160].replace('\n',' '))
           PYTHON
-          # Header-only block read availability on the solidity path (detail=false).
-          code3=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output header.json --write-out '%{http_code}' --header 'Content-Type: application/json' --data '{"detail":false}' 'https://api.trongrid.io/walletsolidity/getblock')
+            done
+            get "${base}?only_to=true&only_confirmed=true&contract_address=${usdt}&min_timestamp=$((ts-600000))&max_timestamp=${ts}&limit=5&order_by=block_timestamp%2Casc" > asc.json
+            python3 - <<'PYTHON'
+          import json
+          r=json.load(open('asc.json')); data=r.get('data') or []; meta=r.get('meta') or {}
+          print('::notice title=ASC::SUCCESS='+str(r.get('success'))+' ITEMS='+str(len(data))+' TS='+str([i.get('block_timestamp') for i in data])+' FP='+str(bool(meta.get('fingerprint')))+' FP_LEN='+str(len(str(meta.get('fingerprint') or '')))+' LINKS='+str(bool((meta.get('links') or {}).get('next'))))
+          PYTHON
+          fi
+          # Header-only block read availability on the solidity path (detail=false) by height.
+          code3=$(curl --silent --show-error --max-time 20 --retry 0 --proto '=https' --output header.json --write-out '%{http_code}' --header 'Content-Type: application/json' --data '{"id_or_num":"87741244","detail":false}' 'https://api.trongrid.io/walletsolidity/getblock')
           export CODE3=$code3
           python3 - <<'PYTHON'
           import json,os
+          raw=open('header.json').read()
           try:
-              r=json.load(open('header.json'))
-              keys=','.join(sorted(r.keys())) if isinstance(r,dict) else type(r).__name__
+              r=json.loads(raw)
               num=(r.get('block_header',{}).get('raw_data',{}).get('number') if isinstance(r,dict) else None)
-              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' KEYS='+keys+' HAS_TX='+str('transactions' in r if isinstance(r,dict) else None)+' NUMBER='+str(num)+' BYTES='+str(len(open('header.json','rb').read())))
+              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' KEYS='+(','.join(sorted(r.keys())) if isinstance(r,dict) else type(r).__name__)+' HAS_TX='+str(isinstance(r,dict) and 'transactions' in r)+' NUMBER='+str(num)+' BYTES='+str(len(raw))+' RAW='+raw[:200])
           except Exception as e:
-              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' PARSE_FAILED='+type(e).__name__)
+              print('::notice title=GETBLOCK::STATUS='+os.environ['CODE3']+' PARSE_FAILED='+type(e).__name__+' RAW='+raw[:200])
           PYTHON
