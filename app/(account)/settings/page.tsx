@@ -6,5 +6,5 @@ import {AccountSettings} from '@/components/account-settings';
 export default async function Page(){
  const user=await serverUser();
  if(!user)redirect('/auth');
- return <AccountSettings user={user} canManageSupport={supportAdmin(user.id)} canReviewIdentity={operationsAllowed(user.id,process.env.IDENTITY_REVIEWER_IDS)}/>;
+ return <AccountSettings user={user} canManageSupport={supportAdmin(user.id)} canReviewIdentity={!!user.emailVerifiedAt&&process.env.IDENTITY_REVIEW_ENABLED==='true'&&operationsAllowed(user.id,process.env.IDENTITY_REVIEWER_IDS)}/>;
 }
