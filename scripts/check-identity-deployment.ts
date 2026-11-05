@@ -15,6 +15,14 @@ async function main(){
  const requireStatus=(response:Response,status:number)=>{if(response.status!==status)throw Error('status')};
  try{
   const config=identityStorageConfig();if(!config||config.policy!=='account_lifetime'||process.env.IDENTITY_LIFECYCLE_ENABLED!=='true'||(process.env.CRON_SECRET||'').length<32)throw Error('configuration');
+  if(process.env.IDENTITY_REVIEW_ENABLED==='true'){
+   phase='reviewer-MFA-configuration';
+   const ids=(process.env.IDENTITY_REVIEWER_IDS||'').split(',').map(s=>s.trim());
+   if(process.env.SIRO_DURABLE_PASSKEY_ENABLED!=='true'||!ids.length||ids.some(id=>!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id)))throw Error('reviewer configuration');
+   const {rows}=await database().query('SELECT u.id FROM "User" u WHERE u.id=ANY($1::uuid[]) AND u."emailVerifiedAt" IS NOT NULL AND EXISTS(SELECT 1 FROM "DurablePasskeyCredential" k WHERE k."userId"=u.id AND k."rpId"=$2)',[ids,new URL(process.env.WEBAUTHN_ORIGIN||'').hostname]);
+   if(rows.length!==new Set(ids).size)throw Error('reviewer MFA');
+   console.log('Identity deployment preflight: configured reviewers have verified accounts and existing domain-bound passkeys.');
+  }
   phase='lifecycle-denial';requireStatus(await lifecycle(new Request('https://sirocash.vercel.app/api/internal/identity-lifecycle')),401);
   phase='lifecycle-reconciliation';requireStatus(await lifecycle(new Request('https://sirocash.vercel.app/api/internal/identity-lifecycle',{headers:{Authorization:'Bearer '+process.env.CRON_SECRET}})),200);
   console.log('Identity deployment preflight: authenticated lifecycle completed; unauthenticated lifecycle denied.');

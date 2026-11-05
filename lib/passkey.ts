@@ -1,3 +1,4 @@
+import {operationsAllowed} from './operations-policy';
 import {readJson} from './request-body';
 import {NextResponse} from 'next/server';
 import {sameOrigin,PublicApiError} from './api';
@@ -22,6 +23,7 @@ export async function handlePasskey(request:Request){
  if(!sessionHash)throw Error('يرجى تسجيل الدخول مجدداً.');
  const input=await readJson(request,65536);
  if(!input||typeof input!=='object'||Array.isArray(input)||typeof input.action!=='string')throw Error('طلب غير صالح.');
+ if(input.action==='authenticate-options'&&input.path==='/api/identity/review'&&(process.env.IDENTITY_REVIEW_ENABLED!=='true'||!operationsAllowed(user.id,process.env.IDENTITY_REVIEWER_IDS)))throw new PublicApiError('غير مصرّح بتفويض مراجعة الهوية.');
  const db:WalletDb={transaction:run=>databaseTransaction(tx=>run({query:async(sql,params)=>({rows:(await tx.query(sql,params)).rows})}))};
  try{
   const result=await durablePasskeyAction(db,{...c,userId:user.id,sessionHash},input);
