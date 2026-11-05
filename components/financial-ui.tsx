@@ -27,6 +27,7 @@ const states: Record<string, [string, string, string]> = {
   SUBMITTED: ["بانتظار التسوية", "Awaiting settlement", "neutral"],
   PENDING: ["قيد المعالجة", "Processing", "neutral"],
 };
+export function financialStateLabel(state:string,ar:boolean){return (states[state]??["قيد المراجعة","Under review"])[ar?0:1]}
 export function FinancialState({ state, ar }: { state: string; ar: boolean }) {
   const item = states[state] ?? ["قيد المراجعة", "Under review", "neutral"];
   return (

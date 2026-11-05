@@ -2,6 +2,7 @@
 import {readFile} from 'node:fs/promises';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
+import {TransactionDocument} from '../../components/transaction-document';
 import {WalletTransactionFeed} from '../../components/wallet-transaction-feed';
 import {AccountNavigation} from '../../components/account-navigation';
 import {ExchangeTickerView} from '../../components/exchange-ticker';
@@ -15,6 +16,10 @@ async function main(){
  const tickerCSS=await readFile('app/exchange-ticker.css','utf8');
  const layoutSource=await readFile('app/layout.tsx','utf8');const styles=await Promise.all([...layoutSource.matchAll(/import '\.\/(.*?\.css)';/g)].map(match=>readFile('app/'+match[1],'utf8')));
  const server=createServer((request,response)=>{
+  if(request.url?.startsWith('/statement-')){
+   const ar=request.url.includes('rtl'),data={enabled:true,userId:'fixture',operations:[{id:'00000000-0000-0000-0000-000000000001',kind:'WITHDRAWAL',amount:'6.123456',feeAmount:'0',state:'SUBMITTED',createdAt:'2026-11-05T01:00:00Z'}],payouts:[{id:'fixture-payout',operationId:'00000000-0000-0000-0000-000000000001',network:'TRC20',state:'CONFIRMED',txId:'a'.repeat(64),createdAt:'2026-11-05T01:01:00Z'}]};
+   const content=renderToStaticMarkup(React.createElement('div',{className:'site-shell account-workspace'},React.createElement(AccountNavigation,{active:'/activity',ar}),React.createElement('main',{className:'wallet-task-main'},React.createElement('p',null,'SYNTHETIC STATEMENT ONLY'),React.createElement(TransactionDocument,{data,scope:'withdrawals',ar}))));response.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});response.end(`<!doctype html><html dir="${ar?'rtl':'ltr'}" data-theme="obsidian"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/precision.css"></head><body>${content}</body></html>`);return;
+  }
   if(request.url==='/precision.css'){response.writeHead(200,{'Content-Type':'text/css'});response.end(styles.join('\n'));return}
   if(request.url?.startsWith('/precision-')){
    const ar=request.url.includes('rtl'),id=(n:number)=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');

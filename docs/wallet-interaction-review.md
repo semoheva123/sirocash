@@ -86,3 +86,14 @@ User explicitly selected the advanced global-wallet direction rather than privat
 - Real-browser fixture added to the existing CSP browser suite to check actual navigation/feed/account CSS at 320/390/1440px in RTL/LTR. Fixture is explicitly synthetic and has no session or financial I/O. Browser CI acceptance is recorded in the release, separate from physical-device proof.
 
 Local complete `npm test` and production `npm run build` passed. New interaction fixtures prove UTC grouping across offset dates, exact amounts, explicit read-only filtering, chip/form synchronization and exact detail/support navigation. No migration, live provider request or financial operation. No claim of absolute luxury, universal device performance or feature parity with regulated global wallets.
+
+## Scoped send and transaction-document refinement (2026-11-05)
+
+Scope: proposals 1/2/5 only. No beneficiaries, security-centre project, account-wide exports, schema migrations, financial activation or provider requests.
+
+- Five labelled send stages, field-local amount/UID errors, guarded amount/recipient editing with retained safe inputs, bounded header/body transport and an uncertain-outcome history link. The exact command/quote stays locked after an uncertain submission; authorization is not bypassed.
+- Owner-resolved transaction document with actual creation records and current state, exact decimal amounts and saved sender transfer fees. Recipient activity does not join another owner's operation fields. Chain confirmation remains separate from account completion. Missing historical fees/timestamps are not inferred.
+- Local escaped script-free HTML statement plus browser print/Save PDF. Download is explicitly HTML, not a generated PDF; print omits navigation and receipt controls. Completed transfers link to their exact owner-gated record.
+- Scoped charcoal/champagne palette, restrained semantic colours, keyboard focus, stable detail loading, short colour-only transitions disabled under reduced motion. No animation loops or financial polling added.
+
+Evidence: full `npm test` and production build passed; dedicated transaction statement/send-procedure tests and restricted-role migrated PostgreSQL fee/ownership fixtures passed. Actual Chromium browser fixture passed at 320/390/1440px RTL/LTR, including no horizontal overflow and print-control exclusion. This is synthetic SSR/layout acceptance, not physical-device performance or a real transfer. Existing older jsdom suites still report legacy attachEvent/detachEvent diagnostics; newer interaction fixtures initialize DOM before react-dom imports. Browser binary used locally is a transient no-save dependency, not an application dependency.

@@ -57,6 +57,13 @@ try{
   assert.equal(await page.locator('.wallet-ledger-reference').count(),2);
   assert.deepEqual(errors,[]);await page.close();
  }
+ for(const width of [320,390,1440])for(const language of ['ltr','rtl']){
+  const page=await browser.newPage({viewport:{width,height:900},reducedMotion:'reduce'});await page.goto(`http://127.0.0.1:${port}/statement-${language}`);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Statement overflow: ${width} ${language}`);
+  assert.equal(await page.locator('.transaction-events time').count(),2);
+  await page.emulateMedia({media:'print'});assert.equal(await page.locator('[data-receipt-document]').evaluate(e=>getComputedStyle(e).visibility),'visible');assert.equal(await page.locator('.receipt-tools button').first().isVisible(),false);await page.close();
+ }
+ console.log('Statement browser PASS: 320/390/1440px RTL/LTR layout, supplied event times only and print controls excluded. Synthetic SSR fixtures, not actual device receipt acceptance.');
  console.log('Precision ledger browser PASS: real feed/navigation/account CSS at 320/390/1440px in RTL/LTR, UTC date grouping, desktop columns/mobile cards and no horizontal overflow. Isolated synthetic SSR fixture, not device acceptance.');
  console.log('Ticker browser PASS: actual component/CSS animates at phone/desktop sizes in RTL/LTR, no page overflow, reduced motion disables animation and keeps prices scrollable. Synthetic only.');
  console.log('Production CSP browser PASS: old policy reproduces blocked prices; real fixed proxy policy + actual reader loads only the exact public JSON without cookies/referrer. Sibling paths/external hosts blocked; nonce scripts, self fetch and local interaction preserved. Synthetic response, no production auth or financial I/O.');
