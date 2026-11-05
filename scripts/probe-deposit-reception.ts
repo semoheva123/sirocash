@@ -2,6 +2,8 @@ import {probeNetworkReadiness} from '../lib/network-readiness';
 import {createBep20ReadRpc,productionBep20ReadRpc} from '../lib/bep20-rpc';
 import {observeUsdtUsdPrice} from '../lib/financial-price';
 import {createTronRead} from '../lib/tron-receipt-observer';
+import {createTronIndexRead} from '../lib/tron-index-read';
+import {tronUsdtContract} from '../lib/tron-deposit-verification';
 import {bep20UsdtContract} from '../lib/bep20-deposit-verification';
 const safeFailure=(e:unknown)=>e instanceof Error&&/^RPC_(?:HTTP_FAILURE|CONTENT_TYPE_INVALID|RESPONSE_TOO_LARGE|EMPTY_RESPONSE|TIMEOUT|INVALID_JSON|INVALID_ENVELOPE|TRANSPORT_FAILURE|READ_METHOD_NOT_ALLOWED)$/.test(e.message)?e.message:'UNEXPECTED_RESULT';
 /** Opt-in read-only BUILD diagnostic. Cannot enable reception, sign, buy, post or allocate.
@@ -31,16 +33,16 @@ async function main(){
    }catch(e){console.log('DEPOSIT_READ_CANDIDATE:'+name+':FAILED:'+phase+':'+safeFailure(e))}
   }
   try{
-   const read=createTronRead({endpoint:process.env.SIRO_TRON_RPC_URL!,apiKey:process.env.SIRO_TRON_RPC_API_KEY,maxResponseBytes:8388608});
-   const tip=await read('/walletsolidity/getnowblock',{}) as {block_header:{raw_data:{number:number}}};
-   const n=tip.block_header.raw_data.number;
-   const b=await read('/walletsolidity/getblockbynum',{num:n}) as {transactions?:{txID:string}[]};
-   const receipts=await read('/wallet/gettransactioninfobyblocknum',{num:n});
-   if(!Array.isArray(receipts)||receipts.length!==(b.transactions??[]).length)throw Error();
-   const ids=new Set(receipts.map((r:{id:string})=>r.id));if(ids.size!==receipts.length||(b.transactions??[]).some(t=>!ids.has(t.txID)))throw Error();
-   console.log('DEPOSIT_READ_TRON_BULK:COMPLETE_CANONICAL_TRANSACTION_SET_VERIFIED');
-  }catch{console.log('DEPOSIT_READ_TRON_BULK:FAILED')}
-  console.log('DEPOSIT_READ_CAPACITY:SHARED_RANGE_AND_BULK_SCANNER_TESTED_OFFLINE_LIVE_LOAD_ACCEPTANCE_STILL_REQUIRED');
+   const read=createTronRead({endpoint:process.env.SIRO_TRON_RPC_URL!,apiKey:process.env.SIRO_TRON_RPC_API_KEY});
+   const tip=await read('/walletsolidity/getblock',{detail:false}) as {blockID?:string;block_header?:{raw_data?:{number?:number;timestamp?:number}}};
+   const n=tip.block_header?.raw_data?.number,timestamp=tip.block_header?.raw_data?.timestamp;
+   if(typeof n!=='number'||typeof timestamp!=='number'||typeof tip.blockID!=='string'||tip.blockID.slice(0,16)!==n.toString(16).padStart(16,'0')||'transactions' in tip)throw Error();
+   const index=createTronIndexRead({endpoint:process.env.SIRO_TRON_INDEX_URL||'https://api.trongrid.io',apiKey:process.env.SIRO_TRON_RPC_API_KEY});
+   const listing=await index(tronUsdtContract,{minTimestamp:timestamp,maxTimestamp:timestamp+2999}) as {success?:unknown;data?:unknown};
+   if(listing?.success!==true||!Array.isArray(listing.data))throw Error();
+   console.log('DEPOSIT_READ_TRON_INDEX:HEADER_ONLY_ANCHORS_AND_RECIPIENT_FILTERED_HISTORY_VERIFIED');
+  }catch{console.log('DEPOSIT_READ_TRON_INDEX:FAILED')}
+  console.log('DEPOSIT_READ_CAPACITY:SHARED_RANGE_AND_INDEXED_SCANNER_TESTED_OFFLINE_LIVE_LOAD_ACCEPTANCE_STILL_REQUIRED');
  }catch{console.log('DEPOSIT_READ_PROBE:REFUSED_REQUIRES_DISABLED_FINANCIAL_EXECUTION')}
  console.log('DEPOSIT_READ_PROBE:NO_ACTIVATION_NO_WRITES_NO_PURCHASE_NO_BROADCAST');
 }

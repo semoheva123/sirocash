@@ -1,0 +1,36 @@
+name: TRON index read-only probe
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/tron-index-probe.yml'
+      - 'scripts/probe-tron-index-public.ts'
+      - 'lib/tron-index-read.ts'
+      - 'lib/tron-receipt-observer.ts'
+  workflow_dispatch:
+    inputs:
+      address:
+        description: 'Public base58 TRON address to inspect (indexed TRC20 history only)'
+        required: true
+        default: 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL'
+permissions: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      # Public, keyless, read-only shape check of the TronGrid indexed TRC20 history API.
+      # No secrets, database, signing, broadcast or production endpoint is touched.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      # Keyless public diagnostic of the real discovery modules: header-only anchors,
+      # recipient-filtered indexed listing, receipt, timestamp and ordering consistency.
+      - name: Exercise indexed discovery modules against public TronGrid
+        env:
+          PROBE_ADDRESS: ${{ inputs.address || 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL' }}
+        run: node --conditions=react-server --import tsx scripts/probe-tron-index-public.ts

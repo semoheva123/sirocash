@@ -86,7 +86,7 @@
     "test:financial-connection": "tsx tests/financial-connection.ts",
     "test:deposit-only": "node --conditions=react-server --import tsx tests/deposit-only.ts && npm run test:deposit-network",
     "deposit:probe": "node --conditions=react-server --import tsx scripts/probe-deposit-reception.ts",
-    "test:deposit-network": "node --conditions=react-server --import tsx tests/deposit-network-scanner.ts",
+    "test:deposit-network": "node --conditions=react-server --import tsx tests/deposit-network-scanner.ts && npm run test:tron-index",
     "test:tronrental": "node --conditions=react-server --import tsx tests/tronrental-read.ts && node tests/tronrental-live-probe.mjs && node --conditions=react-server --import tsx tests/dual-resource-budget-run.ts && node --conditions=react-server --import tsx tests/tronrental-orders.ts",
     "internal:readiness": "node --conditions=react-server --import tsx scripts/check-internal-transfers.ts",
     "test:internal-transfers": "node --conditions=react-server --import tsx tests/internal-transfers.ts",
@@ -105,7 +105,8 @@
     "test:database-resilience": "tsx tests/database-resilience.ts",
     "test:csp-browser": "node tests/csp/browser.mjs",
     "test:pwa": "node --conditions=react-server --import tsx tests/web-push.ts && tsx tests/pwa-seo.ts && tsx tests/pwa-client.tsx",
-    "push:check": "node --conditions=react-server --import tsx scripts/check-web-push.ts"
+    "push:check": "node --conditions=react-server --import tsx scripts/check-web-push.ts",
+    "test:tron-index": "node --conditions=react-server --import tsx tests/tron-index-read.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
