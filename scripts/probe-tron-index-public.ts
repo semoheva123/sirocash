@@ -17,7 +17,7 @@ async function main(){
  const previous=header(await read('/walletsolidity/getblock',{id_or_num:String(tip.n-1),detail:false}));
  note('LINK',`parentMatches=${tip.parent===previous.id} spacingMs=${tip.ts-previous.ts}`);
  await sleep(3000);
- const recent=await index(address,{minTimestamp:0,maxTimestamp:tip.ts}) as {success:boolean;data:{transaction_id:string;block_timestamp:number;to:string}[];meta:Record<string,unknown>};
+ const recent=await index(address,{minTimestamp:tip.ts-30*86400000,maxTimestamp:tip.ts}) as {success:boolean;data:{transaction_id:string;block_timestamp:number;to:string}[];meta:Record<string,unknown>};
  note('RECENT',`success=${recent.success} items=${recent.data.length} fingerprint=${Boolean(recent.meta.fingerprint)}`);
  if(!recent.data.length)return;
  const sample=recent.data[recent.data.length-1];
