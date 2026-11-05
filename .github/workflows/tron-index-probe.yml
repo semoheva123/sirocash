@@ -1,5 +1,8 @@
 name: TRON index read-only probe
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/tron-index-probe.yml'
   workflow_dispatch:
     inputs:
       address:
@@ -16,7 +19,7 @@ jobs:
       # No secrets, database, signing, broadcast or production endpoint is touched.
       - name: Query indexed TRC20 history with timestamp bounds
         env:
-          ADDRESS: ${{ inputs.address }}
+          ADDRESS: ${{ inputs.address || 'TNPeeaaFB7K9cmo4uQpcU32zGK8G1NYqeL' }}
         run: |
           set -eu
           case "$ADDRESS" in T[1-9A-HJ-NP-Za-km-z]*) test "${#ADDRESS}" = 34 ;; *) echo 'INVALID_ADDRESS'; exit 1 ;; esac
