@@ -50,6 +50,15 @@ async function main(){
   await assert.rejects(()=>consume(approved.token,digest,{...c,sessionHash:session2}),/APPROVAL_REQUIRED/);
   await assert.rejects(()=>db.transaction(async tx=>{await consumeDurableApproval(tx,c,approved.token,digest);throw Error('financial write failed')}),/financial write failed/);
   await consume();await assert.rejects(()=>consume(),/APPROVAL_REQUIRED/);
+  const reviewId='10000000-0000-4000-8000-000000000002',reviewPath='/api/identity/review',review={action:'document',id:reviewId,side:'front'},reviewDigest=paymentDigest(reviewPath,review);
+  for(const change of [{side:'back'},{id:userId},{action:'list'},{password:'secret'},{ownerId:userId}]){
+   const altered={...review,...change};try{assert.notEqual(paymentDigest(reviewPath,altered),reviewDigest)}catch(error){if(error instanceof assert.AssertionError)throw error}
+  }
+  assert.throws(()=>paymentDigest(reviewPath,{action:'decision',id:reviewId,status:'approved',confirmed:false}));assert.throws(()=>paymentDigest(reviewPath,{action:'decision',id:reviewId,status:'resubmit',confirmed:true}));
+  const decisionDigest=paymentDigest(reviewPath,{action:'decision',id:reviewId,status:'approved',confirmed:true});assert.notEqual(reviewDigest,decisionDigest);assert.notEqual(reviewDigest,digest);
+  await act({action:'authenticate-options',path:reviewPath,payload:review});const reviewApproval=await act({action:'authenticate-verify'}) as {token:string};
+  await assert.rejects(()=>consume(reviewApproval.token,digest),/APPROVAL_REQUIRED/);await assert.rejects(()=>consume(reviewApproval.token,decisionDigest),/APPROVAL_REQUIRED/);
+  await assert.rejects(()=>consume(reviewApproval.token,reviewDigest,{...c,sessionHash:session2}),/APPROVAL_REQUIRED/);await consume(reviewApproval.token,reviewDigest);await assert.rejects(()=>consume(reviewApproval.token,reviewDigest),/APPROVAL_REQUIRED/);
   await act(options);const expired=await act({action:'authenticate-verify'}) as {token:string};await pg.exec('UPDATE "DurablePaymentApproval" SET "expiresAt"=now()-interval \'1 second\'');await assert.rejects(()=>consume(expired.token),/APPROVAL_REQUIRED/);
   await act(options);const stale=await act({action:'authenticate-verify'}) as {token:string};await act(options);await assert.rejects(()=>consume(stale.token),/APPROVAL_REQUIRED/);
   const broken:WalletDb={transaction:run=>db.transaction(tx=>run({query:async(sql,params)=>{if(sql.startsWith('INSERT INTO "DurablePaymentApproval"'))throw Error('injected db outage');return tx.query(sql,params)}}))};
