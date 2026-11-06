@@ -1,0 +1,80 @@
+name: Ops task on VPS
+
+# Trigger model: the Arena GitHub App can push but cannot call workflow_dispatch
+# (Actions permission is read-only), so a push that changes `.run` on main is the trigger.
+# `.run` format: first line = task name (tasks/<name>.sh), second line (optional) = args.
+# Humans may still use the manual "Run workflow" button.
+on:
+  push:
+    branches: [main]
+    paths: ['.run']
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Task script name under tasks/ (without .sh)"
+        required: true
+        default: "diagnose"
+      args:
+        description: "Optional arguments"
+        required: false
+        default: ""
+
+concurrency:
+  group: vps-ops
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve task
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            task="${{ inputs.task }}"; args="${{ inputs.args }}"
+          else
+            task="$(sed -n '1p' .run | tr -d '\r')"; args="$(sed -n '2p' .run | tr -d '\r')"
+          fi
+          case "$task" in *[!a-zA-Z0-9_-]*|"") echo "invalid task name: $task"; exit 1 ;; esac
+          test -f "tasks/$task.sh" || { echo "tasks/$task.sh not found"; exit 1; }
+          echo "task=$task" >> "$GITHUB_OUTPUT"
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+
+      - name: Run task
+        id: task
+        env:
+          TASK: ${{ steps.resolve.outputs.task }}
+          TASK_ARGS: ${{ steps.resolve.outputs.args }}
+        run: |
+          set -o pipefail
+          chmod +x tasks/*.sh lib/*.sh
+          mkdir -p "$RUNNER_TEMP/report"
+          status=0
+          bash "tasks/$TASK.sh" $TASK_ARGS 2>&1 | tee "$RUNNER_TEMP/report/output.txt" || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "## Task \`$TASK\` exit=$status" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit report to reports/
+        if: always()
+        env:
+          TASK: ${{ steps.resolve.outputs.task }}
+          STATUS: ${{ steps.task.outputs.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 lib/write_report.py "$RUNNER_TEMP/report/output.txt" reports
+          git config user.name "vps-runner"
+          git config user.email "vps-runner@users.noreply.github.com"
+          git add reports
+          git commit -m "report: $TASK exit=${STATUS:-?} run=${{ github.run_id }}" || exit 0
+          # Pushes made with GITHUB_TOKEN never trigger workflows -> no loops.
+          for i in 1 2 3; do git pull --rebase -q origin main && git push -q origin HEAD:main && break || sleep 3; done
+
+      - name: Fail job if task failed
+        if: steps.task.outputs.status != '0'
+        run: exit 1
