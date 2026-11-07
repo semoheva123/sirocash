@@ -96,3 +96,19 @@ scanner lease (`BUSY_OR_PAUSED` failures). It was removed with owner approval; o
 sole automatic scheduler, so a pg_cron outage now delays discovery (cursors never skip)
 until noticed via `lastSuccessAt` or a manual dispatch. Full-execution scheduling, when
 approved, must be added deliberately.
+
+## 2026-11-07: provider-behind is not a reorg
+
+`DepositNetworkScanner.TRC20` paused at 09:48 UTC with `reason=CHAIN_REORG` although the
+stored checkpoint hash (block 87790379) matched the canonical chain exactly. The shared
+scanner treated a finalized/solidified head **below** its own checkpoint as a reorg; a
+load-balanced provider can answer from a node that is a few blocks behind, which proves
+nothing about the chain. Scanning stayed halted (fail closed) until the operator verified
+the hash against the chain and resumed both the network row and its cursors (approved
+2026-11-07 ~20:11 UTC; no cursor, hash or balance was changed).
+
+Fix: when `lastBlock > head` the scan now returns `PROVIDER_BEHIND` for that round without
+pausing or moving the checkpoint; the canonical-hash comparison still runs as soon as the
+provider is back at or past the checkpoint and still pauses on a real hash change. A
+persistent provider-behind condition surfaces through `lastSuccessAt` staleness in
+`depositScannerHealthy`, not through silent progress.
