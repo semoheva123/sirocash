@@ -1,16 +1,13 @@
-/* Launch screen for the installed app. Hidden in ordinary browser tabs; shown only in standalone display modes
-   where the platform otherwise paints a bare black window until the first route renders. */
-.siro-splash { display: none; }
-@media (display-mode: standalone), (display-mode: window-controls-overlay), (display-mode: fullscreen) {
- .siro-splash {
-  position: fixed; inset: 0; z-index: 2147483000; display: grid; grid-template-rows: 1fr auto; place-items: center;
-  padding: max(24px, env(safe-area-inset-top)) 24px max(28px, env(safe-area-inset-bottom));
-  background: radial-gradient(ellipse at 50% 30%, #1a1b23 0%, #0B0B0F 62%); color: #f4f4f5;
-  font-family: 'Manrope Variable', 'Noto Sans Arabic Variable', system-ui, sans-serif;
-  opacity: 1; transition: opacity .42s ease; will-change: opacity;
-  /* CSS-only expiry: even without JavaScript the screen releases the page. */
-  animation: siro-splash-expire 0s 4s forwards;
- }
+/* Launch screen shown on every cold load, in browser tabs and in the installed app alike, replacing the bare
+   dark window platforms paint until the first route renders. Removed by the client once the document has loaded. */
+.siro-splash {
+ position: fixed; inset: 0; z-index: 2147483000; display: grid; grid-template-rows: 1fr auto; place-items: center;
+ padding: max(24px, env(safe-area-inset-top)) 24px max(28px, env(safe-area-inset-bottom));
+ background: radial-gradient(ellipse at 50% 30%, #1a1b23 0%, #0B0B0F 62%); color: #f4f4f5;
+ font-family: 'Manrope Variable', 'Noto Sans Arabic Variable', system-ui, sans-serif;
+ opacity: 1; transition: opacity .42s ease; will-change: opacity;
+ /* CSS-only expiry: even without JavaScript the screen releases the page. */
+ animation: siro-splash-expire 0s 4s forwards;
 }
 .siro-splash[data-phase="leaving"] { opacity: 0; pointer-events: none; }
 .siro-splash-stage { display: grid; justify-items: center; gap: 14px; animation: siro-splash-rise .7s cubic-bezier(.2,.7,.2,1) both; }
