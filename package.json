@@ -104,7 +104,7 @@
     "notifications:check": "node --conditions=react-server --import tsx scripts/check-account-notifications.ts",
     "test:database-resilience": "tsx tests/database-resilience.ts",
     "test:csp-browser": "node tests/csp/browser.mjs",
-    "test:pwa": "node --conditions=react-server --import tsx tests/web-push.ts && tsx tests/pwa-seo.ts && tsx tests/pwa-client.tsx",
+    "test:pwa": "node --conditions=react-server --import tsx tests/web-push.ts && tsx tests/pwa-seo.ts && tsx tests/pwa-client.tsx && tsx tests/app-splash.tsx",
     "push:check": "node --conditions=react-server --import tsx scripts/check-web-push.ts",
     "test:tron-index": "node --conditions=react-server --import tsx tests/tron-index-read.ts"
   },
