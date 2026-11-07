@@ -114,8 +114,13 @@ async function main(){const pg=new PGlite();try{
  for(const owner of owners)assert.equal((await walletBalances(worker,owner)).posted,'39.920000');
  assert.equal((await sql('SELECT count(*)::int AS n FROM "WalletOperation"')).rows[0].n,4);
  assert.equal((await sql('SELECT sum(amount)::text AS total FROM "LedgerEntry"')).rows[0].total,'0.000000');
+ // A provider answering from a node behind our checkpoint is skipped for the round, never treated as a reorg.
+ await sql('UPDATE "DepositNetworkScanner" SET "lastBlock"=116,"lastHash"=$1 WHERE network=\'BEP20\'',[hex(116)]);
+ head=120;assert.equal((await scan.scan('BEP20',signal())).state,'PROVIDER_BEHIND');
+ assert.deepEqual((await sql('SELECT paused,"lastBlock"::int AS b,"claimId" FROM "DepositNetworkScanner" WHERE network=\'BEP20\'')).rows[0],{paused:false,b:116,claimId:null},'provider lag never pauses or moves the checkpoint');
+ assert.equal(await depositScannerHealthy(worker),true);
  // Fail closed on canonical anchor change; all affected owners stop on the same network.
- head=130;await sql('UPDATE "DepositNetworkScanner" SET "lastBlock"=116,"lastHash"=$1 WHERE network=\'BEP20\'',[hex(116)]);reorg=true;
+ head=130;reorg=true;
  await assert.rejects(()=>scan.scan('BEP20',signal()),/CHAIN_REORG/);assert.equal((await sql('SELECT paused FROM "DepositNetworkScanner" WHERE network=\'BEP20\'')).rows[0].paused,true);
  assert.equal((await scan.scan('BEP20',signal())).state,'BUSY_OR_PAUSED');assert.equal(await depositScannerHealthy(worker),false);
  console.log('Shared scanner PASS: 1000-block bounded range, OR recipients, recipient-filtered indexed TRON discovery with header-only anchors and canonical receipts, dense-block fallback, partial replay, new-address backfill, owner-bound credits exactly once, balanced ledger and network-wide reorg pause. Isolated DB only.');

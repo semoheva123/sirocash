@@ -72,7 +72,14 @@ export function createNetworkDepositScanner(db:WalletDb,o:Options){
   if(!lease)return {state:'BUSY_OR_PAUSED'};
   try{
    const head=await finalHeight(network);check();
-   if(lease.lastBlock!==null&&(num(lease.lastBlock)>head||(await block(network,num(lease.lastBlock))).hash!==lease.lastHash))throw Error('CHAIN_REORG');
+   if(lease.lastBlock!==null){
+    const last=num(lease.lastBlock);
+    // A finalized/solidified height below our own checkpoint cannot prove a reorg: load-balanced
+    // providers may answer from a node that is a few blocks behind. Skip this round without pausing;
+    // the canonical-hash check still fails closed once the provider is back at or past the checkpoint.
+    if(last>head)return {state:'PROVIDER_BEHIND',lagBlocks:0};
+    if((await block(network,last)).hash!==lease.lastHash)throw Error('CHAIN_REORG');
+   }
    const addresses=await db.transaction(async tx=>{
     const {rows}=await tx.query('SELECT a.id,a.address,s."nextBlock",s."transactionOffset",s."previousBlockHash",s."blockHash" FROM "UserDepositAddress" a JOIN "DepositAddressVault" v ON v.id=a."vaultId" JOIN "DepositScanCursor" s ON s."addressId"=a.id WHERE a.network=$1 AND v.enabled AND v."originVerified" AND NOT s.paused AND (s."expiresAt" IS NULL OR s."expiresAt"<=clock_timestamp()) ORDER BY s."nextBlock",s."transactionOffset",a.id LIMIT 2049',[network]);
     if(rows.length>2048)throw Error('SCAN_ADDRESS_CAPACITY');
