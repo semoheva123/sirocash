@@ -4,14 +4,12 @@ import {useEffect,useState} from 'react';
 const minimumVisibleMs=700;
 /** Hard upper bound: if the window never reports `load` (slow network), the screen still gets out of the way. */
 const maximumVisibleMs=3200;
-/** Launch screen for the installed app (standalone display mode only — see `app/splash.css`).
+/** Launch screen shown on every cold load — browser tabs and the installed app alike (see `app/splash.css`).
  *  Server-rendered so it is part of the very first paint; a client effect removes it once the document has loaded.
  *  Decorative only: no account data, no network, no frame loop; a CSS-only expiry hides it even if hydration never happens. */
 export function AppSplash(){
  const [phase,setPhase]=useState<'visible'|'leaving'|'gone'>('visible');
  useEffect(()=>{
-  const standalone=window.matchMedia('(display-mode: standalone), (display-mode: window-controls-overlay), (display-mode: fullscreen)').matches||(navigator as Navigator&{standalone?:boolean}).standalone===true;
-  if(!standalone){setPhase('gone');return}
   const shown=performance.now();let leave:ReturnType<typeof setTimeout>|undefined,remove:ReturnType<typeof setTimeout>|undefined;
   const dismiss=()=>{const wait=Math.max(0,minimumVisibleMs-(performance.now()-shown));leave=setTimeout(()=>{setPhase('leaving');remove=setTimeout(()=>setPhase('gone'),window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:420)},wait)};
   const cap=setTimeout(dismiss,maximumVisibleMs);

@@ -22,14 +22,14 @@ Search Console/Bing ownership submission and actual indexing/rank are not establ
 ## Verification and limits
 Complete offline regression suite and production build passed locally; new PGlite tests cover full migrated schema, scoped registration, SSRF/key rejection, queue rollback/failure isolation, expiry/revocation, no replay and grants. Client tests cover explicit opt-in/out and install cancellation; VM tests cover same-origin push-click target and no cache handler. Local HTTP smoke verified public pages, English root language, manifest, SW, sitemap/robots and unauthenticated push refusal. No physical Android/iPhone receipt or search-engine indexing is claimed. See release PR for CI and production promotion evidence.
 
-## Installed-app launch screen (2026-11-08)
+## Launch screen (2026-11-08)
 
-Desktop and mobile platforms paint only the manifest `background_color` until the first
-route renders, which read as a bare black window. `components/app-splash.tsx` is rendered
-in the root layout before the route tree, so it is part of the very first paint, and
-`app/splash.css` shows it only under `display-mode: standalone / window-controls-overlay /
-fullscreen` (ordinary tabs never see it). It carries the wordmark, the Syrian flag (green,
-white, black bands, three red stars) and a tricolour progress line; no account data, no
-network, no frame loop. It stays at least 700 ms after hydration, leaves once `load` fires
-(hard cap 3.2 s), honours `prefers-reduced-motion`, and a CSS-only 4 s expiry releases the
-page even without JavaScript. Covered by `tests/app-splash.tsx` (`npm run test:pwa`).
+Platforms paint only the manifest `background_color` until the first route renders, which read
+as a bare black window. `components/app-splash.tsx` is rendered in the root layout before the
+route tree, so it is part of the very first paint on **every cold load — browser tabs and the
+installed app alike** (owner decision 2026-11-08; it was standalone-only for a few hours). It
+carries the wordmark, the Syrian flag (green, white, black bands, three red stars) and a
+tricolour progress line; no account data, no network, no frame loop, no storage. It stays at
+least 700 ms after hydration, leaves once `load` fires (hard cap 3.2 s), honours
+`prefers-reduced-motion`, and a CSS-only 4 s expiry releases the page even without JavaScript.
+Client-side navigations never remount it. Covered by `tests/app-splash.tsx` (`npm run test:pwa`).
