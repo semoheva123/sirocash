@@ -1,5 +1,6 @@
 import {identityReviewCommand} from '@/lib/identity-review-intent';
 import {requireIdentityReviewApproval} from '@/lib/identity-review-approval';
+import {reviewGatewayFailure} from '@/lib/identity-review-messages';
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
 import {currentUser} from '@/lib/email-auth';
@@ -21,12 +22,12 @@ export async function POST(request:Request){
   const quota=await identityGateway(user.id,'/review/auth-attempt',{method:'POST',review:true});if(!quota.ok)return securityFailure('تم بلوغ حد محاولات المراجعة أو تعذّر التحقق.',quota.status===429?429:503);
   const {rows}=await database().query('SELECT "passwordHash" FROM "User" WHERE id=$1',[user.id]);
   if(!rows[0]?.passwordHash||!await verifyPassword(input.password,rows[0].passwordHash))return securityFailure('تعذّر تأكيد صلاحية المراجع.',403);
-  await requireIdentityReviewApproval(request,user.id,command);
+  try{await requireIdentityReviewApproval(request,user.id,command)}catch{return securityFailure('انتهت صلاحية تأكيد الجهاز لهذا الإجراء أو سبق استخدامه. أعد المحاولة ليُطلب تأكيد جديد.',403)}
   let path='/review',method='GET',body:string|undefined;
   if(input.action==='document'){if(!input.id||!input.side)return securityFailure('بيانات الوثيقة غير مكتملة.',400);path+='/document?id='+input.id+'&side='+input.side}
   if(input.action==='decision'){if(!input.id||!input.status||input.confirmed!==true)return securityFailure('يلزم تأكيد المراجعة البشرية.',400);method='POST';body=JSON.stringify({id:input.id,status:input.status,reason:'reason' in input?input.reason:undefined,confirmed:true})}
   const response=await identityGateway(user.id,path,{review:true,method,body});
-  if(!response.ok)return securityFailure('تعذّر إكمال المراجعة أو انتهت صلاحية الطلب.',response.status===409?409:503);
+  if(!response.ok)return securityFailure(reviewGatewayFailure(input.action,response.status),[404,409,429].includes(response.status)?response.status:503);
   if(input.action==='document')return new Response(response.body,{headers:{...securityHeaders,'Content-Type':'image/jpeg','Content-Disposition':'attachment; filename="identity-document.jpg"','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; sandbox"}});
   return NextResponse.json(await response.json(),{headers:securityHeaders});
  }catch(error){return securityError(error)}
