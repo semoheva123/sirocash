@@ -1,0 +1,113 @@
+/* SiroCash luxury system (2026-11-12). Loaded last: one token set and one treatment for the primitives every
+   private screen shares. Charcoal canvas, hairline borders, a single champagne accent for primary actions and
+   emphasis, silver for secondary/network accents. No loud gradients, no new frame loops, no copy changes. */
+:root[data-theme="obsidian"]{
+ --lux-canvas:#0B0B0F;--lux-surface:#121214;--lux-surface-2:#17171B;--lux-surface-3:#1D1D22;
+ --lux-line:#26262B;--lux-line-strong:#34343A;--lux-highlight:#FFFFFF0C;
+ --lux-text:#F4F4F5;--lux-text-2:#B4B4BC;--lux-muted:#8E8E93;--lux-faint:#6B6B72;
+ --lux-accent:#D6C5A2;--lux-accent-soft:#E6D9BE;--lux-accent-deep:#C9B48A;--lux-accent-ink:#171511;--lux-accent-line:#4A4231;--lux-accent-wash:#211F1B;
+ --lux-silver:#C7C9D1;--lux-success:#A5CDB6;--lux-warning:#DECA97;--lux-danger:#E0AEAE;
+ --lux-radius:18px;--lux-radius-lg:24px;--lux-radius-sm:12px;
+ --lux-shadow:0 1px 0 var(--lux-highlight) inset,0 18px 48px -28px #000000B3;
+ accent-color:var(--lux-accent);
+}
+:root[data-theme="obsidian"] body{background:var(--lux-canvas);color:var(--lux-text)}
+:root[data-theme="obsidian"] ::selection{background:var(--lux-accent);color:var(--lux-accent-ink)}
+:root[data-theme="obsidian"] .account-workspace{--wallet-accent:var(--lux-accent);--wallet-accent-ink:var(--lux-accent-ink);--wallet-line:var(--lux-line);--wallet-muted:var(--lux-muted);font-feature-settings:"tnum" 1,"cv11" 1}
+
+/* Typography: quieter labels, confident numerals. */
+:root[data-theme="obsidian"] .account-workspace :is(h1,h2,h3){letter-spacing:-.015em;font-weight:600}
+:root[data-theme="obsidian"] .account-workspace :is(.mobile-wallet-header small,.wallet-card-heading,.wallet-page-title small,.settings-menu-group-title,.obsidian-overline,.premium-nav-group,.signature-rail-identity,.rail-caption,.eyebrow){font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--lux-accent);opacity:.85}
+:root[data-theme="obsidian"] .account-workspace :is(.mobile-balance-value strong,.big-balance,.transaction-document-amount,.wallet-transaction-value strong,.guided-send .transfer-amount-field input,.remittance-section>label>input){font-variant-numeric:tabular-nums lining-nums;letter-spacing:-.03em}
+:root[data-theme="obsidian"] .account-workspace :is(p,small,time,dd,.settings-note,.settings-description){color:var(--lux-text-2)}
+:root[data-theme="obsidian"] .account-workspace :is(small,time,.settings-note,.wallet-transaction-copy small,.mobile-recent li small){color:var(--lux-muted)}
+
+/* Surfaces: one card treatment with a hairline and a one-pixel inner highlight. */
+:root[data-theme="obsidian"] .account-workspace :is(.wallet-overview-card,.glass,.card,.settings-card,.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a,.remittance-method-list>button,.send-route-picker>button,.transaction-document,.transaction-loading,.remittance-section,.financial-record-card,.deposit-studio-main,.mobile-settings-menu,.wallet-bottom-sheet,.payment-unknown,.receipt-money-details,.transfer-parties){background:var(--lux-surface);border:1px solid var(--lux-line);box-shadow:var(--lux-shadow)}
+:root[data-theme="obsidian"] .account-workspace :is(.wallet-overview-card,.glass,.settings-card,.transaction-document,.deposit-studio-main){border-radius:var(--lux-radius-lg)}
+:root[data-theme="obsidian"] .account-workspace :is(.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a,.remittance-method-list>button,.send-route-picker>button,.financial-record-card,.mobile-settings-menu){border-radius:var(--lux-radius)}
+:root[data-theme="obsidian"] .account-workspace :is(.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a):hover{background:var(--lux-surface-2);border-color:var(--lux-line-strong)}
+
+/* Balance card: the one place the accent frames a surface. */
+:root[data-theme="obsidian"] .account-workspace .wallet-overview-card{border-color:var(--lux-accent-line);background:linear-gradient(180deg,var(--lux-surface-2),var(--lux-surface) 60%);position:relative;overflow:hidden}
+:root[data-theme="obsidian"] .account-workspace .wallet-overview-card::before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,var(--lux-accent) 50%,transparent);opacity:.55;pointer-events:none}
+:root[data-theme="obsidian"] .account-workspace .wallet-card-heading>span:last-child{color:var(--lux-text-2);letter-spacing:.02em;text-transform:none;font-weight:500;border-color:var(--lux-accent-line);border-radius:999px;padding:4px 10px}
+:root[data-theme="obsidian"] .account-workspace .mobile-balance>span{color:var(--lux-muted);font-size:12px;letter-spacing:.02em}
+:root[data-theme="obsidian"] .account-workspace .mobile-balance-value>strong{font-weight:600;color:var(--lux-text)}
+:root[data-theme="obsidian"] .account-workspace .mobile-balance-value>strong small{color:var(--lux-accent);font-size:13px;font-weight:600;letter-spacing:.08em;margin-inline-start:4px}
+:root[data-theme="obsidian"] .account-workspace .mobile-currencies span{border:1px solid var(--lux-line);background:transparent;color:var(--lux-text-2);border-radius:999px;padding:5px 11px;font-size:11px}
+:root[data-theme="obsidian"] .account-workspace .mobile-currencies span small{color:var(--lux-muted)}
+:root[data-theme="obsidian"] .account-workspace .wallet-primary-funding{border-top:1px solid var(--lux-line)}
+:root[data-theme="obsidian"] .account-workspace .wallet-primary-funding a{color:var(--lux-text);font-weight:500}
+:root[data-theme="obsidian"] .account-workspace .wallet-primary-funding a svg{color:var(--lux-accent)}
+:root[data-theme="obsidian"] .account-workspace .wallet-primary-funding a+a{border-inline-start-color:var(--lux-line)}
+
+/* Buttons: champagne primary with dark ink, hairline secondary. */
+:root[data-theme="obsidian"] .account-workspace .button:not(.secondary):not(:disabled),:root[data-theme="obsidian"] .account-workspace .wallet-nav-send svg,:root[data-theme="obsidian"] .account-workspace .wallet-feed-tabs button[aria-pressed="true"],:root[data-theme="obsidian"] .account-workspace .settings-language button.selected,:root[data-theme="obsidian"] .deposit-workspace .deposit-network[aria-pressed="true"] .deposit-network-radio,:root[data-theme="obsidian"] .account-workspace .transfer-progress [aria-current="step"]>span{background:var(--lux-accent);color:var(--lux-accent-ink);border-color:var(--lux-accent)}
+:root[data-theme="obsidian"] .account-workspace .button:not(.secondary):not(:disabled):hover{background:var(--lux-accent-soft);border-color:var(--lux-accent-soft);transform:none;box-shadow:none}
+:root[data-theme="obsidian"] .account-workspace .button.secondary,:root[data-theme="obsidian"] .account-workspace .settings-menu-signout,:root[data-theme="obsidian"] .account-workspace .sheet-cancel,:root[data-theme="obsidian"] .account-workspace .payment-review-edits>button{background:transparent;border:1px solid var(--lux-line-strong);color:var(--lux-text)}
+:root[data-theme="obsidian"] .account-workspace .button.secondary:hover,:root[data-theme="obsidian"] .account-workspace .settings-menu-signout:hover{background:var(--lux-surface-2);border-color:var(--lux-accent-line)}
+:root[data-theme="obsidian"] .account-workspace .button{border-radius:14px;font-weight:600;letter-spacing:.01em}
+:root[data-theme="obsidian"] .account-workspace .transfer-progress [aria-current="step"]{color:var(--lux-accent)}
+
+/* Icon buttons and avatars: one 44px hairline tile. */
+:root[data-theme="obsidian"] .account-workspace :is(.mobile-icon-button,.mobile-avatar,.wallet-page-header>a,.wallet-page-header>button,.wallet-page-mark,.notifications-close,.notifications-page header>a,.route-heading-icon,.route-option-icon,.wallet-transaction-symbol,.feature-icon,.transaction-document-mark){background:var(--lux-surface-2);border:1px solid var(--lux-line);color:var(--lux-text);border-radius:14px}
+:root[data-theme="obsidian"] .account-workspace :is(.mobile-avatar,.wallet-page-mark,.feature-icon,.transaction-document-mark,.route-heading-icon){color:var(--lux-accent);border-color:var(--lux-accent-line);background:var(--lux-accent-wash)}
+:root[data-theme="obsidian"] .account-workspace .notification-count{background:var(--lux-accent);color:var(--lux-accent-ink);font-weight:700}
+
+/* Section titles and "view all" links. */
+:root[data-theme="obsidian"] .account-workspace .mobile-section-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+:root[data-theme="obsidian"] .account-workspace .mobile-section-title h2,:root[data-theme="obsidian"] .account-workspace .wallet-service-grid>h2,:root[data-theme="obsidian"] .account-workspace .wallet-feed-heading h2{font-size:15px;font-weight:600;color:var(--lux-text)}
+:root[data-theme="obsidian"] .account-workspace .mobile-section-title a{color:var(--lux-accent);font-size:12px;font-weight:500;text-decoration:none;text-underline-offset:4px}
+:root[data-theme="obsidian"] .account-workspace .mobile-section-title a:hover{text-decoration:underline}
+:root[data-theme="obsidian"] .account-workspace .wallet-soon{color:var(--lux-muted);border:1px solid var(--lux-line);border-radius:999px;padding:2px 8px;font-size:10px}
+
+/* Lists: quiet rows, signed amounts in state colours. */
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-value strong{color:var(--lux-text)}
+:root[data-theme="obsidian"] .account-workspace .positive{color:var(--lux-success)}
+:root[data-theme="obsidian"] .account-workspace li[data-unread=true]{border-inline-start-color:var(--lux-accent)!important}
+
+/* Settings: group titles in champagne, rows with silver icons and a hairline. */
+:root[data-theme="obsidian"] .account-workspace .settings-main .mobile-settings-menu{padding:4px 18px}
+:root[data-theme="obsidian"] .account-workspace .settings-main .mobile-settings-menu>a{border-bottom-color:var(--lux-line);min-height:64px;padding:16px 0;font-weight:500}
+:root[data-theme="obsidian"] .account-workspace .settings-main .mobile-settings-menu>a>svg:first-child{color:var(--lux-silver);width:20px;height:20px}
+:root[data-theme="obsidian"] .account-workspace .settings-main .mobile-settings-menu>a:active{background:transparent;color:var(--lux-accent)}
+:root[data-theme="obsidian"] .account-workspace .settings-main .mobile-settings-menu>a:active>svg:first-child{color:var(--lux-accent)}
+:root[data-theme="obsidian"] .account-workspace .settings-row-chevron{color:var(--lux-faint)}
+:root[data-theme="obsidian"] .account-workspace .settings-menu-group-title{color:var(--lux-accent)!important;margin:26px 0 4px!important}
+:root[data-theme="obsidian"] .account-workspace .settings-subheading{border-top-color:var(--lux-line)}
+:root[data-theme="obsidian"] .account-workspace .settings-details dt{color:var(--lux-muted)}
+:root[data-theme="obsidian"] .account-workspace .settings-verified{color:var(--lux-success)}
+
+/* Inputs: hairline fields, champagne focus. */
+:root[data-theme="obsidian"] .account-workspace :is(input,select,textarea){background:var(--lux-canvas);border:1px solid var(--lux-line-strong);border-radius:var(--lux-radius-sm);color:var(--lux-text)}
+:root[data-theme="obsidian"] .account-workspace :is(input,select,textarea):focus{border-color:var(--lux-accent);box-shadow:0 0 0 3px #D6C5A224;outline:none}
+:root[data-theme="obsidian"] .account-workspace :is(a,button,input,select,summary,textarea):focus-visible{outline:2px solid var(--lux-accent);outline-offset:3px}
+
+/* Bottom navigation: current item in champagne, the send key as a champagne tile. */
+:root[data-theme="obsidian"] .account-workspace .pro-mobile-nav{background:#0B0B0FF2;border-top:1px solid var(--lux-line);backdrop-filter:saturate(140%) blur(14px);-webkit-backdrop-filter:saturate(140%) blur(14px)}
+:root[data-theme="obsidian"] .account-workspace .pro-mobile-nav a{color:var(--lux-muted)}
+:root[data-theme="obsidian"] .account-workspace .pro-mobile-nav a[aria-current="page"]{color:var(--lux-accent);box-shadow:inset 0 2px var(--lux-accent)}
+:root[data-theme="obsidian"] .account-workspace .pro-mobile-nav .wallet-nav-send{color:var(--lux-text-2)}
+:root[data-theme="obsidian"] .account-workspace .wallet-nav-send svg{border-radius:14px;box-shadow:0 8px 20px -10px #D6C5A2AA}
+:root[data-theme="obsidian"] .account-workspace .account-rail nav>a[aria-current="page"]{background:var(--lux-accent-wash);border-color:var(--lux-accent-line);color:var(--lux-accent)}
+:root[data-theme="obsidian"] .account-workspace .account-rail .logo-mark,:root[data-theme="obsidian"] .account-workspace .logo-dot{color:var(--lux-accent)}
+:root[data-theme="obsidian"] .account-workspace .logo-mark{background:var(--lux-accent-wash);border:1px solid var(--lux-accent-line);transform:none}
+
+/* Exchange ticker and status strips: silver text, champagne separators. */
+:root[data-theme="obsidian"] .exchange-ticker{border-bottom:1px solid var(--lux-line);color:var(--lux-text-2)}
+:root[data-theme="obsidian"] .exchange-ticker-group strong{color:var(--lux-text)}
+:root[data-theme="obsidian"] .account-workspace .mobile-security-note{color:var(--lux-faint);font-size:11px}
+:root[data-theme="obsidian"] .account-workspace .mobile-security-note svg{color:var(--lux-accent)}
+
+/* Sheets and dialogs: same surface, champagne handle. */
+:root[data-theme="obsidian"] .wallet-bottom-sheet{background:var(--lux-surface)!important;border-color:var(--lux-line-strong)!important}
+:root[data-theme="obsidian"] .sheet-handle{background:var(--lux-accent-line)}
+:root[data-theme="obsidian"] .account-workspace .modal{background:var(--lux-surface);border:1px solid var(--lux-line-strong);border-radius:var(--lux-radius-lg)}
+
+/* Scrollbars (WebKit/Chromium) stay unobtrusive. */
+:root[data-theme="obsidian"] .account-workspace ::-webkit-scrollbar{width:8px;height:8px}
+:root[data-theme="obsidian"] .account-workspace ::-webkit-scrollbar-thumb{background:var(--lux-line-strong);border-radius:8px}
+
+@media(prefers-reduced-motion:no-preference){:root[data-theme="obsidian"] .account-workspace :is(.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a,.button,.settings-main .mobile-settings-menu>a){transition:background-color .14s ease,border-color .14s ease,color .14s ease}}
+@media(prefers-reduced-transparency:reduce){:root[data-theme="obsidian"] .account-workspace .pro-mobile-nav{background:var(--lux-canvas);backdrop-filter:none;-webkit-backdrop-filter:none}}

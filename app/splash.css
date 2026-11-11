@@ -13,7 +13,7 @@
 .siro-splash-stage { display: grid; justify-items: center; gap: 14px; animation: siro-splash-rise .7s cubic-bezier(.2,.7,.2,1) both; }
 .siro-splash-flag { width: 84px; height: 56px; filter: drop-shadow(0 14px 28px #0009); }
 .siro-splash-wordmark { margin: 10px 0 0; font-size: 2rem; font-weight: 700; letter-spacing: .01em; line-height: 1.1; }
-.siro-splash-wordmark span { color: #a5f3fc; }
+.siro-splash-wordmark span { color: #E6D9BE; }
 .siro-splash-arabic { margin: 0; font-family: 'Noto Sans Arabic Variable', system-ui, sans-serif; font-size: 1.05rem; font-weight: 500; color: #d4d4d8; letter-spacing: .02em; }
 .siro-splash-line { width: 168px; height: 2px; margin-top: 18px; border-radius: 2px; background: #ffffff14; overflow: hidden; }
 .siro-splash-line i { display: block; width: 40%; height: 100%; border-radius: 2px;

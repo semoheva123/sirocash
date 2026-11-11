@@ -25,7 +25,7 @@
     "test:routing": "node tests/account-routing.mjs",
     "test:settings": "tsx tests/account-settings.tsx && tsx tests/settings-drilldown-css.tsx && tsx tests/identity-review-navigation.tsx && tsx tests/identity-review-workspace.tsx",
     "test:password-change": "tsx tests/change-password.ts",
-    "test:design": "tsx tests/design-system.tsx",
+    "test:design": "tsx tests/design-system.tsx && tsx tests/luxury-system.ts",
     "test:account-security": "tsx tests/account-security.ts",
     "ops:reconcile": "tsx scripts/reconcile-settlement.ts",
     "test:reconciliation": "tsx tests/reconciliation.ts",
