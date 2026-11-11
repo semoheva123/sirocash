@@ -29,3 +29,21 @@ Browser fixtures, bundles, screenshots and tools are ignored scratch files under
 
 ## Service guidance theme regression correction
 The first visual matrix omitted the shared ServiceBrief on private service routes. A mobile production screenshot exposed a legacy white background plus low-contrast inherited text and an icon halo. Explicit Obsidian overrides now cover the shared guidance header, rows, labels, values, notes, private page heading and unavailable-service icon/surface across deposit, withdrawal, Sham Cash and mobile top-up. Isolated real ServiceBrief fixtures were checked at 320/390/768/1440px, Arabic/English: 32 layouts without overflow and 32 axe scans without violations. This is visual component evidence, not a production authenticated transaction test. The existing unit suite now checks the shared component and explicit service theme selectors.
+
+## Luxury system, phase 1 (2026-11-12)
+
+Owner direction: the whole app on one unified system, charcoal with a quiet champagne accent, executed directly.
+- `app/luxury-system.css` (loaded last) defines the tokens (`--lux-*`: canvas/surfaces/hairlines, text tiers,
+  champagne accent with dark ink, silver secondary, state colours) and applies one treatment to the primitives
+  every private screen shares: card surface with hairline + one-pixel inner highlight, balance card framed by
+  the accent, champagne primary buttons / hairline secondary, 44 px icon tiles, uppercase tracked eyebrows in
+  champagne, tabular numerals, settings rows with silver icons and champagne group titles, hairline inputs with
+  champagne focus, bottom navigation with champagne current item and send tile, sheets/dialogs on the same surface.
+- `app/obsidian.css` and `app/deposit.css`: the cyan primary (#67e8f9/#22d3ee/#a5f3fc) and violet network accents
+  (#8b5cf6/#a78bfa/#c4b5fd) are remapped to champagne (#D6C5A2/#C9B48A/#E6D9BE) and silver (#9094A3/#B9BCC8/#D4D6DE),
+  alpha suffixes preserved, so no screen keeps the old palette.
+- Brand assets follow: in-page splash and the 42 iOS launch screens render "Siro" in champagne (#E6D9BE).
+- Guard: `tests/luxury-system.ts` (in `test:design`) — layer order, tokens, no cyan/violet remnants, no multi-stop
+  gradients, reduced-motion/transparency fallbacks, launch assets aligned.
+- Not in this phase: the public landing (`globals.css` mint accents) and screen-specific layout work; those follow
+  per screen after the owner reviews phase 1 on his device.

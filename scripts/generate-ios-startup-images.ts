@@ -30,7 +30,7 @@ export function launchScreenSvg(w:number,h:number){
  <rect width="${w}" height="${h}" fill="url(#glow)"/>
  <rect x="${tileX}" y="${tileY}" width="${tile}" height="${tile}" rx="${tileR}" fill="url(#tile)" stroke="#FFFFFF" stroke-opacity=".12" stroke-width="${Math.max(1,L*0.003)}"/>
  ${glyph}
- <text x="${cx}" y="${wordY}" text-anchor="middle" font-family="Manrope, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="${wordSize}" fill="#F4F4F5" letter-spacing="${wordSize*0.01}"><tspan fill="#A5F3FC">Siro</tspan>Cash</text>
+ <text x="${cx}" y="${wordY}" text-anchor="middle" font-family="Manrope, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="${wordSize}" fill="#F4F4F5" letter-spacing="${wordSize*0.01}"><tspan fill="#E6D9BE">Siro</tspan>Cash</text>
  <g clip-path="url(#flag)">
   <rect x="${flagX}" y="${flagY}" width="${flagW}" height="${band+0.5}" fill="#007A3D"/>
   <rect x="${flagX}" y="${flagY+band}" width="${flagW}" height="${band+0.5}" fill="#FFFFFF"/>
