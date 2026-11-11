@@ -13,6 +13,10 @@ async function main(){
   const css=await readFile(file,'utf8');
   assert(!/#(67e8f9|22d3ee|a5f3fc|8b5cf6|a78bfa|c4b5fd|06b6d4|0891b2)/i.test(css),file+': cyan/violet accents must not remain');
  }
+ // Lists stay lists: no card-in-card on the home feed/ledger, and transfer parties are not boxed surfaces.
+ assert(!/\.receipt-money-details,\.transfer-parties\)/.test(lux),'transfer parties must not be in the surface list');
+ assert(lux.includes(':is(.mobile-recent,.wallet-feed-ledger) .wallet-transaction-card{background:transparent;border:0;box-shadow:none'),'home recent/ledger rows are flat');
+ assert(lux.includes('.wallet-transaction-parties .transfer-parties{margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr'),'parties render as an aligned two-column line');
  const generator=await readFile('scripts/generate-ios-startup-images.ts','utf8');
  assert(generator.includes('#E6D9BE')&&!/#a5f3fc/i.test(generator),'launch screens use the champagne wordmark');
  assert((await readFile('app/splash.css','utf8')).includes('color: #E6D9BE'),'in-page splash wordmark matches');
