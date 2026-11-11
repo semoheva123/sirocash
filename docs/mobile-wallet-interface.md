@@ -57,3 +57,14 @@ Latest local validation: full `npm test` PASS; Next.js webpack production compil
 PASS. No live financial action, production configuration change or deployment was
 performed as part of this interface work. Browser/device visual acceptance remains
 separate from mocked DOM tests and compilation.
+
+## Settings drill-down correction (2026-11-12)
+
+Owner report: tapping a settings row left the screen wherever the long menu had been scrolled, and
+two screens opened with other content above the tapped item. Fixes in `components/account-settings.tsx`
+and `app/mobile-wallet.css`: every view change (row tap and back) scrolls to the top and moves focus to
+the opened screen; "Change password" now opens with the password form first (sign-in facts follow);
+"Sessions & security activity" opens with the sessions panels first (sign-out card follows); every
+menu row carries a direction-aware chevron and a pressed state; a 180 ms enter transition is disabled
+under reduced motion. No settings capability, endpoint or copy about availability changed.
+Test: `tests/account-settings.tsx` (drill-down contract).
