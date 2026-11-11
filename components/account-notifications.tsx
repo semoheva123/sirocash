@@ -1,7 +1,7 @@
 'use client';
 import {clientRequest} from '@/lib/client-request';
 import Link from 'next/link';
-import {Bell,Check} from 'lucide-react';
+import {Bell,Check,Settings2,X} from 'lucide-react';
 import {createContext,useContext,useEffect,useRef,useState} from 'react';
 import {createFinancialStream,type SyncState} from '@/lib/financial-stream-client';
 import {useAccountLanguage} from './account-language';
@@ -33,8 +33,10 @@ export function NotificationsPage(){
  const readLock=useRef(false);
  const [readConfirmed,setReadConfirmed]=useState(false);
  const t=(a:string,e:string)=>ar?a:e;
+ /** Close returns to where the bell was tapped; a direct open (no in-app history) goes to the wallet home. */
+ function closeNotifications(){const inApp=window.history.length>1&&document.referrer.startsWith(window.location.origin);if(inApp)window.history.back();else window.location.assign('/dashboard')}
  async function read(id:string){if(readLock.current)return;readLock.current=true;setReadConfirmed(false);setBusy(id);setError(false);try{const r=await clientRequest('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});if(!r.ok)throw Error();setReadConfirmed(true);await data?.refresh()}catch{setError(true)}finally{readLock.current=false;setBusy(null)}}
- return <main id="main-content" className="notifications-page" dir={ar?'rtl':'ltr'}><header><h1>{t('الإشعارات','Notifications')}</h1><Link prefetch={false} href="/settings">{t('الإعدادات','Settings')}</Link></header>
+ return <main id="main-content" className="notifications-page" dir={ar?'rtl':'ltr'}><header><button type="button" className="notifications-close" aria-label={t('إغلاق الإشعارات','Close notifications')} onClick={closeNotifications}><X size={20}/></button><h1>{t('الإشعارات','Notifications')}</h1><Link prefetch={false} href="/settings" aria-label={t('الإعدادات','Settings')} title={t('الإعدادات','Settings')}><Settings2 size={20}/></Link></header>
   {data?.sync!=='current'&&<p role="status">{t(data?.sync==='syncing'?'جارٍ تحميل الإشعارات…':'تعذّر تحديث الإشعارات.',data?.sync==='syncing'?'Loading notifications…':'Could not update notifications.')}{data?.sync!=='syncing'&&<button onClick={()=>void data?.refresh().catch(()=>setError(true))}>{t('إعادة المحاولة','Retry')}</button>}</p>}
   {data?.inbox&&(data.inbox.notifications.length?<ul>{data.inbox.notifications.map(n=>{
    const href=n.kind.startsWith('SUPPORT_')?(n.staff?'/operations/support':'/settings/support')+'?ticket='+encodeURIComponent(n.reference):n.kind.startsWith('SECURITY_')?'/settings#active-sessions':n.kind==='DEPOSIT_OBSERVED'?'/transactions/deposits/'+encodeURIComponent(n.reference):(n.kind.startsWith('OPERATION_')||n.kind==='TRANSFER_RECEIVED')?'/transactions/operation/'+encodeURIComponent(n.reference):'/activity';

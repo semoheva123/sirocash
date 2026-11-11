@@ -68,3 +68,14 @@ the opened screen; "Change password" now opens with the password form first (sig
 menu row carries a direction-aware chevron and a pressed state; a 180 ms enter transition is disabled
 under reduced motion. No settings capability, endpoint or copy about availability changed.
 Test: `tests/account-settings.tsx` (drill-down contract).
+
+### Correction after the owner's screenshot (2026-11-12, same day)
+
+The screenshot showed the opened "Sessions & activity" title with the whole settings menu still
+under it. Cause: the themed menu rule `:root[data-theme="obsidian"] .account-workspace .mobile-settings-menu
+{display:flex}` outranked the generic hide rule by specificity, so the menu never left and the opened
+section sat below it. Fixed with an equally scoped hide rule for the menu, profile summary and sign-out
+row. `tests/settings-drilldown-css.tsx` now computes `display` with the real stylesheets per view and
+fails on the old CSS. The notifications page also gained a close control (returns to the in-app origin
+of the tap, or to the wallet home when opened directly) and a centred title row with the settings link
+as an icon.

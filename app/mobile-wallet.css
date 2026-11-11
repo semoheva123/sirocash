@@ -104,3 +104,5 @@
 .settings-main:not([data-settings-view="menu"]) .settings-grid,.settings-main:not([data-settings-view="menu"])>.app-preferences{animation:settings-view-enter .18s ease-out}
 @keyframes settings-view-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.settings-main .settings-grid,.settings-main>.app-preferences{animation:none!important}}
+/* Opened settings screen: the menu, profile summary and sign-out row must actually leave (the themed menu rule above outranked the generic hide rule, so the menu stayed on screen under the new title). */
+:root[data-theme="obsidian"] .account-workspace .settings-main:not([data-settings-view="menu"])>.mobile-settings-menu,:root[data-theme="obsidian"] .account-workspace .settings-main:not([data-settings-view="menu"])>.settings-profile-summary,:root[data-theme="obsidian"] .account-workspace .settings-main:not([data-settings-view="menu"])>.settings-menu-signout{display:none}
