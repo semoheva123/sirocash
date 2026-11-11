@@ -23,7 +23,7 @@
 :root[data-theme="obsidian"] .account-workspace :is(small,time,.settings-note,.wallet-transaction-copy small,.mobile-recent li small){color:var(--lux-muted)}
 
 /* Surfaces: one card treatment with a hairline and a one-pixel inner highlight. */
-:root[data-theme="obsidian"] .account-workspace :is(.wallet-overview-card,.glass,.card,.settings-card,.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a,.remittance-method-list>button,.send-route-picker>button,.transaction-document,.transaction-loading,.remittance-section,.financial-record-card,.deposit-studio-main,.mobile-settings-menu,.wallet-bottom-sheet,.payment-unknown,.receipt-money-details,.transfer-parties){background:var(--lux-surface);border:1px solid var(--lux-line);box-shadow:var(--lux-shadow)}
+:root[data-theme="obsidian"] .account-workspace :is(.wallet-overview-card,.glass,.card,.settings-card,.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a,.remittance-method-list>button,.send-route-picker>button,.transaction-document,.transaction-loading,.remittance-section,.financial-record-card,.deposit-studio-main,.mobile-settings-menu,.wallet-bottom-sheet,.payment-unknown,.receipt-money-details){background:var(--lux-surface);border:1px solid var(--lux-line);box-shadow:var(--lux-shadow)}
 :root[data-theme="obsidian"] .account-workspace :is(.wallet-overview-card,.glass,.settings-card,.transaction-document,.deposit-studio-main){border-radius:var(--lux-radius-lg)}
 :root[data-theme="obsidian"] .account-workspace :is(.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a,.remittance-method-list>button,.send-route-picker>button,.financial-record-card,.mobile-settings-menu){border-radius:var(--lux-radius)}
 :root[data-theme="obsidian"] .account-workspace :is(.wallet-transaction-card,.wallet-service-grid>a,.sheet-route-list>a):hover{background:var(--lux-surface-2);border-color:var(--lux-line-strong)}
@@ -63,6 +63,27 @@
 :root[data-theme="obsidian"] .account-workspace .wallet-soon{color:var(--lux-muted);border:1px solid var(--lux-line);border-radius:999px;padding:2px 8px;font-size:10px}
 
 /* Lists: quiet rows, signed amounts in state colours. */
+/* Home "recent" and the activity ledger are lists, not stacks of cards: flat rows with hairline separators,
+   and transfer parties as a quiet two-column line aligned with the row text (owner screenshot 2026-11-12). */
+:root[data-theme="obsidian"] .account-workspace :is(.mobile-recent,.wallet-feed-ledger) .wallet-transaction-card{background:transparent;border:0;box-shadow:none;border-radius:0;padding-inline:0}
+:root[data-theme="obsidian"] .account-workspace :is(.mobile-recent,.wallet-feed-ledger) .wallet-transaction-card:hover{background:transparent}
+:root[data-theme="obsidian"] .account-workspace :is(.mobile-recent,.wallet-feed-ledger) .wallet-transaction-list{gap:0}
+:root[data-theme="obsidian"] .account-workspace .mobile-recent .wallet-transaction-card{padding-block:16px;gap:14px}
+:root[data-theme="obsidian"] .account-workspace .mobile-recent .wallet-transaction-symbol{width:40px;height:40px;border-radius:12px}
+:root[data-theme="obsidian"] .account-workspace .mobile-recent .wallet-transaction-copy{gap:4px}
+:root[data-theme="obsidian"] .account-workspace .mobile-recent .wallet-transaction-copy>strong{font-size:13px}
+:root[data-theme="obsidian"] .account-workspace .mobile-recent .wallet-transaction-value{gap:2px}
+:root[data-theme="obsidian"] .account-workspace .mobile-recent .wallet-transaction-value strong{font-size:14px}
+:root[data-theme="obsidian"] .account-workspace .mobile-recent .wallet-transaction-value small{font-size:10px}
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties{padding:0 0 14px;padding-inline-start:54px;margin-top:-6px}
+:root[data-theme="obsidian"] .account-workspace .wallet-feed-ledger .wallet-transaction-parties{padding-inline-start:52px}
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties .transfer-parties{margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;background:transparent;border:0;box-shadow:none;border-radius:0;min-width:0;font-size:11px}
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties .transfer-parties>div{display:grid;gap:2px;min-width:0}
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties .transfer-parties dt{font-size:10px;color:var(--lux-faint);letter-spacing:.02em}
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties .transfer-parties dd{margin:0;display:flex;flex-direction:column;gap:1px;font-size:11px;color:var(--lux-text-2)}
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties .transfer-parties dd>span:first-child{color:var(--lux-text);font-weight:500}
+:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties .transfer-party-uid{font-variant-numeric:tabular-nums;color:var(--lux-muted)}
+@media(max-width:380px){:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties{padding-inline-start:0}:root[data-theme="obsidian"] .account-workspace .wallet-transaction-parties .transfer-parties{grid-template-columns:1fr}}
 :root[data-theme="obsidian"] .account-workspace .wallet-transaction-value strong{color:var(--lux-text)}
 :root[data-theme="obsidian"] .account-workspace .positive{color:var(--lux-success)}
 :root[data-theme="obsidian"] .account-workspace li[data-unread=true]{border-inline-start-color:var(--lux-accent)!important}

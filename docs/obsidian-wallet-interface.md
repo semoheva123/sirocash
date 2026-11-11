@@ -47,3 +47,11 @@ Owner direction: the whole app on one unified system, charcoal with a quiet cham
   gradients, reduced-motion/transparency fallbacks, launch assets aligned.
 - Not in this phase: the public landing (`globals.css` mint accents) and screen-specific layout work; those follow
   per screen after the owner reviews phase 1 on his device.
+
+### Phase 1 correction — lists are lists (2026-11-12, owner screenshot)
+
+The shared card treatment had reached the home "recent transactions" rows (card-in-card, more height) and
+the transfer-parties `<dl>` (a detached box offset under the row). `app/luxury-system.css` now keeps
+`.mobile-recent` and `.wallet-feed-ledger` rows flat with hairline separators, tightens the compact row,
+and renders transfer parties as a quiet two-column line (label / name / UID) aligned with the row text.
+`tests/luxury-system.ts` guards both.
