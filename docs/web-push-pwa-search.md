@@ -33,3 +33,16 @@ tricolour progress line; no account data, no network, no frame loop, no storage.
 least 700 ms after hydration, leaves once `load` fires (hard cap 3.2 s), honours
 `prefers-reduced-motion`, and a CSS-only 4 s expiry releases the page even without JavaScript.
 Client-side navigations never remount it. Covered by `tests/app-splash.tsx` (`npm run test:pwa`).
+
+## Native launch screens for iOS home-screen installs (2026-11-11)
+
+iOS ignores the manifest for launch screens and shows a bare window until the page paints,
+unless the page declares `apple-touch-startup-image` links whose `media` query matches the
+device exactly. `lib/ios-startup-images.ts` holds the device table (21 classes, both
+orientations → 42 screens) and feeds `appleWebApp.startupImage` in `app/layout.tsx`;
+`scripts/generate-ios-startup-images.ts` renders the PNGs in `public/splash/ios/` from one
+vector composition (obsidian background, transfer glyph tile, wordmark, Syrian flag). The
+screens are captured by iOS when the user adds the app to the home screen, so an existing
+install must be removed and re-added once. Android/Chrome already builds its native splash
+from the manifest (icon + name on `background_color`); desktop PWAs have no native splash,
+so the in-page launch screen is the only option there. Test: `tests/ios-startup-images.ts`.
