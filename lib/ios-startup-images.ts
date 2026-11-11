@@ -29,8 +29,9 @@ export function startupImageFile(d:StartupDevice,orientation:'portrait'|'landsca
  const w=orientation==='portrait'?d.width:d.height,h=orientation==='portrait'?d.height:d.width;
  return `/splash/ios/${w*d.ratio}x${h*d.ratio}.png`;
 }
+/** Same shape as pwa-asset-generator's output (no `screen and` prefix), the form most widely verified on real iPhones. */
 export function startupImageMedia(d:StartupDevice,orientation:'portrait'|'landscape'){
- return `screen and (device-width: ${d.width}px) and (device-height: ${d.height}px) and (-webkit-device-pixel-ratio: ${d.ratio}) and (orientation: ${orientation})`;
+ return `(device-width: ${d.width}px) and (device-height: ${d.height}px) and (-webkit-device-pixel-ratio: ${d.ratio}) and (orientation: ${orientation})`;
 }
 /** `appleWebApp.startupImage` entries for Next metadata: every device, both orientations. */
 export function iosStartupImages(){

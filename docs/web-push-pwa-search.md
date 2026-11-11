@@ -46,3 +46,15 @@ screens are captured by iOS when the user adds the app to the home screen, so an
 install must be removed and re-added once. Android/Chrome already builds its native splash
 from the manifest (icon + name on `background_color`); desktop PWAs have no native splash,
 so the in-page launch screen is the only option there. Test: `tests/ios-startup-images.ts`.
+
+### Follow-up: the Apple-prefixed capable tag (2026-11-12)
+
+First device test (iPhone 13 Pro Max, re-added icon) still launched to a black window. Inspecting
+the served HTML showed the 42 links in `<head>` with the right media queries and a 200 for the
+PNGs, but no `<meta name="apple-mobile-web-app-capable" content="yes">`: Next 15+ turns
+`appleWebApp.capable` into `mobile-web-app-capable` only, and iOS does not use startup images
+without the Apple-prefixed tag (vercel/next.js#74524, closed as not planned). The tag is now
+rendered directly in the root layout's `<head>`, and the media queries dropped the `screen and`
+prefix to match the form most widely verified on real iPhones. Still requires remove + re-add of
+the home-screen icon. Reports in that issue also show the feature behaving inconsistently across
+iOS 18/26 devices, so a black first frame on some iPhones can remain outside the page's control.
